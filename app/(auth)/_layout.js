@@ -1,0 +1,13 @@
+
+import { Stack } from 'expo-router';
+
+export default function AuthLayout() {
+  return (
+    <Stack initialRouteName="WelcomeScreen">
+      <Stack.Screen name="WelcomeScreen" options={{ headerShown: false }} />
+      <Stack.Screen name="LoginScreen" options={{ title: 'Connexion' }} />
+      <Stack.Screen name="UserTypeScreen" options={{ headerShown: false }} />
+      <Stack.Screen name="RegisterScreen" options={{ title: 'Inscription' }} />
+    </Stack>
+  );
+}
