@@ -1,8 +1,10 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
-import { ActivityIndicator, Button, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Button, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const RegisterScreen = () => {
   const [firstName, setFirstName] = useState('');
@@ -14,6 +16,7 @@ const RegisterScreen = () => {
 
   const auth = getAuth();
   const db = getFirestore();
+  const storage = getStorage();
   const router = useRouter();
 
   const handleRegister = async () => {
@@ -30,20 +33,67 @@ const RegisterScreen = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
+      // If an image is selected, upload it to Firebase Storage
+      let photoURL = null;
+      if (imageUri) {
+        try {
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          const storageRef = ref(storage, `users/${user.uid}/profile.jpg`);
+          await uploadBytes(storageRef, blob);
+          photoURL = await getDownloadURL(storageRef);
+        } catch (uploadError) {
+          // Continue registration but report upload error
+          setError('Inscription réussie mais échec upload image: ' + uploadError.message);
+        }
+      }
+
       // Store user info in Firestore
-      await setDoc(doc(db, 'users', user.uid), {
+      const userDoc = {
         uid: user.uid,
         firstName,
         lastName,
         email: email.toLowerCase(),
         createdAt: serverTimestamp(),
-      });
+      };
+      if (photoURL) userDoc.photoURL = photoURL;
 
-      // Navigate to another screen or show success message
+      await setDoc(doc(db, 'users', user.uid), userDoc);
+
+      // Success - navigate to main app
+      router.replace('/');
     } catch (error) {
-      setError(error.message);
+      // Provide clear error origin
+      const msg = error?.code ? `${error.code} - ${error.message}` : error.message || String(error);
+      setError('Erreur lors de l\'inscription : ' + msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Image picker
+  const [imageUri, setImageUri] = useState(null);
+
+  const pickImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission requise', 'Autorisez l\'accès aux images pour choisir une photo de profil.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      setError('Erreur ouverture sélection images: ' + (err.message || String(err)));
     }
   };
 
@@ -65,6 +115,8 @@ const RegisterScreen = () => {
             style={styles.input}
             placeholder="Dupont"
             placeholderTextColor="#999"
+            value={lastName}
+            onChangeText={setLastName}
             autoCapitalize="words"
           />
 
@@ -73,6 +125,8 @@ const RegisterScreen = () => {
             style={styles.input}
             placeholder="Maya"
             placeholderTextColor="#999"
+            value={firstName}
+            onChangeText={setFirstName}
             autoCapitalize="words"
           />
 
@@ -98,10 +152,14 @@ const RegisterScreen = () => {
           />
 
           <Text style={styles.label}>Photo de profil</Text>
-          <TouchableOpacity style={styles.photoContainer}>
-            <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoIcon}>✎</Text>
-            </View>
+          <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.photoPlaceholder} />
+            ) : (
+              <View style={styles.photoPlaceholder}>
+                <Text style={styles.photoIcon}>✎</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
       {loading ? (
