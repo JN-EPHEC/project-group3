@@ -66,7 +66,7 @@ export default function HomeScreen() {
 
       fetchData();
     } else {
-      router.replace('/(auth)/LoginScreen');
+      router.replace('/(auth)/WelcomeScreen');
     }
   }, [router]);
 
