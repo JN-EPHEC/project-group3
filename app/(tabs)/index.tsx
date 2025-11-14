@@ -1,4 +1,3 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
@@ -111,15 +110,23 @@ export default function HomeScreen() {
             <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Actions rapides</Text>
             <View style={styles.quickActionsRow}>
               <TouchableOpacity style={styles.quickCard}>
-                <View style={[styles.iconCircle, { backgroundColor: '#87CEEB' }]}>
-                  <IconSymbol name="plus" size={24} color="#fff" />
+                <View style={styles.iconCircle}>
+                  <Image 
+                    source={require('../../ImageAndLogo/newevent.png')}
+                    style={{ width: 50, height: 50 }}
+                    resizeMode="contain"
+                  />
                 </View>
                 <Text style={styles.quickCardText}>Nouvel évènement</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.quickCard}>
-                <View style={[styles.iconCircle, { backgroundColor: '#87CEEB' }]}>
-                  <IconSymbol name="message" size={24} color="#fff" />
+                <View style={styles.iconCircle}>
+                  <Image 
+                    source={require('../../ImageAndLogo/newmessage.png')}
+                    style={{ width: 50, height: 50 }}
+                    resizeMode="contain"
+                  />
                 </View>
                 <Text style={styles.quickCardText}>Nouveau message</Text>
               </TouchableOpacity>
