@@ -1,10 +1,10 @@
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { auth, db } from '../../constants/firebase';
+import { auth, db, getUserFamily } from '../../constants/firebase';
 
 export default function AgendaScreen() {
   const router = useRouter();
@@ -15,6 +15,53 @@ export default function AgendaScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const colorScheme = useColorScheme();
+
+  const fetchEvents = useCallback(async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const uid = currentUser.uid;
+    try {
+      console.log('=== FETCHING EVENTS IN AGENDA ===');
+      const userFamily = await getUserFamily(uid);
+      console.log('User family:', userFamily);
+      
+      if (userFamily?.id) {
+        console.log('Querying events with familyId:', userFamily.id);
+        const eventsQuery = query(
+          collection(db, 'events'),
+          where('familyId', '==', userFamily.id),
+          orderBy('date', 'asc')
+        );
+        const eventsSnapshot = await getDocs(eventsQuery);
+        console.log('Events found:', eventsSnapshot.docs.length);
+        const fetchedEvents = eventsSnapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data() 
+        }));
+        console.log('Events data:', fetchedEvents);
+        setEvents(fetchedEvents);
+      } else {
+        console.log('No family found, querying by userID');
+        const eventsQuery = query(
+          collection(db, 'events'),
+          where('userID', '==', uid),
+          orderBy('date', 'asc')
+        );
+        const eventsSnapshot = await getDocs(eventsQuery);
+        console.log('Events found by userID:', eventsSnapshot.docs.length);
+        setEvents(eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    } catch (error) {
+      console.error("Error fetching events:", error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvents();
+    }, [fetchEvents])
+  );
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -30,14 +77,7 @@ export default function AgendaScreen() {
             setFirstName(userDocSnap.data().firstName || 'Utilisateur');
           }
 
-          const eventsQuery = query(
-            collection(db, 'events'),
-            where('userID', '==', uid),
-            orderBy('date', 'asc')
-          );
-          const eventsSnapshot = await getDocs(eventsQuery);
-          setEvents(eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
+          await fetchEvents();
         } catch (error) {
           console.error("Error fetching data:", error);
         } finally {
@@ -49,7 +89,7 @@ export default function AgendaScreen() {
     } else {
       router.replace('/(auth)/WelcomeScreen');
     }
-  }, [router]);
+  }, [router, fetchEvents]);
 
   const getDaysInMonth = () => {
     const year = currentMonth.getFullYear();
@@ -138,12 +178,16 @@ export default function AgendaScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Agenda partagé</Text>
             <View style={styles.headerButtons}>
-              <TouchableOpacity style={styles.todayButton} onPress={goToToday}>
-                <Text style={styles.todayButtonText}>Aujourd'hui</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.addButton}>
-                <Text style={styles.addButtonText}>+</Text>
-              </TouchableOpacity>
+              <View style={styles.todayButton}>
+                <TouchableOpacity onPress={goToToday}>
+                  <Text style={styles.todayButtonText}>Aujourd'hui</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                  router.push('/create-event');
+                }}>
+                  <Text style={styles.addButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
@@ -207,12 +251,16 @@ export default function AgendaScreen() {
             
             {selectedDateEvents.length > 0 ? (
               selectedDateEvents.map((event: any) => (
-                <View key={event.id} style={styles.eventCard}>
+                <TouchableOpacity 
+                  key={event.id} 
+                  style={styles.eventCard}
+                  onPress={() => router.push(`/event-details?eventId=${event.id}`)}
+                >
                   <Text style={styles.eventTitle}>{event.title}</Text>
                   <Text style={styles.eventTime}>
                     {event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))
             ) : (
               <Text style={styles.noEventsText}>Aucun évènement à ce jour</Text>
@@ -257,7 +305,6 @@ const styles = StyleSheet.create({
   },
   headerButtons: {
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'center',
   },
   todayButton: {
@@ -265,24 +312,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   todayButtonText: {
     color: '#87CEEB',
     fontSize: 14,
     fontWeight: '600',
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#87CEEB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   addButtonText: {
     fontSize: 24,
-    color: '#fff',
+    color: '#87CEEB',
     fontWeight: '300',
+    lineHeight: 24,
   },
   calendarContainer: {
     backgroundColor: '#fff',
@@ -367,7 +410,7 @@ const styles = StyleSheet.create({
   eventsSectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111',
+    color: '#666',
     marginBottom: 16,
     textTransform: 'capitalize',
   },
