@@ -1,18 +1,17 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
 
 export default function DepensesScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [firstName, setFirstName] = useState('');
-  const [expenses, setExpenses] = useState([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [myShare, setMyShare] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -75,18 +74,7 @@ export default function DepensesScreen() {
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>Dépenses</Text>
-              <Text style={styles.name}>{firstName}</Text>
-            </View>
-
-            <TouchableOpacity onPress={() => router.push('/(tabs)')}>
-              <Image 
-                source={require('../../ImageAndLogo/LogoWeKid.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
+            <Text style={styles.title}>Dépenses</Text>
           </View>
 
           {/* Summary Cards */}
@@ -165,20 +153,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  greeting: {
-    fontSize: 14,
-    color: '#9AA6B2',
-  },
-  name: {
+  title: {
     fontSize: 34,
     fontWeight: '800',
     color: '#111',
     marginTop: 4,
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 100,
   },
   summarySection: {
     flexDirection: 'row',

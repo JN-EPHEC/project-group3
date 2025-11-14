@@ -95,14 +95,6 @@ export default function HomeScreen() {
               <Text style={styles.greeting}>Bonjour,</Text>
               <Text style={styles.name}>{firstName || 'Maya'}</Text>
             </View>
-
-            <TouchableOpacity onPress={() => router.push('/(tabs)')}>
-              <Image 
-                source={require('../../ImageAndLogo/LogoWeKid.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
           </View>
 
           {/* Quick Actions */}
@@ -201,9 +193,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 24,
   },
   greeting: {
@@ -215,11 +204,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#111',
     marginTop: 4,
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 100,
   },
   section: {
     marginBottom: 28,
@@ -236,28 +220,28 @@ const styles = StyleSheet.create({
   quickCard: {
     flex: 1,
     backgroundColor: '#E8E8E8',
-    borderRadius: 20,
-    paddingVertical: 20,
+    borderRadius: 16,
+    paddingVertical: 16,
     paddingHorizontal: 12,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
   },
   iconCircle: {
-    width: 50,
-    height: 50,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   quickCardText: {
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#000',
-    fontSize: 16,
+    fontSize: 14,
   },
   rowCard: {
     backgroundColor: '#E8E8E8',

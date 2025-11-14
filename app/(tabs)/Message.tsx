@@ -1,18 +1,17 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
 
 export default function MessageScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [firstName, setFirstName] = useState('');
-  const [conversations, setConversations] = useState([]);
+  const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const colorScheme = useColorScheme();
 
@@ -67,18 +66,7 @@ export default function MessageScreen() {
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>Messages</Text>
-              <Text style={styles.name}>{firstName}</Text>
-            </View>
-
-            <TouchableOpacity onPress={() => router.push('/(tabs)')}>
-              <Image 
-                source={require('../../ImageAndLogo/LogoWeKid.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
+            <Text style={styles.title}>Messages</Text>
           </View>
 
           {/* New Message Button */}
@@ -171,6 +159,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
+  },
+  title: {
+    fontSize: 34,
+    fontWeight: '800',
+    color: '#111',
+    marginTop: 4,
   },
   greeting: {
     fontSize: 14,

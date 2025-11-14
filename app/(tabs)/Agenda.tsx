@@ -1,21 +1,20 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
 
 export default function AgendaScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [firstName, setFirstName] = useState('');
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const colorScheme = useColorScheme();
-  const tintColor = Colors[colorScheme ?? 'light'].tint;
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -48,9 +47,74 @@ export default function AgendaScreen() {
 
       fetchData();
     } else {
-      router.replace('/(auth)/LoginScreen');
+      router.replace('/(auth)/WelcomeScreen');
     }
   }, [router]);
+
+  const getDaysInMonth = () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days = [];
+    
+    // Previous month days
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      const prevMonthDay = new Date(year, month, -startingDayOfWeek + i + 1);
+      days.push({ date: prevMonthDay, isCurrentMonth: false });
+    }
+    
+    // Current month days
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({ date: new Date(year, month, i), isCurrentMonth: true });
+    }
+    
+    // Next month days to fill the grid
+    const remainingDays = 42 - days.length;
+    for (let i = 1; i <= remainingDays; i++) {
+      days.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
+    }
+    
+    return days;
+  };
+
+  const changeMonth = (offset: number) => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+  };
+
+  const goToToday = () => {
+    const today = new Date();
+    setCurrentMonth(today);
+    setSelectedDate(today);
+  };
+
+  const getEventsForSelectedDate = () => {
+    return events.filter((event: any) => {
+      if (!event.date?.toDate) return false;
+      const eventDate = event.date.toDate();
+      return (
+        eventDate.getDate() === selectedDate.getDate() &&
+        eventDate.getMonth() === selectedDate.getMonth() &&
+        eventDate.getFullYear() === selectedDate.getFullYear()
+      );
+    });
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
+
+  const isSelected = (date: Date) => {
+    return date.getDate() === selectedDate.getDate() &&
+           date.getMonth() === selectedDate.getMonth() &&
+           date.getFullYear() === selectedDate.getFullYear();
+  };
 
   if (loading) {
     return (
@@ -62,60 +126,96 @@ export default function AgendaScreen() {
     );
   }
 
+  const days = getDaysInMonth();
+  const weekDays = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+  const selectedDateEvents = getEventsForSelectedDate();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>Agenda</Text>
-              <Text style={styles.name}>{firstName || 'Maya'}</Text>
+            <Text style={styles.title}>Agenda partagé</Text>
+            <View style={styles.headerButtons}>
+              <TouchableOpacity style={styles.todayButton} onPress={goToToday}>
+                <Text style={styles.todayButtonText}>Aujourd'hui</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addButton}>
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Calendar */}
+          <View style={styles.calendarContainer}>
+            {/* Month Navigation */}
+            <View style={styles.monthHeader}>
+              <TouchableOpacity onPress={() => changeMonth(-1)}>
+                <Text style={styles.navButton}>{'<'}</Text>
+              </TouchableOpacity>
+              <Text style={styles.monthText}>
+                {currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+              </Text>
+              <TouchableOpacity onPress={() => changeMonth(1)}>
+                <Text style={styles.navButton}>{'>'}</Text>
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity onPress={() => router.push('/(tabs)')}>
-              <Image 
-                source={require('../../ImageAndLogo/LogoWeKid.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
-          </View>
+            {/* Week Days */}
+            <View style={styles.weekDaysRow}>
+              {weekDays.map((day) => (
+                <Text key={day} style={styles.weekDayText}>{day}</Text>
+              ))}
+            </View>
 
-          {/* Add Event Button */}
-          <View style={styles.section}>
-            <TouchableOpacity style={styles.addButton}>
-              <IconSymbol name="plus" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>Ajouter un évènement</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Events List */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Tous les évènements</Text>
-            {events.length > 0 ? (
-              events.map((event: any) => (
-                <TouchableOpacity key={event.id} style={styles.eventCard}>
-                  <View style={styles.eventDateCircle}>
-                    <Text style={styles.eventDateText}>
-                      {new Date(event.date?.toDate()).getDate()}
-                    </Text>
-                    <Text style={styles.eventMonthText}>
-                      {new Date(event.date?.toDate()).toLocaleDateString('fr-FR', { month: 'short' })}
-                    </Text>
-                  </View>
-                  <View style={styles.eventDetails}>
-                    <Text style={styles.eventTitle}>{event.title}</Text>
-                    <Text style={styles.eventTime}>
-                      {new Date(event.date?.toDate()).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+            {/* Calendar Grid */}
+            <View style={styles.calendarGrid}>
+              {days.map((day, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.dayCell,
+                    !day.isCurrentMonth && styles.otherMonthDay,
+                  ]}
+                  onPress={() => setSelectedDate(day.date)}
+                >
+                  <View style={[
+                    styles.dayCircle,
+                    isToday(day.date) && styles.todayCircle,
+                    isSelected(day.date) && styles.selectedCircle,
+                  ]}>
+                    <Text style={[
+                      styles.dayText,
+                      !day.isCurrentMonth && styles.otherMonthText,
+                      isToday(day.date) && styles.todayText,
+                      isSelected(day.date) && styles.selectedText,
+                    ]}>
+                      {day.date.getDate()}
                     </Text>
                   </View>
                 </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Selected Date Events */}
+          <View style={styles.eventsSection}>
+            <Text style={styles.eventsSectionTitle}>
+              {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </Text>
+            
+            {selectedDateEvents.length > 0 ? (
+              selectedDateEvents.map((event: any) => (
+                <View key={event.id} style={styles.eventCard}>
+                  <Text style={styles.eventTitle}>{event.title}</Text>
+                  <Text style={styles.eventTime}>
+                    {event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
               ))
             ) : (
-              <View style={styles.rowCard}>
-                <Text style={styles.emptyText}>Aucun évènement programmé</Text>
-              </View>
+              <Text style={styles.noEventsText}>Aucun évènement à ce jour</Text>
             )}
           </View>
 
@@ -150,83 +250,132 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  greeting: {
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#87CEEB',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  todayButton: {
+    backgroundColor: '#E7F7FF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  todayButtonText: {
+    color: '#87CEEB',
     fontSize: 14,
-    color: '#9AA6B2',
-  },
-  name: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: '#111',
-    marginTop: 4,
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 100,
-  },
-  section: {
-    marginBottom: 28,
-  },
-  sectionTitle: {
-    fontSize: 22,
     fontWeight: '600',
-    marginBottom: 16,
   },
   addButton: {
-    backgroundColor: '#87CEEB',
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: '#87CEEB',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
+    alignItems: 'center',
   },
   addButtonText: {
+    fontSize: 24,
     color: '#fff',
-    fontSize: 16,
+    fontWeight: '300',
+  },
+  calendarContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 24,
+  },
+  monthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  navButton: {
+    fontSize: 24,
+    color: '#666',
+    paddingHorizontal: 16,
+  },
+  monthText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111',
+  },
+  weekDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+  },
+  weekDayText: {
+    width: 40,
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '500',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  dayCell: {
+    width: '14.28%',
+    aspectRatio: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 4,
+  },
+  dayCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todayCircle: {
+    backgroundColor: '#E7F7FF',
+  },
+  selectedCircle: {
+    backgroundColor: '#87CEEB',
+  },
+  dayText: {
+    fontSize: 14,
+    color: '#111',
+    fontWeight: '500',
+  },
+  otherMonthDay: {
+    opacity: 0.3,
+  },
+  otherMonthText: {
+    color: '#999',
+  },
+  todayText: {
+    color: '#87CEEB',
     fontWeight: '700',
-    marginLeft: 10,
+  },
+  selectedText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  eventsSection: {
+    marginTop: 8,
+  },
+  eventsSectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 16,
+    textTransform: 'capitalize',
   },
   eventCard: {
     backgroundColor: '#E8E8E8',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  eventDateCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#87CEEB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  eventDateText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  eventMonthText: {
-    fontSize: 12,
-    color: '#fff',
-    textTransform: 'uppercase',
-  },
-  eventDetails: {
-    flex: 1,
   },
   eventTitle: {
     fontSize: 16,
@@ -238,17 +387,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  rowCard: {
-    backgroundColor: '#E8E8E8',
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    minHeight: 60,
-  },
-  emptyText: {
-    color: '#B0B0B0',
+  noEventsText: {
     textAlign: 'center',
+    color: '#999',
     fontSize: 15,
+    marginTop: 24,
   },
 });

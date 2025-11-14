@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Image } from 'react-native';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 
 export default function TabLayout() {
   return (
@@ -38,7 +37,6 @@ export default function TabLayout() {
           ),
         }}
       />
-
       <Tabs.Screen
         name="Agenda"
         options={{
@@ -106,13 +104,6 @@ export default function TabLayout() {
               resizeMode="contain"
             />
           ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="explore"
-        options={{
-          href: null,
         }}
       />
     </Tabs>
