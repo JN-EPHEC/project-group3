@@ -143,6 +143,31 @@ export default function AgendaScreen() {
     });
   };
 
+  const getEventCountForDate = (date: Date) => {
+    const count = events.filter((event: any) => {
+      if (!event.date?.toDate) return false;
+      const eventDate = event.date.toDate();
+      return (
+        eventDate.getDate() === date.getDate() &&
+        eventDate.getMonth() === date.getMonth() &&
+        eventDate.getFullYear() === date.getFullYear()
+      );
+    }).length;
+    return Math.min(count, 3); // Maximum 3 pastilles visibles
+  };
+
+  const hasEventsOnDate = (date: Date) => {
+    return events.some((event: any) => {
+      if (!event.date?.toDate) return false;
+      const eventDate = event.date.toDate();
+      return (
+        eventDate.getDate() === date.getDate() &&
+        eventDate.getMonth() === date.getMonth() &&
+        eventDate.getFullYear() === date.getFullYear()
+      );
+    });
+  };
+
   const isToday = (date: Date) => {
     const today = new Date();
     return date.getDate() === today.getDate() &&
@@ -237,6 +262,19 @@ export default function AgendaScreen() {
                     ]}>
                       {day.date.getDate()}
                     </Text>
+                    {getEventCountForDate(day.date) > 0 && (
+                      <View style={styles.eventDotsContainer}>
+                        {Array.from({ length: getEventCountForDate(day.date) }).map((_, i) => (
+                          <View 
+                            key={i} 
+                            style={[
+                              styles.eventDot,
+                              { backgroundColor: ['#87CEEB', '#FF6B6B', '#4ECDC4'][i] }
+                            ]} 
+                          />
+                        ))}
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -258,7 +296,7 @@ export default function AgendaScreen() {
                 >
                   <Text style={styles.eventTitle}>{event.title}</Text>
                   <Text style={styles.eventTime}>
-                    {event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                   </Text>
                 </TouchableOpacity>
               ))
@@ -378,6 +416,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
   todayCircle: {
     backgroundColor: '#E7F7FF',
@@ -435,5 +474,16 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 15,
     marginTop: 24,
+  },
+  eventDotsContainer: {
+    position: 'absolute',
+    bottom: 2,
+    flexDirection: 'row',
+    gap: 3,
+  },
+  eventDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 });

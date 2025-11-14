@@ -14,6 +14,12 @@ export default function EditEventScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isAllDay, setIsAllDay] = useState(false);
+
+  const [initialTitle, setInitialTitle] = useState('');
+  const [initialDescription, setInitialDescription] = useState('');
+  const [initialDate, setInitialDate] = useState(new Date());
+  const [initialIsAllDay, setInitialIsAllDay] = useState(false);
 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -29,10 +35,18 @@ export default function EditEventScreen() {
         const eventDoc = await getDoc(doc(db, 'events', eventId));
         if (eventDoc.exists()) {
           const eventData = eventDoc.data();
+          const eventDate = eventData.date?.toDate() || new Date();
+          
           setTitle(eventData.title || '');
           setDescription(eventData.description || '');
-          const eventDate = eventData.date?.toDate() || new Date();
+          setIsAllDay(eventData.isAllDay || false);
           setDate(eventDate);
+          
+          setInitialTitle(eventData.title || '');
+          setInitialDescription(eventData.description || '');
+          setInitialDate(eventDate);
+          setInitialIsAllDay(eventData.isAllDay || false);
+          
           setSelectedDay(eventDate.getDate());
           setSelectedMonth(eventDate.getMonth());
           setSelectedYear(eventDate.getFullYear());
@@ -49,6 +63,31 @@ export default function EditEventScreen() {
     fetchEvent();
   }, [eventId]);
 
+  const hasChanges = () => {
+    return (
+      title !== initialTitle ||
+      description !== initialDescription ||
+      isAllDay !== initialIsAllDay ||
+      date.getTime() !== initialDate.getTime()
+    );
+  };
+
+  const handleBack = () => {
+    if (hasChanges()) {
+      Alert.alert(
+        'Modifications non sauvegardées',
+        'Voulez-vous sauvegarder vos modifications avant de quitter ?',
+        [
+          { text: 'Ne pas sauvegarder', style: 'destructive', onPress: () => router.back() },
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Sauvegarder', onPress: handleUpdateEvent }
+        ]
+      );
+    } else {
+      router.back();
+    }
+  };
+
   const handleUpdateEvent = async () => {
     if (!title.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un titre pour l\'événement');
@@ -63,12 +102,12 @@ export default function EditEventScreen() {
         title: title.trim(),
         description: description.trim(),
         date: Timestamp.fromDate(date),
+        isAllDay: isAllDay,
         updatedAt: Timestamp.now(),
       });
 
-      Alert.alert('Succès', 'Événement modifié avec succès', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      // Redirection immédiate sans alert
+      router.replace('/(tabs)/Agenda');
     } catch (error) {
       console.error('Error updating event:', error);
       Alert.alert('Erreur', 'Impossible de modifier l\'événement');
@@ -133,12 +172,21 @@ export default function EditEventScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Heure</Text>
-                <TouchableOpacity style={styles.dateButton} onPress={() => { setSelectedHour(date.getHours()); setSelectedMinute(date.getMinutes()); setShowTimePicker(true); }}>
-                  <Text style={styles.dateButtonText}>{date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
+              <View style={styles.toggleContainer}>
+                <Text style={styles.label}>Toute la journée</Text>
+                <TouchableOpacity style={[styles.toggle, isAllDay && styles.toggleActive]} onPress={() => setIsAllDay(!isAllDay)}>
+                  <View style={[styles.toggleCircle, isAllDay && styles.toggleCircleActive]} />
                 </TouchableOpacity>
               </View>
+
+              {!isAllDay && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Heure</Text>
+                  <TouchableOpacity style={styles.dateButton} onPress={() => { setSelectedHour(date.getHours()); setSelectedMinute(date.getMinutes()); setShowTimePicker(true); }}>
+                    <Text style={styles.dateButtonText}>{date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Description</Text>
@@ -146,11 +194,11 @@ export default function EditEventScreen() {
               </View>
 
               <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.cancelButtonStyle} onPress={() => router.back()}>
+                <TouchableOpacity style={styles.cancelButtonStyle} onPress={handleBack}>
                   <Text style={styles.cancelButtonText}>Annuler</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.updateButtonStyle, saving && styles.disabled]} onPress={handleUpdateEvent} disabled={saving}>
-                  <Text style={styles.updateButtonText}>{saving ? 'Modification...' : 'Modifier'}</Text>
+                <TouchableOpacity style={[styles.updateButtonStyle, (saving || !hasChanges()) && styles.disabled]} onPress={handleUpdateEvent} disabled={saving || !hasChanges()}>
+                  <Text style={styles.updateButtonText}>{saving ? 'Modification...' : 'Confirmer'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -251,6 +299,11 @@ const styles = StyleSheet.create({
   updateButtonStyle: { flex: 1, backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   updateButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
   disabled: { opacity: 0.5 },
+  toggleContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 },
+  toggle: { width: 50, height: 28, borderRadius: 14, backgroundColor: '#E0E0E0', padding: 3, justifyContent: 'center' },
+  toggleActive: { backgroundColor: '#87CEEB' },
+  toggleCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 2 }, shadowRadius: 2, elevation: 2 },
+  toggleCircleActive: { alignSelf: 'flex-end' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' },
   modalTitle: { fontSize: 20, fontWeight: '700', color: '#111', textAlign: 'center', marginBottom: 20 },

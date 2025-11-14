@@ -12,6 +12,7 @@ export default function CreateEventScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isAllDay, setIsAllDay] = useState(false);
 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -44,6 +45,7 @@ export default function CreateEventScreen() {
         title: title.trim(),
         description: description.trim(),
         date: Timestamp.fromDate(date),
+        isAllDay: isAllDay,
         userID: currentUser.uid,
         familyId: family.id,
         createdAt: Timestamp.now(),
@@ -104,12 +106,21 @@ export default function CreateEventScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Heure</Text>
-                <TouchableOpacity style={styles.dateButton} onPress={() => { setSelectedHour(date.getHours()); setSelectedMinute(date.getMinutes()); setShowTimePicker(true); }}>
-                  <Text style={styles.dateButtonText}>{date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
+              <View style={styles.toggleContainer}>
+                <Text style={styles.label}>Toute la journée</Text>
+                <TouchableOpacity style={[styles.toggle, isAllDay && styles.toggleActive]} onPress={() => setIsAllDay(!isAllDay)}>
+                  <View style={[styles.toggleCircle, isAllDay && styles.toggleCircleActive]} />
                 </TouchableOpacity>
               </View>
+
+              {!isAllDay && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Heure</Text>
+                  <TouchableOpacity style={styles.dateButton} onPress={() => { setSelectedHour(date.getHours()); setSelectedMinute(date.getMinutes()); setShowTimePicker(true); }}>
+                    <Text style={styles.dateButtonText}>{date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Description</Text>
@@ -221,6 +232,11 @@ const styles = StyleSheet.create({
   createButtonStyle: { flex: 1, backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
   createButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
   disabled: { opacity: 0.5 },
+  toggleContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginVertical: 8 },
+  toggle: { width: 50, height: 28, borderRadius: 14, backgroundColor: '#E0E0E0', padding: 3, justifyContent: 'center' },
+  toggleActive: { backgroundColor: '#87CEEB' },
+  toggleCircle: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 2 }, shadowRadius: 2, elevation: 2 },
+  toggleCircleActive: { alignSelf: 'flex-end' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' },
   modalTitle: { fontSize: 20, fontWeight: '700', color: '#111', textAlign: 'center', marginBottom: 20 },

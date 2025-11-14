@@ -145,9 +145,14 @@ export default function HomeScreen() {
                   onPress={() => router.push(`/event-details?eventId=${event.id}`)}
                 >
                   <Text style={styles.rowCardText}>{event.title}</Text>
-                  <Text style={styles.rowCardDate}>
-                    {event.date?.toDate().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                  </Text>
+                  <View style={styles.eventMetaRow}>
+                    <Text style={styles.rowCardDate}>
+                      {event.date?.toDate().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                    </Text>
+                    <Text style={styles.eventTime}>
+                      {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))
             ) : (
@@ -202,9 +207,25 @@ const styles = StyleSheet.create({
   iconCircle: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
   quickCardText: { fontWeight: '500', color: '#000', fontSize: 14 },
   rowCard: { backgroundColor: '#E8E8E8', borderRadius: 20, paddingVertical: 20, paddingHorizontal: 20, justifyContent: 'center', marginBottom: 12, minHeight: 60, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 2 },
-  rowCardText: { color: '#666', fontSize: 15 },
-  rowCardDate: { color: '#87CEEB', fontSize: 13, fontWeight: '600', marginTop: 4 },
+  rowCardText: { color: '#666', fontSize: 15, marginBottom: 8 },
+  eventMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  rowCardDate: { color: '#87CEEB', fontSize: 13, fontWeight: '600' },
+  eventTime: {
+    color: '#87CEEB',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   emptyText: { color: '#B0B0B0', textAlign: 'center', fontSize: 15 },
   tipCard: { backgroundColor: '#FFFACD', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 2 },
   tipText: { color: '#000', fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  eventContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
 });
