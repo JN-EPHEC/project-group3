@@ -1,22 +1,22 @@
 import { initializeApp } from 'firebase/app';
 import {
-    createUserWithEmailAndPassword,
-    signOut as fbSignOut,
-    getAuth,
-    signInWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  signOut as fbSignOut,
+  getAuth,
+  signInWithEmailAndPassword
 } from 'firebase/auth';
 import {
-    addDoc,
-    arrayUnion,
-    collection,
-    doc,
-    getDoc,
-    getDocs,
-    getFirestore,
-    query,
-    setDoc,
-    updateDoc,
-    where
+  addDoc,
+  arrayUnion,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  query,
+  setDoc,
+  updateDoc,
+  where
 } from 'firebase/firestore';
 
 const firebaseConfig = {  apiKey: "AIzaSyBBw-uc8UozoUhFI2J8hahWGQLd9s3c7gc",  authDomain: "wekid-test.firebaseapp.com",  projectId: "wekid-test",  storageBucket: "wekid-test.firebasestorage.app",  messagingSenderId: "901894988107",  appId: "1:901894988107:web:d24a57f713ba9e1e9488ce"};
@@ -161,7 +161,14 @@ export async function setUserRoles(uid, rolesArray) {
  * Sign out wrapper.
  */
 export async function signOut() {
-  await fbSignOut(auth);
+  try {
+    console.log('signOut function called');
+    await fbSignOut(auth);
+    console.log('Firebase signOut successful');
+  } catch (error) {
+    console.error('Error in signOut:', error);
+    throw error;
+  }
 }
 
 // Nouveau helper : sign in + indique si l'utilisateur parent doit passer par l'écran "family code".

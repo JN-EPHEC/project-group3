@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily, signOut } from '../../constants/firebase';
 
 export default function ProfilScreen() {
@@ -34,7 +34,7 @@ export default function ProfilScreen() {
 
           const family = await getUserFamily(uid);
           if (family) {
-            setFamilyCode(family.code);
+            setFamilyCode(family.id);
           }
         } catch (error) {
           console.error("Error fetching data:", error);
@@ -50,26 +50,16 @@ export default function ProfilScreen() {
   }, [router]);
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Déconnexion',
-      'Voulez-vous vraiment vous déconnecter ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Déconnexion',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-              router.replace('/(auth)/WelcomeScreen');
-            } catch (error) {
-              console.error('Error signing out:', error);
-              Alert.alert('Erreur', 'Impossible de se déconnecter');
-            }
-          },
-        },
-      ]
-    );
+    console.log('=== handleLogout triggered ===');
+    try {
+      console.log('Calling signOut directly...');
+      await signOut();
+      console.log('SignOut completed, navigating...');
+      router.replace('/(auth)/WelcomeScreen');
+      console.log('Navigation called');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   if (loading) {
@@ -170,7 +160,10 @@ export default function ProfilScreen() {
           </View>
 
           {/* Logout Button */}
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <TouchableOpacity 
+            style={styles.logoutButton} 
+            onPress={handleLogout}
+          >
             <IconSymbol name="arrow.right.square" size={20} color="#fff" />
             <Text style={styles.logoutText}>Se déconnecter</Text>
           </TouchableOpacity>
