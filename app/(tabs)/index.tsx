@@ -113,7 +113,7 @@ export default function HomeScreen() {
                 <View style={styles.iconCircle}>
                   <Image 
                     source={require('../../ImageAndLogo/newevent.png')}
-                    style={{ width: 50, height: 50 }}
+                    style={{ width: 40, height: 40 }}
                     resizeMode="contain"
                   />
                 </View>
@@ -124,7 +124,7 @@ export default function HomeScreen() {
                 <View style={styles.iconCircle}>
                   <Image 
                     source={require('../../ImageAndLogo/newmessage.png')}
-                    style={{ width: 50, height: 50 }}
+                    style={{ width: 40, height: 40 }}
                     resizeMode="contain"
                   />
                 </View>
