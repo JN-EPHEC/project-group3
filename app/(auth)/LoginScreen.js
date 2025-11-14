@@ -17,7 +17,7 @@ const LoginScreen = () => {
     setError('');
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace('/'); // Navigate to the main app screen on successful login
+      router.replace('FamilyCodeScreen'); // Navigate to the main app screen on successful login
     } catch (error) {
       setError(error.message);
     } finally {
