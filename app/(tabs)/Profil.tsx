@@ -49,7 +49,7 @@ export default function ProfilScreen() {
     }
   }, [router]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     Alert.alert(
       'Déconnexion',
       'Voulez-vous vraiment vous déconnecter ?',
@@ -59,8 +59,13 @@ export default function ProfilScreen() {
           text: 'Déconnexion',
           style: 'destructive',
           onPress: async () => {
-            await signOut();
-            router.replace('/(auth)/LoginScreen');
+            try {
+              await signOut();
+              router.replace('/(auth)/WelcomeScreen');
+            } catch (error) {
+              console.error('Error signing out:', error);
+              Alert.alert('Erreur', 'Impossible de se déconnecter');
+            }
           },
         },
       ]
