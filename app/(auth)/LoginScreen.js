@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { db } from '../../constants/firebase';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -16,10 +18,32 @@ const LoginScreen = () => {
     setLoading(true);
     setError('');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.replace('FamilyCodeScreen'); // Navigate to the main app screen on successful login
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Vérifier si l'utilisateur a déjà un familyId
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        
+        if (userData.familyId) {
+          // L'utilisateur a déjà une famille, aller directement à l'accueil
+          console.log('User already has a family, redirecting to home...');
+          router.replace('/(tabs)');
+        } else {
+          // L'utilisateur n'a pas de famille, aller vers FamilyCodeScreen
+          console.log('User has no family, redirecting to FamilyCodeScreen...');
+          router.replace('FamilyCodeScreen');
+        }
+      } else {
+        // Document utilisateur n'existe pas, aller vers FamilyCodeScreen
+        router.replace('FamilyCodeScreen');
+      }
     } catch (error) {
-      setError(error.message);
+      console.error('Login error:', error);
+      setError('Email ou mot de passe incorrect');
     } finally {
       setLoading(false);
     }
