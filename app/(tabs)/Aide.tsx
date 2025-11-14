@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
 
 export default function AideScreen() {
@@ -58,18 +58,7 @@ export default function AideScreen() {
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>Aide & Support</Text>
-              <Text style={styles.name}>{firstName}</Text>
-            </View>
-
-            <TouchableOpacity onPress={() => router.push('/(tabs)')}>
-              <Image 
-                source={require('../../ImageAndLogo/LogoWeKid.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
+            <Text style={styles.title}>Aide</Text>
           </View>
 
           {/* FAQ Section */}
@@ -158,11 +147,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  greeting: {
-    fontSize: 14,
-    color: '#9AA6B2',
-  },
-  name: {
+  title: {
     fontSize: 34,
     fontWeight: '800',
     color: '#111',

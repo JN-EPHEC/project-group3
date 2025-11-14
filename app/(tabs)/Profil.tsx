@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily, signOut } from '../../constants/firebase';
 
 export default function ProfilScreen() {
@@ -82,14 +82,6 @@ export default function ProfilScreen() {
               <Text style={styles.greeting}>Mon Profil</Text>
               <Text style={styles.name}>{firstName}</Text>
             </View>
-
-            <TouchableOpacity onPress={() => router.push('/(tabs)')}>
-              <Image 
-                source={require('../../ImageAndLogo/LogoWeKid.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
           </View>
 
           {/* Profile Avatar */}
@@ -194,9 +186,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 24,
   },
   greeting: {
@@ -208,11 +197,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#111',
     marginTop: 4,
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 100,
   },
   avatarSection: {
     alignItems: 'center',
