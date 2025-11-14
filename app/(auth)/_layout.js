@@ -7,6 +7,7 @@ export default function AuthLayout() {
       <Stack.Screen name="LoginScreen" options={{ title: 'Connexion', headerShown: false }} />
       <Stack.Screen name="UserTypeScreen" options={{ headerShown: false }} />
       <Stack.Screen name="RegisterScreen" options={{ title: 'Inscription', headerShown: false }} />
+      <Stack.Screen name="FamilyCodeScreen" options={{ title: 'Code Familial', headerShown: false }} />
     </Stack>
   );
 }

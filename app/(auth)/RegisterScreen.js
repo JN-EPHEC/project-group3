@@ -61,7 +61,7 @@ const RegisterScreen = () => {
       await setDoc(doc(db, 'users', user.uid), userDoc);
 
       // Success - navigate to main app
-      router.replace('/');
+      router.replace('FamilyCodeScreen');
     } catch (error) {
       // Provide clear error origin
       const msg = error?.code ? `${error.code} - ${error.message}` : error.message || String(error);
