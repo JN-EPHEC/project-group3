@@ -1,30 +1,38 @@
-import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Share } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, createFamilyForUser } from '../../constants/firebase';
 
 export default function CreationFamilyCodeScreen() {
   const router = useRouter();
-  const [familyName, setFamilyName] = useState('');
+  const [uid, setUid] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [familyCode, setFamilyCode] = useState(null);
   const [error, setError] = useState(null);
-  const [generatedCode, setGeneratedCode] = useState(null);
 
-  async function handleCreateFamily() {
+  useEffect(() => {
     const user = auth.currentUser;
     if (!user) {
       router.replace('/(auth)/LoginScreen');
       return;
     }
-    if (!familyName) {
-      setError('Veuillez donner un nom à votre famille.');
+    setUid(user.uid);
+  }, [router]);
+
+  async function handleCreateFamily() {
+    if (!uid) {
+      setError('Utilisateur non connecté.');
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const { code } = await createFamilyForUser(user.uid, familyName);
-      setGeneratedCode(code);
+      const family = await createFamilyForUser(uid);
+      if (family) {
+        setFamilyCode(family.code);
+      } else {
+        setError('Erreur lors de la création de la famille.');
+      }
     } catch (e) {
       setError('Erreur lors de la création de la famille.');
       console.error(e);
@@ -33,37 +41,22 @@ export default function CreationFamilyCodeScreen() {
     }
   }
 
-  async function handleShareCode() {
+  const handleShareCode = async () => {
+    if (!familyCode) return;
+    
     try {
       await Share.share({
-        message: `Rejoignez ma famille sur l'application avec le code : ${generatedCode}`,
+        message: `Rejoins ma famille sur WeKid avec le code : ${familyCode}`,
+        title: 'Code famille WeKid',
       });
     } catch (error) {
-      console.error('Erreur lors du partage du code:', error.message);
+      console.error('Error sharing code:', error);
     }
-  }
+  };
 
-  if (generatedCode) {
-    return (
-      <View style={styles.container}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.replace('/')}
-        >
-          <Text style={styles.backButtonText}>→</Text>
-        </TouchableOpacity>
-        <View style={styles.contentWrapper}>
-          <Text style={styles.title}>Merci !</Text>
-          <Text style={styles.subtitle}>Voici le code pour votre famille !</Text>
-          <Text style={styles.codeText}>{generatedCode}</Text>
-          <Text style={styles.infoText}>Ce code sera actif 2 jours</Text>
-          <TouchableOpacity onPress={handleShareCode} style={styles.shareButton}>
-            <Text style={styles.shareButtonText}>Partager le code</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  const handleGoToHome = () => {
+    router.replace('/(tabs)');
+  };
 
   return (
     <View style={styles.container}>
@@ -73,25 +66,59 @@ export default function CreationFamilyCodeScreen() {
       >
         <Text style={styles.backButtonText}>←</Text>
       </TouchableOpacity>
+
       <View style={styles.contentWrapper}>
-        <Text style={styles.title}>Créer une famille</Text>
-        <Text style={styles.subtitle}>Donnez un nom à votre nouvelle famille.</Text>
+        {!familyCode ? (
+          <>
+            <Text style={styles.title}>Créer une famille</Text>
+            <Text style={styles.subtitle}>
+              Un code unique sera généré pour votre famille. Partagez-le avec vos proches !
+            </Text>
 
-        <View style={styles.formContainer}>
-          <Text style={styles.label}>Nom de la famille</Text>
-          <TextInput
-            value={familyName}
-            onChangeText={setFamilyName}
-            placeholder="Ex: Famille Dupont"
-            style={styles.input}
-          />
-          <TouchableOpacity onPress={handleCreateFamily} disabled={loading} style={styles.createButton}>
-            <Text style={styles.createButtonText}>Créer</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={handleCreateFamily}
+              disabled={loading}
+              style={styles.createButton}
+            >
+              <Text style={styles.createButtonText}>
+                {loading ? 'Création en cours...' : 'Créer ma famille'}
+              </Text>
+            </TouchableOpacity>
 
-        {loading && <ActivityIndicator style={styles.loader} size="large" color="#FFFFFF" />}
-        {error && <Text style={styles.error}>{error}</Text>}
+            {error && <Text style={styles.error}>{error}</Text>}
+          </>
+        ) : (
+          <>
+            <Text style={styles.title}>Famille créée !</Text>
+            <Text style={styles.subtitle}>
+              Votre code famille a été généré avec succès
+            </Text>
+
+            <View style={styles.codeContainer}>
+              <Text style={styles.codeLabel}>Votre code famille</Text>
+              <View style={styles.codeBox}>
+                <Text style={styles.codeText}>{familyCode}</Text>
+              </View>
+              <Text style={styles.codeHint}>
+                Partagez ce code avec les membres de votre famille
+              </Text>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.shareButton}
+              onPress={handleShareCode}
+            >
+              <Text style={styles.shareButtonText}>Partager le code</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.homeButton}
+              onPress={handleGoToHome}
+            >
+              <Text style={styles.homeButtonText}>Accéder à mon espace</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -134,26 +161,6 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     paddingHorizontal: 20,
   },
-  formContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  label: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    alignSelf: 'flex-start',
-    marginLeft: 35,
-    marginBottom: 8,
-  },
-  input: {
-    width: '90%',
-    height: 50,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    fontSize: 16,
-  },
   createButton: {
     width: '90%',
     backgroundColor: '#FFFFFF',
@@ -174,25 +181,43 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  loader: {
-    marginTop: 20,
+  codeContainer: {
+    width: '90%',
+    alignItems: 'center',
+    marginBottom: 30,
   },
-  error: {
-    marginTop: 12,
-    color: 'red',
+  codeLabel: {
     fontSize: 16,
-    textAlign: 'center',
+    color: '#FFFFFF',
+    marginBottom: 16,
+    fontWeight: '600',
+  },
+  codeBox: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 24,
+    paddingHorizontal: 32,
+    borderRadius: 20,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
   codeText: {
-    fontSize: 48,
+    fontSize: 36,
     fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginVertical: 20,
+    color: '#87CEEB',
+    letterSpacing: 4,
   },
-  infoText: {
-    fontSize: 16,
+  codeHint: {
+    fontSize: 14,
     color: '#FFFFFF',
-    marginBottom: 40,
+    textAlign: 'center',
+    opacity: 0.9,
   },
   shareButton: {
     width: '90%',
@@ -200,10 +225,39 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 25,
     alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5
   },
   shareButtonText: {
-    color: '#3B82F6',
+    color: '#000000',
     fontSize: 18,
     fontWeight: '600',
+  },
+  homeButton: {
+    width: '90%',
+    backgroundColor: 'transparent',
+    paddingVertical: 15,
+    borderRadius: 25,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  homeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  error: {
+    marginTop: 12,
+    color: 'red',
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
