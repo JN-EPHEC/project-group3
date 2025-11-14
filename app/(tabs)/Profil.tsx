@@ -34,7 +34,7 @@ export default function ProfilScreen() {
 
           const family = await getUserFamily(uid);
           if (family) {
-            setFamilyCode(family.id);
+            setFamilyCode(family.code);
           }
         } catch (error) {
           console.error("Error fetching data:", error);
