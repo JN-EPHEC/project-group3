@@ -13,6 +13,7 @@ export default function HomeScreen() {
   const [events, setEvents] = useState<Array<{ id: string; [key: string]: any }>>([]);
   const [messages, setMessages] = useState<Array<{ id: string; [key: string]: any }>>([]);
   const [loading, setLoading] = useState(true);
+  const [showAllEvents, setShowAllEvents] = useState(false);
   const colorScheme = useColorScheme();
 
   const fetchEvents = useCallback(async () => {
@@ -34,8 +35,7 @@ export default function HomeScreen() {
         const fetchedEvents = eventsSnapshot.docs
           .map(d => ({ id: d.id, ...(d.data() as any) }))
           .filter((event: any) => event.date?.toDate() >= now)
-          .sort((a: any, b: any) => a.date?.toDate() - b.date?.toDate())
-          .slice(0, 3);
+          .sort((a: any, b: any) => a.date?.toDate() - b.date?.toDate());
         
         setEvents(fetchedEvents);
       }
@@ -105,6 +105,8 @@ export default function HomeScreen() {
     );
   }
 
+  const displayedEvents = showAllEvents ? events : events.slice(0, 2);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.scrollView}>
@@ -121,14 +123,14 @@ export default function HomeScreen() {
             <View style={styles.quickActionsRow}>
               <TouchableOpacity style={styles.quickCard} onPress={() => router.push('/create-event')}>
                 <View style={styles.iconCircle}>
-                  <Image source={require('../../ImageAndLogo/newevent.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
+                  <Image source={require('../../ImageAndLogo/newevent.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
                 </View>
                 <Text style={styles.quickCardText}>Nouvel évènement</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.quickCard}>
                 <View style={styles.iconCircle}>
-                  <Image source={require('../../ImageAndLogo/newmessage.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
+                  <Image source={require('../../ImageAndLogo/newmessage.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
                 </View>
                 <Text style={styles.quickCardText}>Nouveau message</Text>
               </TouchableOpacity>
@@ -137,24 +139,36 @@ export default function HomeScreen() {
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Prochains évènements</Text>
-            {events.length > 0 ? (
-              events.map((event: any) => (
-                <TouchableOpacity 
-                  key={event.id} 
-                  style={styles.rowCard}
-                  onPress={() => router.push(`/event-details?eventId=${event.id}`)}
-                >
-                  <Text style={styles.rowCardText}>{event.title}</Text>
-                  <View style={styles.eventMetaRow}>
-                    <Text style={styles.rowCardDate}>
-                      {event.date?.toDate().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+            {displayedEvents.length > 0 ? (
+              <>
+                {displayedEvents.map((event: any) => (
+                  <TouchableOpacity 
+                    key={event.id} 
+                    style={styles.rowCard}
+                    onPress={() => router.push(`/event-details?eventId=${event.id}`)}
+                  >
+                    <Text style={styles.rowCardText}>{event.title}</Text>
+                    <View style={styles.eventMetaRow}>
+                      <Text style={styles.rowCardDate}>
+                        {event.date?.toDate().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                      </Text>
+                      <Text style={styles.eventTime}>
+                        {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                {events.length > 2 && (
+                  <TouchableOpacity 
+                    style={styles.seeMoreButton}
+                    onPress={() => setShowAllEvents(!showAllEvents)}
+                  >
+                    <Text style={styles.seeMoreText}>
+                      {showAllEvents ? 'Voir moins' : `Voir plus (${events.length - 2} autres)`}
                     </Text>
-                    <Text style={styles.eventTime}>
-                      {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))
+                  </TouchableOpacity>
+                )}
+              </>
             ) : (
               <View style={styles.rowCard}>
                 <Text style={styles.emptyText}>Aucun évènement à venir</Text>
@@ -203,9 +217,32 @@ const styles = StyleSheet.create({
   section: { marginBottom: 28 },
   sectionTitle: { fontSize: 22, fontWeight: '600', marginBottom: 16 },
   quickActionsRow: { flexDirection: 'row', gap: 12 },
-  quickCard: { flex: 1, backgroundColor: '#E8E8E8', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 12, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6, elevation: 2 },
-  iconCircle: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  quickCardText: { fontWeight: '500', color: '#000', fontSize: 14 },
+  quickCard: { 
+    flex: 1, 
+    backgroundColor: '#E8E8E8', 
+    borderRadius: 8, 
+    paddingVertical: 8, 
+    paddingHorizontal: 6, 
+    alignItems: 'center', 
+    shadowColor: '#000', 
+    shadowOpacity: 0.05, 
+    shadowOffset: { width: 0, height: 2 }, 
+    shadowRadius: 6, 
+    elevation: 2 
+  },
+  iconCircle: { 
+    width: 32, 
+    height: 32, 
+    borderRadius: 8, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 6 
+  },
+  quickCardText: { 
+    fontWeight: '500', 
+    color: '#000', 
+    fontSize: 12 
+  },
   rowCard: { backgroundColor: '#E8E8E8', borderRadius: 20, paddingVertical: 20, paddingHorizontal: 20, justifyContent: 'center', marginBottom: 12, minHeight: 60, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 2 },
   rowCardText: { color: '#666', fontSize: 15, marginBottom: 8 },
   eventMetaRow: {
@@ -222,6 +259,19 @@ const styles = StyleSheet.create({
   emptyText: { color: '#B0B0B0', textAlign: 'center', fontSize: 15 },
   tipCard: { backgroundColor: '#FFFACD', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 2 },
   tipText: { color: '#000', fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  seeMoreButton: {
+    backgroundColor: '#E7F7FF',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  seeMoreText: {
+    color: '#87CEEB',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   eventContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
