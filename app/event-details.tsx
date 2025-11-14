@@ -82,7 +82,7 @@ export default function EventDetailsScreen() {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>🕐 Heure</Text>
                 <Text style={styles.infoValue}>
-                  {event.date?.toDate().toLocaleTimeString('fr-FR', { 
+                  {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { 
                     hour: '2-digit', 
                     minute: '2-digit' 
                   })}
