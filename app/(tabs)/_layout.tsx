@@ -100,7 +100,11 @@ export default function TabLayout() {
         options={{
           title: 'Profil',
           tabBarIcon: ({ focused, color, size }) => (
-            <IconSymbol name="person.fill" size={32} color="#87CEEB" />
+            <Image 
+              source={require('../../ImageAndLogo/logoprofil.png')}
+              style={{ width: 32, height: 32 }}
+              resizeMode="contain"
+            />
           ),
         }}
       />
