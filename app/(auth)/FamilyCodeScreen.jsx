@@ -38,7 +38,7 @@ export default function FamilyCodeScreen() {
         setError('Code introuvable. Vérifiez le code et réessayez.');
       } else {
         setMessage('Vous avez rejoint la famille.');
-        router.replace('/');
+        router.replace('/(tabs)');
       }
     } catch (e) {
       setError('Erreur lors de la jonction à la famille.');
