@@ -86,13 +86,13 @@ export default function HomeScreen() {
 
       fetchData();
     } else {
-      router.replace('/(auth)/WelcomeScreen');
+      router.replace('/(auth)/WelcomeScreen' as any);
     }
   }, [router, fetchEvents]);
 
   const handleLogout = async () => {
     await signOut();
-    router.replace('/(auth)/LoginScreen');
+    router.replace('/(auth)/LoginScreen' as any);
   };
 
   if (loading) {
@@ -121,7 +121,7 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Actions rapides</Text>
             <View style={styles.quickActionsRow}>
-              <TouchableOpacity style={styles.quickCard} onPress={() => router.push('/create-event')}>
+              <TouchableOpacity style={styles.quickCard} onPress={() => router.push('../create-event')}>
                 <View style={styles.iconCircle}>
                   <Image source={require('../../ImageAndLogo/newevent.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
                 </View>
@@ -145,7 +145,7 @@ export default function HomeScreen() {
                   <TouchableOpacity 
                     key={event.id} 
                     style={styles.rowCard}
-                    onPress={() => router.push(`/event-details?eventId=${event.id}`)}
+                    onPress={() => router.push({ pathname: '../event-details', params: { eventId: event.id } })}
                   >
                     <Text style={styles.rowCardText}>{event.title}</Text>
                     <View style={styles.eventMetaRow}>

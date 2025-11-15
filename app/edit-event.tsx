@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { db } from '../constants/firebase';
 
@@ -26,6 +26,12 @@ export default function EditEventScreen() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedHour, setSelectedHour] = useState(new Date().getHours());
   const [selectedMinute, setSelectedMinute] = useState(new Date().getMinutes());
+
+  const dayScrollRef = useRef<any>(null);
+  const monthScrollRef = useRef<any>(null);
+  const yearScrollRef = useRef<any>(null);
+  const hourScrollRef = useRef<any>(null);
+  const minuteScrollRef = useRef<any>(null);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -205,26 +211,45 @@ export default function EditEventScreen() {
           </View>
         </ScrollView>
 
-        <Modal visible={showDatePicker} transparent={true} animationType="slide">
+        <Modal visible={showDatePicker} transparent={true} animationType="slide" onShow={() => {
+          setTimeout(() => {
+            const itemHeight = 56;
+            const visibleItems = 3.5;
+            const centerOffset = (itemHeight * visibleItems) / 2 - itemHeight / 2;
+            
+            dayScrollRef.current?.scrollTo({ 
+              y: Math.max(0, (selectedDay - 1) * itemHeight - centerOffset), 
+              animated: true 
+            });
+            monthScrollRef.current?.scrollTo({ 
+              y: Math.max(0, selectedMonth * itemHeight - centerOffset), 
+              animated: true 
+            });
+            yearScrollRef.current?.scrollTo({ 
+              y: Math.max(0, years.indexOf(selectedYear) * itemHeight - centerOffset), 
+              animated: true 
+            });
+          }, 300);
+        }}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Sélectionner une date</Text>
               <View style={styles.pickerRow}>
-                <ScrollView style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                <ScrollView ref={dayScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {days.map((day) => (
                     <TouchableOpacity key={day} style={[styles.pickerItem, selectedDay === day && styles.pickerItemSelected]} onPress={() => setSelectedDay(day)}>
                       <Text style={[styles.pickerText, selectedDay === day && styles.pickerTextSelected]}>{day}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <ScrollView style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                <ScrollView ref={monthScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {months.map((month, index) => (
                     <TouchableOpacity key={index} style={[styles.pickerItem, selectedMonth === index && styles.pickerItemSelected]} onPress={() => setSelectedMonth(index)}>
                       <Text style={[styles.pickerText, selectedMonth === index && styles.pickerTextSelected]}>{month}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <ScrollView style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                <ScrollView ref={yearScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {years.map((year) => (
                     <TouchableOpacity key={year} style={[styles.pickerItem, selectedYear === year && styles.pickerItemSelected]} onPress={() => setSelectedYear(year)}>
                       <Text style={[styles.pickerText, selectedYear === year && styles.pickerTextSelected]}>{year}</Text>
@@ -244,12 +269,27 @@ export default function EditEventScreen() {
           </View>
         </Modal>
 
-        <Modal visible={showTimePicker} transparent={true} animationType="slide">
+        <Modal visible={showTimePicker} transparent={true} animationType="slide" onShow={() => {
+          setTimeout(() => {
+            const itemHeight = 56;
+            const visibleItems = 3.5;
+            const centerOffset = (itemHeight * visibleItems) / 2 - itemHeight / 2;
+            
+            hourScrollRef.current?.scrollTo({ 
+              y: Math.max(0, selectedHour * itemHeight - centerOffset), 
+              animated: true 
+            });
+            minuteScrollRef.current?.scrollTo({ 
+              y: Math.max(0, selectedMinute * itemHeight - centerOffset), 
+              animated: true 
+            });
+          }, 300);
+        }}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Sélectionner l'heure</Text>
               <View style={styles.pickerRow}>
-                <ScrollView style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                <ScrollView ref={hourScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {hours.map((hour) => (
                     <TouchableOpacity key={hour} style={[styles.pickerItem, selectedHour === hour && styles.pickerItemSelected]} onPress={() => setSelectedHour(hour)}>
                       <Text style={[styles.pickerText, selectedHour === hour && styles.pickerTextSelected]}>{hour.toString().padStart(2, '0')}</Text>
@@ -257,7 +297,7 @@ export default function EditEventScreen() {
                   ))}
                 </ScrollView>
                 <Text style={styles.timeSeparator}>:</Text>
-                <ScrollView style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                <ScrollView ref={minuteScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {minutes.map((minute) => (
                     <TouchableOpacity key={minute} style={[styles.pickerItem, selectedMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedMinute(minute)}>
                       <Text style={[styles.pickerText, selectedMinute === minute && styles.pickerTextSelected]}>{minute.toString().padStart(2, '0')}</Text>
