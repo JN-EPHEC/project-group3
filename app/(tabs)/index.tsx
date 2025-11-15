@@ -14,6 +14,7 @@ export default function HomeScreen() {
   const [messages, setMessages] = useState<Array<{ id: string; [key: string]: any }>>([]);
   const [loading, setLoading] = useState(true);
   const [showAllEvents, setShowAllEvents] = useState(false);
+  const [familyMembers, setFamilyMembers] = useState<any[]>([]);
   const colorScheme = useColorScheme();
 
   const fetchEvents = useCallback(async () => {
@@ -66,6 +67,21 @@ export default function HomeScreen() {
 
           await fetchEvents();
 
+          // Récupérer les membres de la famille
+          const userFamily = await getUserFamily(uid);
+          if (userFamily?.id) {
+            const membersQuery = query(
+              collection(db, 'users'),
+              where('familyId', '==', userFamily.id)
+            );
+            const membersSnapshot = await getDocs(membersQuery);
+            const members = membersSnapshot.docs
+              .map(doc => ({ uid: doc.id, ...doc.data() }))
+              .filter((member: any) => member.uid !== uid);
+            
+            setFamilyMembers(members);
+          }
+
           const messagesQuery = query(
             collection(db, 'messages'),
             where('participants', 'array-contains', uid),
@@ -89,6 +105,20 @@ export default function HomeScreen() {
       router.replace('/(auth)/WelcomeScreen' as any);
     }
   }, [router, fetchEvents]);
+
+  const handleNewMessage = () => {
+    if (familyMembers.length === 0) {
+      return;
+    }
+    const otherMember = familyMembers[0];
+    router.push({
+      pathname: '/conversation',
+      params: {
+        otherUserId: otherMember.uid,
+        otherUserName: `${otherMember.firstName} ${otherMember.lastName || ''}`
+      }
+    });
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -130,7 +160,11 @@ export default function HomeScreen() {
                 <Text style={styles.quickCardText}>Nouvel évènement</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.quickCard}>
+              <TouchableOpacity 
+                style={styles.quickCard} 
+                onPress={handleNewMessage}
+                disabled={familyMembers.length === 0}
+              >
                 <View style={styles.iconCircle}>
                   <Image source={require('../../ImageAndLogo/newmessage.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
                 </View>

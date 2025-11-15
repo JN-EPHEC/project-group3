@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
@@ -13,7 +13,9 @@ const RegisterScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [imageUri, setImageUri] = useState(null);
 
+  const { userType } = useLocalSearchParams();
   const auth = getAuth();
   const db = getFirestore();
   const storage = getStorage();
@@ -33,7 +35,6 @@ const RegisterScreen = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // If an image is selected, upload it to Firebase Storage
       let photoURL = null;
       if (imageUri) {
         try {
@@ -43,36 +44,35 @@ const RegisterScreen = () => {
           await uploadBytes(storageRef, blob);
           photoURL = await getDownloadURL(storageRef);
         } catch (uploadError) {
-          // Continue registration but report upload error
           setError('Inscription réussie mais échec upload image: ' + uploadError.message);
         }
       }
 
-      // Store user info in Firestore
       const userDoc = {
         uid: user.uid,
         firstName,
         lastName,
         email: email.toLowerCase(),
+        userType: userType || 'parent',
         createdAt: serverTimestamp(),
       };
       if (photoURL) userDoc.photoURL = photoURL;
 
       await setDoc(doc(db, 'users', user.uid), userDoc);
 
-      // Success - navigate to main app
-      router.replace('FamilyCodeScreen');
+      // Redirection selon le type d'utilisateur
+      if (userType === 'professionnel') {
+        router.replace('/(pro-tabs)');
+      } else {
+        router.replace('FamilyCodeScreen');
+      }
     } catch (error) {
-      // Provide clear error origin
       const msg = error?.code ? `${error.code} - ${error.message}` : error.message || String(error);
       setError('Erreur lors de l\'inscription : ' + msg);
     } finally {
       setLoading(false);
     }
   };
-
-  // Image picker
-  const [imageUri, setImageUri] = useState(null);
 
   const pickImage = async () => {
     try {
