@@ -14,6 +14,7 @@ export default function RootLayout() {
       <Stack initialRouteName="(auth)">
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(pro-tabs)" options={{ headerShown: false, title: '' }} />
         <Stack.Screen name="modal" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />

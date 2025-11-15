@@ -21,24 +21,24 @@ const LoginScreen = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Vérifier si l'utilisateur a déjà un familyId
       const userDocRef = doc(db, 'users', user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
         
-        if (userData.familyId) {
-          // L'utilisateur a déjà une famille, aller directement à l'accueil
+        // Vérifier le type d'utilisateur
+        if (userData.userType === 'professionnel') {
+          console.log('Professional user, redirecting to pro interface...');
+          router.replace('/(pro-tabs)');
+        } else if (userData.familyId) {
           console.log('User already has a family, redirecting to home...');
           router.replace('/(tabs)');
         } else {
-          // L'utilisateur n'a pas de famille, aller vers FamilyCodeScreen
           console.log('User has no family, redirecting to FamilyCodeScreen...');
           router.replace('FamilyCodeScreen');
         }
       } else {
-        // Document utilisateur n'existe pas, aller vers FamilyCodeScreen
         router.replace('FamilyCodeScreen');
       }
     } catch (error) {

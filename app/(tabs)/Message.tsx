@@ -1,11 +1,11 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { auth, db } from '../../constants/firebase';
+import { auth, db, getUserFamily } from '../../constants/firebase';
 
 export default function MessageScreen() {
   const router = useRouter();
@@ -13,7 +13,57 @@ export default function MessageScreen() {
   const [firstName, setFirstName] = useState('');
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [familyMembers, setFamilyMembers] = useState<any[]>([]);
   const colorScheme = useColorScheme();
+
+  const fetchConversations = useCallback(async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const uid = currentUser.uid;
+    try {
+      // Récupérer la famille de l'utilisateur
+      const userFamily = await getUserFamily(uid);
+      
+      if (userFamily?.id) {
+        // Récupérer tous les membres de la famille
+        const membersQuery = query(
+          collection(db, 'users'),
+          where('familyId', '==', userFamily.id)
+        );
+        const membersSnapshot = await getDocs(membersQuery);
+        const members = membersSnapshot.docs
+          .map(doc => ({ uid: doc.id, ...doc.data() }))
+          .filter((member: any) => member.uid !== uid);
+        
+        setFamilyMembers(members);
+
+        // Récupérer les conversations
+        const messagesQuery = query(
+          collection(db, 'conversations'),
+          where('familyId', '==', userFamily.id),
+          where('participants', 'array-contains', uid),
+          orderBy('lastMessageTime', 'desc')
+        );
+        const messagesSnapshot = await getDocs(messagesQuery);
+        
+        const convs = messagesSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        setConversations(convs);
+      }
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchConversations();
+    }, [fetchConversations])
+  );
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -29,14 +79,7 @@ export default function MessageScreen() {
             setFirstName(userDocSnap.data().firstName || 'Utilisateur');
           }
 
-          const messagesQuery = query(
-            collection(db, 'messages'),
-            where('participants', 'array-contains', uid),
-            orderBy('lastMessageTimestamp', 'desc')
-          );
-          const messagesSnapshot = await getDocs(messagesQuery);
-          setConversations(messagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
+          await fetchConversations();
         } catch (error) {
           console.error("Error fetching data:", error);
         } finally {
@@ -48,7 +91,36 @@ export default function MessageScreen() {
     } else {
       router.replace('/(auth)/LoginScreen');
     }
-  }, [router]);
+  }, [router, fetchConversations]);
+
+  const handleNewMessage = () => {
+    if (familyMembers.length === 0) {
+      return;
+    }
+    // S'il n'y a qu'un seul membre, ouvrir directement la conversation
+    const otherMember = familyMembers[0];
+    router.push({
+      pathname: '/conversation',
+      params: {
+        otherUserId: otherMember.uid,
+        otherUserName: `${otherMember.firstName} ${otherMember.lastName || ''}`
+      }
+    });
+  };
+
+  const formatTime = (timestamp: any) => {
+    if (!timestamp?.toDate) return '';
+    const date = timestamp.toDate();
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    
+    if (hours < 24) {
+      return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    }
+  };
 
   if (loading) {
     return (
@@ -62,75 +134,93 @@ export default function MessageScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Messages</Text>
-          </View>
-
-          {/* New Message Button */}
-          <View style={styles.section}>
-            <TouchableOpacity style={styles.newMessageButton}>
-              <IconSymbol name="plus" size={20} color="#fff" />
-              <Text style={styles.newMessageText}>Nouveau message</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Conversations List */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Conversations</Text>
-            {conversations.length > 0 ? (
-              conversations.map((conv: any) => (
-                <TouchableOpacity key={conv.id} style={styles.conversationCard}>
-                  <View style={styles.avatarCircle}>
-                    <IconSymbol name="person.fill" size={24} color="#87CEEB" />
-                  </View>
-                  <View style={styles.conversationDetails}>
-                    <Text style={styles.conversationName}>
-                      {conv.otherParentName || 'Co-parent'}
-                    </Text>
-                    <Text style={styles.lastMessage} numberOfLines={1}>
-                      {conv.lastMessage || 'Aucun message'}
-                    </Text>
-                  </View>
-                  <View style={styles.conversationMeta}>
-                    <Text style={styles.messageTime}>
-                      {conv.lastMessageTimestamp?.toDate ? 
-                        new Date(conv.lastMessageTimestamp.toDate()).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) 
-                        : ''}
-                    </Text>
-                    {conv.unreadCount > 0 && (
-                      <View style={styles.unreadBadge}>
-                        <Text style={styles.unreadText}>{conv.unreadCount}</Text>
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.emptyCard}>
-                <IconSymbol name="message" size={48} color="#B0B0B0" />
-                <Text style={styles.emptyText}>Aucune conversation</Text>
-                <Text style={styles.emptySubtext}>
-                  Commencez une conversation avec votre co-parent
-                </Text>
-              </View>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Messages</Text>
+          <View style={styles.headerButtons}>
+            {familyMembers.length > 0 && (
+              <TouchableOpacity 
+                style={styles.newMessageButton}
+                onPress={handleNewMessage}
+              >
+                <Text style={styles.newMessageButtonText}>Nouveau</Text>
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
             )}
           </View>
+        </View>
 
-          {/* Quick Tips */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Conseils de communication</Text>
-            <View style={styles.tipCard}>
-              <Text style={styles.tipText}>
-                💡 Restez courtois et factuel dans vos échanges. Une bonne communication facilite la co-parentalité.
+        {/* Conversations List */}
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {conversations.length > 0 ? (
+            conversations.map((conv: any) => {
+              const otherParticipant = conv.participants?.find((p: string) => p !== user?.uid);
+              const otherUserData = familyMembers.find((m: any) => m.uid === otherParticipant);
+              
+              return (
+                <TouchableOpacity 
+                  key={conv.id} 
+                  style={styles.conversationCard}
+                  onPress={() => router.push({
+                    pathname: '/conversation',
+                    params: {
+                      conversationId: conv.id,
+                      otherUserId: otherParticipant,
+                      otherUserName: `${otherUserData?.firstName || 'Co-parent'} ${otherUserData?.lastName || ''}`
+                    }
+                  })}
+                >
+                  <View style={styles.avatarCircle}>
+                    <Text style={styles.avatarText}>
+                      {(otherUserData?.firstName?.[0] || 'C').toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.conversationDetails}>
+                    <View style={styles.conversationHeader}>
+                      <Text style={styles.conversationName}>
+                        {otherUserData?.firstName || 'Co-parent'} {otherUserData?.lastName || ''}
+                      </Text>
+                      <Text style={styles.messageTime}>
+                        {formatTime(conv.lastMessageTime)}
+                      </Text>
+                    </View>
+                    <View style={styles.lastMessageContainer}>
+                      {conv.lastMessageType === 'image' ? (
+                        <View style={styles.imageMessagePreview}>
+                          <IconSymbol name="photo" size={16} color="#666" />
+                          <Text style={styles.lastMessage}>Photo</Text>
+                        </View>
+                      ) : (
+                        <Text style={styles.lastMessage} numberOfLines={1}>
+                          {conv.lastMessage || 'Aucun message'}
+                        </Text>
+                      )}
+                      {conv.unreadCount?.[user?.uid || ''] > 0 && (
+                        <View style={styles.unreadBadge}>
+                          <Text style={styles.unreadText}>
+                            {conv.unreadCount[user?.uid || '']}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <View style={styles.emptyCard}>
+              <IconSymbol name="message" size={64} color="#B0B0B0" />
+              <Text style={styles.emptyText}>Aucune conversation</Text>
+              <Text style={styles.emptySubtext}>
+                {familyMembers.length > 0 
+                  ? 'Commencez une conversation avec votre co-parent'
+                  : 'Aucun autre membre dans votre famille'}
               </Text>
             </View>
-          </View>
-
-        </View>
-      </ScrollView>
+          )}
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -140,14 +230,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  scrollView: {
-    flex: 1,
-  },
   container: {
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: 32,
   },
   containerCentered: {
     flex: 1,
@@ -158,119 +244,114 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     color: '#87CEEB',
   },
-  greeting: {
-    fontSize: 14,
-    color: '#9AA6B2',
-  },
-  name: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: '#111',
-    marginTop: 4,
-  },
-  logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 100,
-  },
-  section: {
-    marginBottom: 28,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    marginBottom: 16,
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   newMessageButton: {
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#E7F7FF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
+    gap: 12,
   },
-  newMessageText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: 10,
+  newMessageButtonText: {
+    color: '#87CEEB',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addButtonText: {
+    fontSize: 24,
+    color: '#87CEEB',
+    fontWeight: '300',
+    lineHeight: 24,
+  },
+  scrollView: {
+    flex: 1,
   },
   conversationCard: {
-    backgroundColor: '#E8E8E8',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   avatarCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E7F7FF',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#87CEEB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
+  },
+  avatarText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#fff',
   },
   conversationDetails: {
     flex: 1,
   },
-  conversationName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111',
+  conversationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  lastMessage: {
-    fontSize: 14,
-    color: '#666',
-  },
-  conversationMeta: {
-    alignItems: 'flex-end',
+  conversationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111',
   },
   messageTime: {
     fontSize: 12,
     color: '#999',
-    marginBottom: 6,
+  },
+  lastMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  imageMessagePreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
   },
   unreadBadge: {
     backgroundColor: '#87CEEB',
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
+    marginLeft: 8,
   },
   unreadText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   emptyCard: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 80,
   },
   emptyText: {
     fontSize: 18,
@@ -283,21 +364,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+    paddingHorizontal: 40,
   },
-  tipCard: {
-    backgroundColor: '#FFFACD',
-    borderRadius: 20,
-    padding: 24,
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#87CEEB',
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  tipText: {
-    color: '#000',
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
