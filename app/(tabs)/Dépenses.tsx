@@ -154,10 +154,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: '#111',
-    marginTop: 4,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#87CEEB',
   },
   summarySection: {
     flexDirection: 'row',

@@ -112,10 +112,12 @@ export default function HomeScreen() {
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>Bonjour,</Text>
-              <Text style={styles.name}>{firstName || 'Maya'}</Text>
-            </View>
+            <Text style={styles.title}>Accueil</Text>
+          </View>
+
+          <View style={styles.welcomeSection}>
+            <Text style={styles.greeting}>Bonjour,</Text>
+            <Text style={styles.name}>{firstName || 'Maya'}</Text>
           </View>
 
           <View style={styles.section}>
@@ -211,9 +213,22 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { marginBottom: 24 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#87CEEB',
+  },
+  welcomeSection: {
+    marginBottom: 24,
+  },
   greeting: { fontSize: 14, color: '#9AA6B2' },
-  name: { fontSize: 34, fontWeight: '800', color: '#111', marginTop: 4 },
+  name: { fontSize: 24, fontWeight: '600', color: '#111', marginTop: 4 },
   section: { marginBottom: 28 },
   sectionTitle: { fontSize: 22, fontWeight: '600', marginBottom: 16 },
   quickActionsRow: { flexDirection: 'row', gap: 12 },

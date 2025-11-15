@@ -12,6 +12,7 @@ export default function ProfilScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [familyCode, setFamilyCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,7 @@ export default function ProfilScreen() {
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
             setFirstName(userDocSnap.data().firstName || 'Utilisateur');
+            setLastName(userDocSnap.data().lastName || '');
           }
 
           const family = await getUserFamily(uid);
@@ -78,10 +80,11 @@ export default function ProfilScreen() {
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>Mon Profil</Text>
-              <Text style={styles.name}>{firstName}</Text>
-            </View>
+            <Text style={styles.title}>Profil</Text>
+          </View>
+
+          <View style={styles.userInfoSection}>
+            <Text style={styles.name}>{firstName} {lastName}</Text>
           </View>
 
           {/* Profile Avatar */}
@@ -100,7 +103,7 @@ export default function ProfilScreen() {
                 <IconSymbol name="person" size={20} color="#666" />
                 <View style={styles.infoText}>
                   <Text style={styles.infoLabel}>Nom</Text>
-                  <Text style={styles.infoValue}>{firstName}</Text>
+                  <Text style={styles.infoValue}>{firstName} {lastName}</Text>
                 </View>
               </View>
             </View>
@@ -186,17 +189,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#87CEEB',
+  },
+  userInfoSection: {
     marginBottom: 24,
+  },
+  name: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#111',
   },
   greeting: {
     fontSize: 14,
     color: '#9AA6B2',
-  },
-  name: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: '#111',
-    marginTop: 4,
   },
   avatarSection: {
     alignItems: 'center',
