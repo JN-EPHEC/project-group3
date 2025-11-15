@@ -97,7 +97,10 @@ export default function AgendaScreen() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
+    
+    // Ajuster le jour de début pour commencer par lundi (1) au lieu de dimanche (0)
+    let startingDayOfWeek = firstDay.getDay();
+    startingDayOfWeek = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
 
     const days = [];
     
@@ -192,7 +195,7 @@ export default function AgendaScreen() {
   }
 
   const days = getDaysInMonth();
-  const weekDays = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+  const weekDays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
   const selectedDateEvents = getEventsForSelectedDate();
 
   return (
