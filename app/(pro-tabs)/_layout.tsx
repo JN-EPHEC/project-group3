@@ -75,6 +75,24 @@ export default function ProTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="maps"
+        options={{
+          title: 'Localisation',
+          headerShown: false,
+          tabBarIcon: ({ focused }) => (
+            <Image
+              source={require('../../ImageAndLogo/LogoWeKid.png')}
+              style={{
+                width: 28,
+                height: 28,
+                tintColor: '#FFCEB0',
+              }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profil"
         options={{
           title: 'Profil',
