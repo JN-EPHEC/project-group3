@@ -206,16 +206,17 @@ export default function AgendaScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Agenda partagé</Text>
             <View style={styles.headerButtons}>
-              <View style={styles.todayButton}>
-                <TouchableOpacity onPress={goToToday}>
-                  <Text style={styles.todayButtonText}>Aujourd'hui</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => {
+              <TouchableOpacity style={styles.todayButton} onPress={goToToday}>
+                <Text style={styles.todayButtonText}>Aujourd'hui</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.addButton}
+                onPress={() => {
                   router.push('/create-event');
-                }}>
-                  <Text style={styles.addButtonText}>+</Text>
-                </TouchableOpacity>
-              </View>
+                }}
+              >
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -347,6 +348,7 @@ const styles = StyleSheet.create({
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   todayButton: {
     backgroundColor: '#E7F7FF',
@@ -355,18 +357,27 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
   todayButtonText: {
     color: '#87CEEB',
     fontSize: 14,
     fontWeight: '600',
   },
+  addButton: {
+    backgroundColor: '#87CEEB',
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 10,
+    borderRadius: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   addButtonText: {
     fontSize: 24,
-    color: '#87CEEB',
+    color: '#FFFFFF',
     fontWeight: '300',
-    lineHeight: 24,
+    lineHeight: 20,
   },
   calendarContainer: {
     backgroundColor: '#fff',
