@@ -147,7 +147,7 @@ export default function AgendaScreen() {
   };
 
   const getEventCountForDate = (date: Date) => {
-    const count = events.filter((event: any) => {
+    const dayEvents = events.filter((event: any) => {
       if (!event.date?.toDate) return false;
       const eventDate = event.date.toDate();
       return (
@@ -155,8 +155,8 @@ export default function AgendaScreen() {
         eventDate.getMonth() === date.getMonth() &&
         eventDate.getFullYear() === date.getFullYear()
       );
-    }).length;
-    return Math.min(count, 3); // Maximum 3 pastilles visibles
+    }).slice(0, 3); // Maximum 3 pastilles visibles
+    return dayEvents;
   };
 
   const hasEventsOnDate = (date: Date) => {
@@ -266,14 +266,14 @@ export default function AgendaScreen() {
                     ]}>
                       {day.date.getDate()}
                     </Text>
-                    {getEventCountForDate(day.date) > 0 && (
+                    {getEventCountForDate(day.date).length > 0 && (
                       <View style={styles.eventDotsContainer}>
-                        {Array.from({ length: getEventCountForDate(day.date) }).map((_, i) => (
+                        {getEventCountForDate(day.date).map((event: any, i: number) => (
                           <View 
                             key={i} 
                             style={[
                               styles.eventDot,
-                              { backgroundColor: ['#87CEEB', '#FF6B6B', '#4ECDC4'][i] }
+                              { backgroundColor: event.category?.color || '#87CEEB' }
                             ]} 
                           />
                         ))}
@@ -300,7 +300,12 @@ export default function AgendaScreen() {
                 >
                   <Text style={styles.eventTitle}>{event.title}</Text>
                   <Text style={styles.eventTime}>
-                    {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    {event.isAllDay 
+                      ? 'Toute la journée' 
+                      : event.startTime && event.endTime
+                        ? `${event.startTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${event.endTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                        : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                    }
                   </Text>
                 </TouchableOpacity>
               ))

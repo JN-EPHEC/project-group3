@@ -189,7 +189,12 @@ export default function HomeScreen() {
                         {event.date?.toDate().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                       </Text>
                       <Text style={styles.eventTime}>
-                        {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        {event.isAllDay 
+                          ? 'Toute la journée' 
+                          : event.startTime && event.endTime
+                            ? `${event.startTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${event.endTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                            : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                        }
                       </Text>
                     </View>
                   </TouchableOpacity>
