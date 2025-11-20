@@ -82,12 +82,24 @@ export default function EventDetailsScreen() {
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>🕐 Heure</Text>
                 <Text style={styles.infoValue}>
-                  {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
+                  {event.isAllDay 
+                    ? 'Toute la journée' 
+                    : event.startTime && event.endTime
+                      ? `${event.startTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${event.endTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                      : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                  }
                 </Text>
               </View>
+
+              {event.category && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>🏷️ Catégorie</Text>
+                  <View style={styles.categoryContainer}>
+                    <View style={[styles.categoryDot, { backgroundColor: event.category.color }]} />
+                    <Text style={styles.infoValue}>{event.category.name}</Text>
+                  </View>
+                </View>
+              )}
 
               {event.description && (
                 <View style={styles.descriptionSection}>
@@ -123,7 +135,9 @@ const styles = StyleSheet.create({
   infoRow: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, marginBottom: 12 },
   infoLabel: { fontSize: 14, color: '#666', marginBottom: 8, fontWeight: '600' },
   infoValue: { fontSize: 16, color: '#111', textTransform: 'capitalize' },
-  descriptionSection: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, marginTop: 12 },
+  categoryContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  categoryDot: { width: 14, height: 14, borderRadius: 7, marginRight: 8 },
+  descriptionSection: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16 },
   descriptionLabel: { fontSize: 14, color: '#666', marginBottom: 8, fontWeight: '600' },
   descriptionText: { fontSize: 16, color: '#111', lineHeight: 24 },
   editButton: { backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
