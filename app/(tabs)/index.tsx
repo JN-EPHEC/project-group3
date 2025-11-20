@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
@@ -15,7 +16,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   const fetchEvents = useCallback(async () => {
     const currentUser = auth.currentUser;
@@ -127,9 +129,9 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
@@ -138,57 +140,57 @@ export default function HomeScreen() {
   const displayedEvents = showAllEvents ? events : events.slice(0, 2);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={styles.title}>Accueil</Text>
+            <Text style={[styles.title, { color: colors.tint }]}>Accueil</Text>
           </View>
 
           <View style={styles.welcomeSection}>
-            <Text style={styles.greeting}>Bonjour,</Text>
-            <Text style={styles.name}>{firstName || 'Maya'}</Text>
+            <Text style={[styles.greeting, { color: colors.textTertiary }]}>Bonjour,</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{firstName || 'Maya'}</Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Actions rapides</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Actions rapides</Text>
             <View style={styles.quickActionsRow}>
-              <TouchableOpacity style={styles.quickCard} onPress={() => router.push('../create-event')}>
+              <TouchableOpacity style={[styles.quickCard, { backgroundColor: colors.cardBackground }]} onPress={() => router.push('../create-event')}>
                 <View style={styles.iconCircle}>
                   <Image source={require('../../ImageAndLogo/newevent.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
                 </View>
-                <Text style={styles.quickCardText}>Nouvel évènement</Text>
+                <Text style={[styles.quickCardText, { color: colors.text }]}>Nouvel évènement</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={styles.quickCard} 
+                style={[styles.quickCard, { backgroundColor: colors.cardBackground }]} 
                 onPress={handleNewMessage}
                 disabled={familyMembers.length === 0}
               >
                 <View style={styles.iconCircle}>
                   <Image source={require('../../ImageAndLogo/newmessage.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
                 </View>
-                <Text style={styles.quickCardText}>Nouveau message</Text>
+                <Text style={[styles.quickCardText, { color: colors.text }]}>Nouveau message</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Prochains évènements</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Prochains évènements</Text>
             {displayedEvents.length > 0 ? (
               <>
                 {displayedEvents.map((event: any) => (
                   <TouchableOpacity 
                     key={event.id} 
-                    style={styles.rowCard}
+                    style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}
                     onPress={() => router.push({ pathname: '../event-details', params: { eventId: event.id } })}
                   >
-                    <Text style={styles.rowCardText}>{event.title}</Text>
+                    <Text style={[styles.rowCardText, { color: colors.textSecondary }]}>{event.title}</Text>
                     <View style={styles.eventMetaRow}>
-                      <Text style={styles.rowCardDate}>
+                      <Text style={[styles.rowCardDate, { color: colors.tint }]}>
                         {event.date?.toDate().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                       </Text>
-                      <Text style={styles.eventTime}>
+                      <Text style={[styles.eventTime, { color: colors.tint }]}>
                         {event.isAllDay 
                           ? 'Toute la journée' 
                           : event.startTime && event.endTime
@@ -201,41 +203,41 @@ export default function HomeScreen() {
                 ))}
                 {events.length > 2 && (
                   <TouchableOpacity 
-                    style={styles.seeMoreButton}
+                    style={[styles.seeMoreButton, { backgroundColor: colors.secondaryCardBackground }]}
                     onPress={() => setShowAllEvents(!showAllEvents)}
                   >
-                    <Text style={styles.seeMoreText}>
+                    <Text style={[styles.seeMoreText, { color: colors.tint }]}>
                       {showAllEvents ? 'Voir moins' : `Voir plus (${events.length - 2} autres)`}
                     </Text>
                   </TouchableOpacity>
                 )}
               </>
             ) : (
-              <View style={styles.rowCard}>
-                <Text style={styles.emptyText}>Aucun évènement à venir</Text>
+              <View style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucun évènement à venir</Text>
               </View>
             )}
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Messages récents</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Messages récents</Text>
             {messages.length > 0 ? (
               messages.map((msg: any) => (
-                <View key={msg.id} style={styles.rowCard}>
-                  <Text style={styles.rowCardText}>{msg.lastMessage}</Text>
+                <View key={msg.id} style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}>
+                  <Text style={[styles.rowCardText, { color: colors.textSecondary }]}>{msg.lastMessage}</Text>
                 </View>
               ))
             ) : (
-              <View style={styles.rowCard}>
-                <Text style={styles.emptyText}>Aucun message récent</Text>
+              <View style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucun message récent</Text>
               </View>
             )}
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Conseils du jour</Text>
-            <View style={styles.tipCard}>
-              <Text style={styles.tipText}>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Conseils du jour</Text>
+            <View style={[styles.tipCard, { backgroundColor: colors.tipCardBackground }]}>
+              <Text style={[styles.tipText, { color: colors.text }]}>
                 La communication bienveillante avec votre ex-partenaire profite avant tout à votre enfant.
               </Text>
             </View>
@@ -248,7 +250,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff' },
+  safeArea: { flex: 1 },
   scrollView: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -261,19 +263,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#87CEEB',
   },
   welcomeSection: {
     marginBottom: 24,
   },
-  greeting: { fontSize: 14, color: '#9AA6B2' },
-  name: { fontSize: 24, fontWeight: '600', color: '#111', marginTop: 4 },
+  greeting: { fontSize: 14 },
+  name: { fontSize: 24, fontWeight: '600', marginTop: 4 },
   section: { marginBottom: 28 },
   sectionTitle: { fontSize: 22, fontWeight: '600', marginBottom: 16 },
   quickActionsRow: { flexDirection: 'row', gap: 12 },
   quickCard: { 
     flex: 1, 
-    backgroundColor: '#E8E8E8', 
     borderRadius: 8, 
     paddingVertical: 8, 
     paddingHorizontal: 6, 
@@ -294,27 +294,24 @@ const styles = StyleSheet.create({
   },
   quickCardText: { 
     fontWeight: '500', 
-    color: '#000', 
     fontSize: 12 
   },
-  rowCard: { backgroundColor: '#E8E8E8', borderRadius: 20, paddingVertical: 20, paddingHorizontal: 20, justifyContent: 'center', marginBottom: 12, minHeight: 60, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 2 },
-  rowCardText: { color: '#666', fontSize: 15, marginBottom: 8 },
+  rowCard: { borderRadius: 20, paddingVertical: 20, paddingHorizontal: 20, justifyContent: 'center', marginBottom: 12, minHeight: 60, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 2 },
+  rowCardText: { fontSize: 15, marginBottom: 8 },
   eventMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  rowCardDate: { color: '#87CEEB', fontSize: 13, fontWeight: '600' },
+  rowCardDate: { fontSize: 13, fontWeight: '600' },
   eventTime: {
-    color: '#87CEEB',
     fontSize: 12,
     fontWeight: '600',
   },
-  emptyText: { color: '#B0B0B0', textAlign: 'center', fontSize: 15 },
-  tipCard: { backgroundColor: '#FFFACD', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 2 },
-  tipText: { color: '#000', fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  emptyText: { textAlign: 'center', fontSize: 15 },
+  tipCard: { borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 2 },
+  tipText: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
   seeMoreButton: {
-    backgroundColor: '#E7F7FF',
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -322,7 +319,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   seeMoreText: {
-    color: '#87CEEB',
     fontSize: 14,
     fontWeight: '600',
   },

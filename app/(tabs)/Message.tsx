@@ -1,4 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
@@ -14,7 +15,8 @@ export default function MessageScreen() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   const fetchConversations = useCallback(async () => {
     const currentUser = auth.currentUser;
@@ -124,28 +126,28 @@ export default function MessageScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Messages</Text>
+          <Text style={[styles.title, { color: colors.tint }]}>Messages</Text>
           <View style={styles.headerButtons}>
             {familyMembers.length > 0 && (
               <TouchableOpacity 
-                style={styles.newMessageButton}
+                style={[styles.newMessageButton, { backgroundColor: colors.secondaryCardBackground }]}
                 onPress={handleNewMessage}
               >
-                <Text style={styles.newMessageButtonText}>Nouveau</Text>
-                <Text style={styles.addButtonText}>+</Text>
+                <Text style={[styles.newMessageButtonText, { color: colors.tint }]}>Nouveau</Text>
+                <Text style={[styles.addButtonText, { color: colors.tint }]}>+</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -161,7 +163,7 @@ export default function MessageScreen() {
               return (
                 <TouchableOpacity 
                   key={conv.id} 
-                  style={styles.conversationCard}
+                  style={[styles.conversationCard, { borderBottomColor: colors.border }]}
                   onPress={() => router.push({
                     pathname: '/conversation',
                     params: {
@@ -171,33 +173,33 @@ export default function MessageScreen() {
                     }
                   })}
                 >
-                  <View style={styles.avatarCircle}>
+                  <View style={[styles.avatarCircle, { backgroundColor: colors.tint }]}>
                     <Text style={styles.avatarText}>
                       {(otherUserData?.firstName?.[0] || 'C').toUpperCase()}
                     </Text>
                   </View>
                   <View style={styles.conversationDetails}>
                     <View style={styles.conversationHeader}>
-                      <Text style={styles.conversationName}>
+                      <Text style={[styles.conversationName, { color: colors.text }]}>
                         {otherUserData?.firstName || 'Co-parent'} {otherUserData?.lastName || ''}
                       </Text>
-                      <Text style={styles.messageTime}>
+                      <Text style={[styles.messageTime, { color: colors.textTertiary }]}>
                         {formatTime(conv.lastMessageTime)}
                       </Text>
                     </View>
                     <View style={styles.lastMessageContainer}>
                       {conv.lastMessageType === 'image' ? (
                         <View style={styles.imageMessagePreview}>
-                          <IconSymbol name="photo" size={16} color="#666" />
-                          <Text style={styles.lastMessage}>Photo</Text>
+                          <IconSymbol name="photo" size={16} color={colors.textSecondary} />
+                          <Text style={[styles.lastMessage, { color: colors.textSecondary }]}>Photo</Text>
                         </View>
                       ) : (
-                        <Text style={styles.lastMessage} numberOfLines={1}>
+                        <Text style={[styles.lastMessage, { color: colors.textSecondary }]} numberOfLines={1}>
                           {conv.lastMessage || 'Aucun message'}
                         </Text>
                       )}
                       {conv.unreadCount?.[user?.uid || ''] > 0 && (
-                        <View style={styles.unreadBadge}>
+                        <View style={[styles.unreadBadge, { backgroundColor: colors.tint }]}>
                           <Text style={styles.unreadText}>
                             {conv.unreadCount[user?.uid || '']}
                           </Text>
@@ -210,9 +212,9 @@ export default function MessageScreen() {
             })
           ) : (
             <View style={styles.emptyCard}>
-              <IconSymbol name="message" size={64} color="#B0B0B0" />
-              <Text style={styles.emptyText}>Aucune conversation</Text>
-              <Text style={styles.emptySubtext}>
+              <IconSymbol name="message" size={64} color={colors.textTertiary} />
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucune conversation</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textTertiary }]}>
                 {familyMembers.length > 0 
                   ? 'Commencez une conversation avec votre co-parent'
                   : 'Aucun autre membre dans votre famille'}
@@ -228,7 +230,6 @@ export default function MessageScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   container: {
     flex: 1,
@@ -249,14 +250,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#87CEEB',
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   newMessageButton: {
-    backgroundColor: '#E7F7FF',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
@@ -265,13 +264,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   newMessageButtonText: {
-    color: '#87CEEB',
     fontSize: 14,
     fontWeight: '600',
   },
   addButtonText: {
     fontSize: 24,
-    color: '#87CEEB',
     fontWeight: '300',
     lineHeight: 24,
   },
@@ -283,13 +280,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   avatarCircle: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#87CEEB',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -311,11 +306,9 @@ const styles = StyleSheet.create({
   conversationName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111',
   },
   messageTime: {
     fontSize: 12,
-    color: '#999',
   },
   lastMessageContainer: {
     flexDirection: 'row',
@@ -324,7 +317,6 @@ const styles = StyleSheet.create({
   },
   lastMessage: {
     fontSize: 14,
-    color: '#666',
     flex: 1,
   },
   imageMessagePreview: {
@@ -334,7 +326,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   unreadBadge: {
-    backgroundColor: '#87CEEB',
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -356,13 +347,11 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
     textAlign: 'center',
     paddingHorizontal: 40,
   },

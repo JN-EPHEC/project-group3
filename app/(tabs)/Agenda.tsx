@@ -1,3 +1,4 @@
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
@@ -14,7 +15,8 @@ export default function AgendaScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   const fetchEvents = useCallback(async () => {
     const currentUser = auth.currentUser;
@@ -186,9 +188,9 @@ export default function AgendaScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
@@ -199,18 +201,18 @@ export default function AgendaScreen() {
   const selectedDateEvents = getEventsForSelectedDate();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Agenda partagé</Text>
+            <Text style={[styles.title, { color: colors.tint }]}>Agenda partagé</Text>
             <View style={styles.headerButtons}>
-              <TouchableOpacity style={styles.todayButton} onPress={goToToday}>
-                <Text style={styles.todayButtonText}>Aujourd'hui</Text>
+              <TouchableOpacity style={[styles.todayButton, { backgroundColor: colors.secondaryCardBackground }]} onPress={goToToday}>
+                <Text style={[styles.todayButtonText, { color: colors.tint }]}>Aujourd'hui</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={styles.addButton}
+                style={[styles.addButton, { backgroundColor: colors.primaryButton }]}
                 onPress={() => {
                   router.push('/create-event');
                 }}
@@ -221,24 +223,24 @@ export default function AgendaScreen() {
           </View>
 
           {/* Calendar */}
-          <View style={styles.calendarContainer}>
+          <View style={[styles.calendarContainer, { backgroundColor: colors.cardBackground }]}>
             {/* Month Navigation */}
             <View style={styles.monthHeader}>
               <TouchableOpacity onPress={() => changeMonth(-1)}>
-                <Text style={styles.navButton}>{'<'}</Text>
+                <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'<'}</Text>
               </TouchableOpacity>
-              <Text style={styles.monthText}>
+              <Text style={[styles.monthText, { color: colors.text }]}>
                 {currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
               </Text>
               <TouchableOpacity onPress={() => changeMonth(1)}>
-                <Text style={styles.navButton}>{'>'}</Text>
+                <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'>'}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Week Days */}
             <View style={styles.weekDaysRow}>
               {weekDays.map((day) => (
-                <Text key={day} style={styles.weekDayText}>{day}</Text>
+                <Text key={day} style={[styles.weekDayText, { color: colors.textTertiary }]}>{day}</Text>
               ))}
             </View>
 
@@ -255,14 +257,15 @@ export default function AgendaScreen() {
                 >
                   <View style={[
                     styles.dayCircle,
-                    isToday(day.date) && styles.todayCircle,
-                    isSelected(day.date) && styles.selectedCircle,
+                    isToday(day.date) && { backgroundColor: colors.secondaryCardBackground },
+                    isSelected(day.date) && { backgroundColor: colors.tint },
                   ]}>
                     <Text style={[
                       styles.dayText,
-                      !day.isCurrentMonth && styles.otherMonthText,
-                      isToday(day.date) && styles.todayText,
-                      isSelected(day.date) && styles.selectedText,
+                      { color: colors.text },
+                      !day.isCurrentMonth && { color: colors.textTertiary, opacity: 0.3 },
+                      isToday(day.date) && { color: colors.tint, fontWeight: '700' },
+                      isSelected(day.date) && { color: '#fff', fontWeight: '700' },
                     ]}>
                       {day.date.getDate()}
                     </Text>
@@ -273,7 +276,7 @@ export default function AgendaScreen() {
                             key={i} 
                             style={[
                               styles.eventDot,
-                              { backgroundColor: event.category?.color || '#87CEEB' }
+                              { backgroundColor: event.category?.color || colors.tint }
                             ]} 
                           />
                         ))}
@@ -287,7 +290,7 @@ export default function AgendaScreen() {
 
           {/* Selected Date Events */}
           <View style={styles.eventsSection}>
-            <Text style={styles.eventsSectionTitle}>
+            <Text style={[styles.eventsSectionTitle, { color: colors.textSecondary }]}>
               {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </Text>
             
@@ -295,11 +298,11 @@ export default function AgendaScreen() {
               selectedDateEvents.map((event: any) => (
                 <TouchableOpacity 
                   key={event.id} 
-                  style={styles.eventCard}
+                  style={[styles.eventCard, { backgroundColor: colors.cardBackground }]}
                   onPress={() => router.push(`/event-details?eventId=${event.id}`)}
                 >
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventTime}>
+                  <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                  <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
                     {event.isAllDay 
                       ? 'Toute la journée' 
                       : event.startTime && event.endTime
@@ -310,7 +313,7 @@ export default function AgendaScreen() {
                 </TouchableOpacity>
               ))
             ) : (
-              <Text style={styles.noEventsText}>Aucun évènement à ce jour</Text>
+              <Text style={[styles.noEventsText, { color: colors.textTertiary }]}>Aucun évènement à ce jour</Text>
             )}
           </View>
 
@@ -323,7 +326,6 @@ export default function AgendaScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   scrollView: {
     flex: 1,
@@ -348,7 +350,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#87CEEB',
   },
   headerButtons: {
     flexDirection: 'row',
@@ -356,7 +357,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   todayButton: {
-    backgroundColor: '#E7F7FF',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
@@ -364,12 +364,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   todayButtonText: {
-    color: '#87CEEB',
     fontSize: 14,
     fontWeight: '600',
   },
   addButton: {
-    backgroundColor: '#87CEEB',
     paddingHorizontal: 14,
     paddingTop: 6,
     paddingBottom: 10,
@@ -385,7 +383,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   calendarContainer: {
-    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 16,
     marginBottom: 24,
@@ -398,13 +395,11 @@ const styles = StyleSheet.create({
   },
   navButton: {
     fontSize: 24,
-    color: '#666',
     paddingHorizontal: 16,
   },
   monthText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111',
   },
   weekDaysRow: {
     flexDirection: 'row',
@@ -415,7 +410,6 @@ const styles = StyleSheet.create({
     width: 40,
     textAlign: 'center',
     fontSize: 12,
-    color: '#999',
     fontWeight: '500',
   },
   calendarGrid: {
@@ -445,7 +439,6 @@ const styles = StyleSheet.create({
   },
   dayText: {
     fontSize: 14,
-    color: '#111',
     fontWeight: '500',
   },
   otherMonthDay: {
@@ -468,12 +461,10 @@ const styles = StyleSheet.create({
   eventsSectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#666',
     marginBottom: 16,
     textTransform: 'capitalize',
   },
   eventCard: {
-    backgroundColor: '#E8E8E8',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -481,16 +472,13 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111',
     marginBottom: 4,
   },
   eventTime: {
     fontSize: 14,
-    color: '#666',
   },
   noEventsText: {
     textAlign: 'center',
-    color: '#999',
     fontSize: 15,
     marginTop: 24,
   },
