@@ -257,15 +257,14 @@ export default function AgendaScreen() {
                 >
                   <View style={[
                     styles.dayCircle,
-                    isToday(day.date) && { backgroundColor: colors.secondaryCardBackground },
-                    isSelected(day.date) && { backgroundColor: colors.tint },
+                    isSelected(day.date) && { backgroundColor: colors.secondaryCardBackground },
                   ]}>
                     <Text style={[
                       styles.dayText,
                       { color: colors.text },
                       !day.isCurrentMonth && { color: colors.textTertiary, opacity: 0.3 },
-                      isToday(day.date) && { color: colors.tint, fontWeight: '700' },
-                      isSelected(day.date) && { color: '#fff', fontWeight: '700' },
+                      isToday(day.date) && !isSelected(day.date) && { color: '#dd2e2eff', fontWeight: '700' },
+                      isSelected(day.date) && { color: colors.tint, fontWeight: '700' },
                     ]}>
                       {day.date.getDate()}
                     </Text>
