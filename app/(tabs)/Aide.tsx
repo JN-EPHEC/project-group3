@@ -13,8 +13,8 @@ export default function AideScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [firstName, setFirstName] = useState('');
   const [loading, setLoading] = useState(true);
-  const colorScheme = useColorScheme();
-  const tintColor = Colors[colorScheme ?? 'light'].tint;
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -44,73 +44,73 @@ export default function AideScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Aide</Text>
+            <Text style={[styles.title, { color: colors.tint }]}>Aide</Text>
           </View>
 
           {/* FAQ Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Questions fréquentes</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Questions fréquentes</Text>
             
-            <TouchableOpacity style={styles.faqCard}>
-              <Text style={styles.faqQuestion}>Comment créer un évènement ?</Text>
-              <IconSymbol name="chevron.right" size={20} color="#666" />
+            <TouchableOpacity style={[styles.faqCard, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.faqQuestion, { color: colors.text }]}>Comment créer un évènement ?</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.faqCard}>
-              <Text style={styles.faqQuestion}>Comment rejoindre une famille ?</Text>
-              <IconSymbol name="chevron.right" size={20} color="#666" />
+            <TouchableOpacity style={[styles.faqCard, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.faqQuestion, { color: colors.text }]}>Comment rejoindre une famille ?</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.faqCard}>
-              <Text style={styles.faqQuestion}>Comment gérer mes notifications ?</Text>
-              <IconSymbol name="chevron.right" size={20} color="#666" />
+            <TouchableOpacity style={[styles.faqCard, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.faqQuestion, { color: colors.text }]}>Comment gérer mes notifications ?</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           {/* Contact Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Nous contacter</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Nous contacter</Text>
             
-            <TouchableOpacity style={styles.contactCard}>
-              <View style={[styles.iconCircle, { backgroundColor: '#87CEEB' }]}>
+            <TouchableOpacity style={[styles.contactCard, { backgroundColor: colors.cardBackground }]}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.tint }]}>
                 <IconSymbol name="envelope.fill" size={24} color="#fff" />
               </View>
               <View style={styles.contactInfo}>
-                <Text style={styles.contactTitle}>Email</Text>
-                <Text style={styles.contactDetail}>support@wekid.com</Text>
+                <Text style={[styles.contactTitle, { color: colors.textSecondary }]}>Email</Text>
+                <Text style={[styles.contactDetail, { color: colors.text }]}>support@wekid.com</Text>
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.contactCard}>
-              <View style={[styles.iconCircle, { backgroundColor: '#87CEEB' }]}>
+            <TouchableOpacity style={[styles.contactCard, { backgroundColor: colors.cardBackground }]}>
+              <View style={[styles.iconCircle, { backgroundColor: colors.tint }]}>
                 <IconSymbol name="phone.fill" size={24} color="#fff" />
               </View>
               <View style={styles.contactInfo}>
-                <Text style={styles.contactTitle}>Téléphone</Text>
-                <Text style={styles.contactDetail}>+33 1 23 45 67 89</Text>
+                <Text style={[styles.contactTitle, { color: colors.textSecondary }]}>Téléphone</Text>
+                <Text style={[styles.contactDetail, { color: colors.text }]}>+33 1 23 45 67 89</Text>
               </View>
             </TouchableOpacity>
           </View>
 
           {/* Resources Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Ressources utiles</Text>
-            <View style={styles.tipCard}>
-              <Text style={styles.tipText}>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Ressources utiles</Text>
+            <View style={[styles.tipCard, { backgroundColor: colors.tipCardBackground }]}>
+              <Text style={[styles.tipText, { color: colors.text }]}>
                 Consultez notre guide complet pour tirer le meilleur parti de WeKid et faciliter la communication avec votre co-parent.
               </Text>
             </View>
@@ -125,7 +125,6 @@ export default function AideScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   scrollView: {
     flex: 1,
@@ -150,7 +149,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#87CEEB',
   },
   logo: {
     width: 60,
@@ -166,7 +164,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   faqCard: {
-    backgroundColor: '#E8E8E8',
     borderRadius: 20,
     paddingVertical: 18,
     paddingHorizontal: 20,
@@ -183,11 +180,9 @@ const styles = StyleSheet.create({
   faqQuestion: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#111',
     flex: 1,
   },
   contactCard: {
-    backgroundColor: '#E8E8E8',
     borderRadius: 20,
     padding: 16,
     flexDirection: 'row',
@@ -212,16 +207,13 @@ const styles = StyleSheet.create({
   },
   contactTitle: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 4,
   },
   contactDetail: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111',
   },
   tipCard: {
-    backgroundColor: '#FFFACD',
     borderRadius: 20,
     padding: 24,
     shadowColor: '#000',
@@ -231,7 +223,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tipText: {
-    color: '#000',
     fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,
