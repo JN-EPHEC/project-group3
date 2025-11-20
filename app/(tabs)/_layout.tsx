@@ -17,10 +17,10 @@ export default function TabLayout() {
           fontSize: 10,
           fontWeight: '600',
           marginTop: 2,
-          marginBottom: 2,
+          marginBottom: -4,
         },
         tabBarIconStyle: {
-          marginTop: 4,
+          marginTop: 2,
         },
         headerShown: false,
         tabBarStyle: {
