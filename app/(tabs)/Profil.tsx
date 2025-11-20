@@ -1,11 +1,12 @@
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily, signOut } from '../../constants/firebase';
 
 export default function ProfilScreen() {
@@ -16,7 +17,8 @@ export default function ProfilScreen() {
   const [email, setEmail] = useState('');
   const [familyCode, setFamilyCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -66,11 +68,11 @@ export default function ProfilScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedView style={styles.safeArea}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
-      </SafeAreaView>
+      </ThemedView>
     );
   }
 
@@ -80,51 +82,51 @@ export default function ProfilScreen() {
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Profil</Text>
+            <Text style={[styles.title, { color: colors.tint }]}>Profil</Text>
           </View>
 
           <View style={styles.userInfoSection}>
-            <Text style={styles.name}>{firstName} {lastName}</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{firstName} {lastName}</Text>
           </View>
 
           {/* Profile Avatar */}
           <View style={styles.avatarSection}>
-            <View style={styles.avatarCircle}>
-              <IconSymbol name="person.fill" size={60} color="#87CEEB" />
+            <View style={[styles.avatarCircle, { backgroundColor: colors.secondaryCardBackground }]}>
+              <IconSymbol name="person.fill" size={60} color={colors.tint} />
             </View>
           </View>
 
           {/* Account Info */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Informations du compte</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Informations du compte</Text>
             
-            <View style={styles.infoCard}>
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.infoRow}>
-                <IconSymbol name="person" size={20} color="#666" />
+                <IconSymbol name="person" size={20} color={colors.textSecondary} />
                 <View style={styles.infoText}>
-                  <Text style={styles.infoLabel}>Nom</Text>
-                  <Text style={styles.infoValue}>{firstName} {lastName}</Text>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Nom</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>{firstName} {lastName}</Text>
                 </View>
               </View>
             </View>
 
-            <View style={styles.infoCard}>
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.infoRow}>
-                <IconSymbol name="envelope" size={20} color="#666" />
+                <IconSymbol name="envelope" size={20} color={colors.textSecondary} />
                 <View style={styles.infoText}>
-                  <Text style={styles.infoLabel}>Email</Text>
-                  <Text style={styles.infoValue}>{email}</Text>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>{email}</Text>
                 </View>
               </View>
             </View>
 
             {familyCode && (
-              <View style={styles.infoCard}>
+              <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
                 <View style={styles.infoRow}>
-                  <IconSymbol name="house" size={20} color="#666" />
+                  <IconSymbol name="house" size={20} color={colors.textSecondary} />
                   <View style={styles.infoText}>
-                    <Text style={styles.infoLabel}>Code famille</Text>
-                    <Text style={styles.infoValue}>{familyCode}</Text>
+                    <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Code famille</Text>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>{familyCode}</Text>
                   </View>
                 </View>
               </View>
@@ -133,30 +135,30 @@ export default function ProfilScreen() {
 
           {/* Settings */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#87CEEB' }]}>Paramètres</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Paramètres</Text>
             
-            <TouchableOpacity style={styles.settingCard}>
-              <IconSymbol name="bell" size={24} color="#666" />
-              <Text style={styles.settingText}>Notifications</Text>
-              <IconSymbol name="chevron.right" size={20} color="#666" />
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+              <IconSymbol name="bell" size={24} color={colors.textSecondary} />
+              <Text style={[styles.settingText, { color: colors.text }]}>Notifications</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingCard}>
-              <IconSymbol name="lock" size={24} color="#666" />
-              <Text style={styles.settingText}>Confidentialité</Text>
-              <IconSymbol name="chevron.right" size={20} color="#666" />
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+              <IconSymbol name="lock" size={24} color={colors.textSecondary} />
+              <Text style={[styles.settingText, { color: colors.text }]}>Confidentialité</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingCard}>
-              <IconSymbol name="questionmark.circle" size={24} color="#666" />
-              <Text style={styles.settingText}>Aide</Text>
-              <IconSymbol name="chevron.right" size={20} color="#666" />
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+              <IconSymbol name="questionmark.circle" size={24} color={colors.textSecondary} />
+              <Text style={[styles.settingText, { color: colors.text }]}>Aide</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
           {/* Logout Button */}
           <TouchableOpacity 
-            style={styles.logoutButton} 
+            style={[styles.logoutButton, { backgroundColor: colors.dangerButton }]} 
             onPress={handleLogout}
           >
             <IconSymbol name="arrow.right.square" size={20} color="#fff" />
@@ -172,7 +174,6 @@ export default function ProfilScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   scrollView: {
     flex: 1,
@@ -194,7 +195,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#87CEEB',
   },
   userInfoSection: {
     marginBottom: 24,
@@ -202,11 +202,9 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#111',
   },
   greeting: {
     fontSize: 14,
-    color: '#9AA6B2',
   },
   avatarSection: {
     alignItems: 'center',
@@ -216,7 +214,6 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#E7F7FF',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -234,7 +231,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   infoCard: {
-    backgroundColor: '#E8E8E8',
     borderRadius: 20,
     padding: 16,
     marginBottom: 12,
@@ -254,16 +250,13 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 12,
-    color: '#666',
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111',
   },
   settingCard: {
-    backgroundColor: '#E8E8E8',
     borderRadius: 20,
     padding: 18,
     marginBottom: 12,
@@ -279,11 +272,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#111',
     marginLeft: 16,
   },
   logoutButton: {
-    backgroundColor: '#FF6B6B',
     borderRadius: 20,
     paddingVertical: 16,
     paddingHorizontal: 20,
