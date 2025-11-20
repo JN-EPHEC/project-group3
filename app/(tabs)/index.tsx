@@ -156,9 +156,7 @@ export default function HomeScreen() {
             <Text style={[styles.sectionTitle, { color: colors.tint }]}>Actions rapides</Text>
             <View style={styles.quickActionsRow}>
               <TouchableOpacity style={[styles.quickCard, { backgroundColor: colors.cardBackground }]} onPress={() => router.push('../create-event')}>
-                <View style={styles.iconCircle}>
-                  <Image source={require('../../ImageAndLogo/newevent.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
-                </View>
+                <Text style={[styles.plusIcon, { color: '#B0D7FF' }]}>+</Text>
                 <Text style={[styles.quickCardText, { color: colors.text }]}>Nouvel évènement</Text>
               </TouchableOpacity>
 
@@ -283,6 +281,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 }, 
     shadowRadius: 6, 
     elevation: 2 
+  },
+  plusIcon: {
+    fontSize: 48,
+    fontWeight: '300',
+    lineHeight: 32,
+    marginBottom: 6,
   },
   iconCircle: { 
     width: 32, 
