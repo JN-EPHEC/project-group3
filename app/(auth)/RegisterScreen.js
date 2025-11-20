@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Button, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const RegisterScreen = () => {
   const [firstName, setFirstName] = useState('');
@@ -67,8 +67,22 @@ const RegisterScreen = () => {
         router.replace('FamilyCodeScreen');
       }
     } catch (error) {
-      const msg = error?.code ? `${error.code} - ${error.message}` : error.message || String(error);
-      setError('Erreur lors de l\'inscription : ' + msg);
+      // Gestion des erreurs Firebase avec messages en français
+      let errorMessage = '';
+      switch (error?.code) {
+        case 'auth/weak-password':
+          errorMessage = 'Le mot de passe doit au moins contenir 6 caractères';
+          break;
+        case 'auth/email-already-in-use':
+          errorMessage = 'Cette adresse email est déjà utilisée';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Adresse email invalide';
+          break;
+        default:
+          errorMessage = error.message || 'Une erreur est survenue lors de l\'inscription';
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -165,7 +179,13 @@ const RegisterScreen = () => {
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
       ) : (
-        <Button title="Créer le compte" onPress={handleRegister} disabled={loading} />
+        <TouchableOpacity 
+          style={styles.registerButton} 
+          onPress={handleRegister} 
+          disabled={loading}
+        >
+          <Text style={styles.registerButtonText}>Créer le compte</Text>
+        </TouchableOpacity>
       )}
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
@@ -236,32 +256,28 @@ const styles = StyleSheet.create({
     color: '#999'
   },
   registerButton: {
+    width: '100%',
+    height: 50,
     backgroundColor: '#FFFFFF',
-    paddingVertical: 15,
     borderRadius: 25,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5
+    marginTop: 10
   },
   registerButtonText: {
     color: '#000000',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600'
   },
   loader: {
     marginTop: 20
   },
   error: {
-    color: '#FFFFFF',
+    color: '#FF0000',
     marginTop: 10,
-    textAlign: 'center'
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: 14
   }
 });
 
