@@ -2,8 +2,9 @@ import { useRouter } from 'expo-router';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { db } from '../../constants/firebase';
+import { Colors } from '../../constants/theme';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -11,6 +12,8 @@ const LoginScreen = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   const auth = getAuth();
 
@@ -50,50 +53,50 @@ const LoginScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
       </TouchableOpacity>
       <View style={styles.contentWrapper}>
         <View style={styles.contentContainer}>
-          <Text style={styles.title}>Connexion</Text>
-          <Text style={styles.subtitle}>Content de vous revoir !</Text>
+          <Text style={[styles.title, { color: colors.tint }]}>Connexion</Text>
+          <Text style={[styles.subtitle, { color: colors.tint }]}>Content de vous revoir !</Text>
           
           <View style={styles.formContainer}>
-          <Text style={styles.label}>Email*</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Email*</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
             placeholder="votre@email.be"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             keyboardType="email-address"
             autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
           />
           
-          <Text style={styles.label}>Mot de passe*</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Mot de passe*</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
             placeholder="Mot de passe"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             secureTextEntry
             value={password}
             onChangeText={setPassword}
           />
           
           <TouchableOpacity
-            style={styles.loginButton}
+            style={[styles.loginButton, { backgroundColor: colors.tint }]}
             onPress={handleLogin}
             disabled={loading}
           >
-            <Text style={styles.loginButtonText}>Se connecter</Text>
+            <Text style={[styles.loginButtonText, { color: '#fff' }]}>Se connecter</Text>
           </TouchableOpacity>
           
-          {loading && <ActivityIndicator style={styles.loader} color="#FFFFFF" />}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {loading && <ActivityIndicator style={styles.loader} color={colors.tint} />}
+          {error ? <Text style={[styles.error, { color: colors.dangerButton }]}>{error}</Text> : null}
         </View>
       </View>
       </View>

@@ -1,14 +1,17 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { auth, db, getUserFamily, storage } from '../constants/firebase';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { auth, db, getUserFamily } from '../constants/firebase';
 
 export default function ConversationScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const { conversationId, otherUserId, otherUserName } = useLocalSearchParams();
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
@@ -19,6 +22,7 @@ export default function ConversationScreen() {
   );
   const flatListRef = useRef<FlatList>(null);
   const currentUser = auth.currentUser;
+  const storage = getStorage();
 
   useEffect(() => {
     if (!currentUser || !otherUserId) return;
@@ -56,7 +60,7 @@ export default function ConversationScreen() {
               lastMessageTime: serverTimestamp(),
               unreadCount: {
                 [currentUser.uid]: 0,
-                [otherUserId]: 0
+                [String(otherUserId)]: 0
               }
             });
             convId = newConvRef.id;
@@ -79,13 +83,6 @@ export default function ConversationScreen() {
             }));
             setMessages(msgs);
             setLoading(false);
-
-            // Marquer comme lu
-            if (msgs.length > 0 && convId) {
-              updateDoc(doc(db, 'conversations', convId), {
-                [`unreadCount.${currentUser.uid}`]: 0
-              });
-            }
           });
 
           return () => unsubscribe();
@@ -99,6 +96,46 @@ export default function ConversationScreen() {
     initConversation();
   }, [currentUser, otherUserId, currentConversationId]);
 
+  // Marquer les messages comme lus uniquement après le chargement complet et l'affichage
+  useEffect(() => {
+    if (!currentUser || !currentConversationId || loading || messages.length === 0) {
+      return;
+    }
+
+    // Attendre que la FlatList soit rendue avant de marquer comme lu
+    const timeoutId = setTimeout(async () => {
+      try {
+        // Filtrer uniquement les messages reçus (pas les miens) qui ne sont pas encore lus
+        const unreadMessages = messages.filter(msg => {
+          const isFromOther = msg.senderId && msg.senderId !== currentUser.uid;
+          const isNotRead = msg.status !== 'read';
+          return isFromOther && isNotRead;
+        });
+        
+        if (unreadMessages.length > 0) {
+          // Marquer chaque message comme lu
+          const updatePromises = unreadMessages.map(msg => 
+            updateDoc(doc(db, 'conversations', currentConversationId, 'messages', msg.id), {
+              status: 'read',
+              readAt: serverTimestamp()
+            })
+          );
+          
+          await Promise.all(updatePromises);
+          
+          // Réinitialiser le compteur de messages non lus
+          await updateDoc(doc(db, 'conversations', currentConversationId), {
+            [`unreadCount.${currentUser.uid}`]: 0
+          });
+        }
+      } catch (error) {
+        console.error('Error marking messages as read:', error);
+      }
+    }, 1000); // Délai de 1 seconde pour s'assurer que l'utilisateur voit l'écran
+
+    return () => clearTimeout(timeoutId);
+  }, [currentUser, currentConversationId, loading, messages]);
+
   const handleSendMessage = async () => {
     if (!inputText.trim() || !currentConversationId || !currentUser) return;
 
@@ -111,7 +148,8 @@ export default function ConversationScreen() {
         text: messageText,
         senderId: currentUser.uid,
         timestamp: serverTimestamp(),
-        type: 'text'
+        type: 'text',
+        status: 'delivered'
       });
 
       await updateDoc(doc(db, 'conversations', currentConversationId), {
@@ -157,7 +195,8 @@ export default function ConversationScreen() {
           imageUrl: downloadURL,
           senderId: currentUser.uid,
           timestamp: serverTimestamp(),
-          type: 'image'
+          type: 'image',
+          status: 'delivered'
         });
 
         await updateDoc(doc(db, 'conversations', currentConversationId), {
@@ -178,17 +217,35 @@ export default function ConversationScreen() {
     const isMe = item.senderId === currentUser?.uid;
     
     return (
-      <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
+      <View style={[
+        styles.messageContainer, 
+        isMe ? { backgroundColor: colors.tint, borderBottomRightRadius: 4, alignSelf: 'flex-end' } : { backgroundColor: colors.cardBackground, borderBottomLeftRadius: 4, alignSelf: 'flex-start' }
+      ]}>
         {item.type === 'image' ? (
           <Image source={{ uri: item.imageUrl }} style={styles.messageImage} />
         ) : (
-          <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
+          <Text style={[styles.messageText, isMe ? { color: '#fff' } : { color: colors.text }]}>
             {item.text}
           </Text>
         )}
-        <Text style={[styles.messageTime, isMe ? styles.myMessageTime : styles.otherMessageTime]}>
-          {item.timestamp?.toDate ? item.timestamp.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}
-        </Text>
+        <View style={styles.messageFooter}>
+          <Text style={[styles.messageTime, isMe ? { color: 'rgba(255, 255, 255, 0.7)' } : { color: colors.textSecondary }]}>
+            {item.timestamp?.toDate ? item.timestamp.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}
+          </Text>
+          {isMe && (
+            <View style={styles.statusContainer}>
+              {item.status === 'sent' && (
+                <Text style={styles.statusIcon}>✓</Text>
+              )}
+              {item.status === 'delivered' && (
+                <Text style={styles.statusIcon}>✓✓</Text>
+              )}
+              {item.status === 'read' && (
+                <Text style={styles.statusIconRead}>✓✓</Text>
+              )}
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -197,9 +254,9 @@ export default function ConversationScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false, animation: 'none' }} />
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color="#87CEEB" />
+            <ActivityIndicator size="large" color={colors.tint} />
           </View>
         </SafeAreaView>
       </>
@@ -209,13 +266,13 @@ export default function ConversationScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false, animation: 'slide_from_right' }} />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.container}
           keyboardVerticalOffset={0}
         >
-          <View style={styles.header}>
+          <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <TouchableOpacity 
               onPress={() => {
                 console.log('Back button pressed');
@@ -223,15 +280,15 @@ export default function ConversationScreen() {
               }} 
               style={styles.backButton}
             >
-              <Text style={styles.backButtonText}>←</Text>
+              <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
             </TouchableOpacity>
             <View style={styles.headerInfo}>
-              <View style={styles.headerAvatar}>
+              <View style={[styles.headerAvatar, { backgroundColor: colors.tint }]}>
                 <Text style={styles.headerAvatarText}>
                   {otherUserName?.toString()[0]?.toUpperCase() || 'C'}
                 </Text>
               </View>
-              <Text style={styles.headerName}>{otherUserName || 'Co-parent'}</Text>
+              <Text style={[styles.headerName, { color: colors.text }]}>{otherUserName || 'Co-parent'}</Text>
             </View>
             <View style={styles.headerSpacer} />
           </View>
@@ -248,20 +305,21 @@ export default function ConversationScreen() {
           />
 
           {/* Input */}
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
             <TouchableOpacity style={styles.imageButton} onPress={handlePickImage} disabled={sending}>
-              <IconSymbol name="photo" size={24} color="#87CEEB" />
+              <IconSymbol name="photo" size={24} color={colors.tint} />
             </TouchableOpacity>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
               placeholder="Message..."
               value={inputText}
               onChangeText={setInputText}
               multiline
               maxLength={500}
+              placeholderTextColor={colors.textSecondary}
             />
             <TouchableOpacity 
-              style={[styles.sendButton, (!inputText.trim() || sending) && styles.sendButtonDisabled]} 
+              style={[styles.sendButton, { backgroundColor: colors.tint }, (!inputText.trim() || sending) && styles.sendButtonDisabled]} 
               onPress={handleSendMessage}
               disabled={!inputText.trim() || sending}
             >
@@ -368,11 +426,28 @@ const styles = StyleSheet.create({
   },
   messageTime: {
     fontSize: 11,
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginTop: 4,
+  },
+  statusContainer: {
+    marginLeft: 4,
+  },
+  statusIcon: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: '600',
+  },
+  statusIconRead: {
+    fontSize: 14,
+    color: '#34C759',
+    fontWeight: '600',
   },
   myMessageTime: {
     color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'right',
   },
   otherMessageTime: {
     color: '#999',

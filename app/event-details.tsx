@@ -1,11 +1,14 @@
+import { Colors } from '@/constants/theme';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { db } from '../constants/firebase';
 
 export default function EventDetailsScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const { eventId } = useLocalSearchParams();
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,9 +34,9 @@ export default function EventDetailsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
@@ -41,10 +44,10 @@ export default function EventDetailsScreen() {
 
   if (!event) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <Text style={styles.errorText}>Événement introuvable</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>Événement introuvable</Text>
+          <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.tint }]} onPress={() => router.back()}>
             <Text style={styles.backButtonText}>Retour</Text>
           </TouchableOpacity>
         </View>
@@ -55,21 +58,21 @@ export default function EventDetailsScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <ScrollView style={styles.scrollView}>
           <View style={styles.container}>
-            <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
-              <Text style={styles.closeButtonText}>✕</Text>
+            <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.cardBackground }]} onPress={() => router.back()}>
+              <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
             </TouchableOpacity>
 
             <View style={styles.header}>
-              <Text style={styles.title}>{event.title}</Text>
+              <Text style={[styles.title, { color: colors.tint }]}>{event.title}</Text>
             </View>
 
             <View style={styles.infoSection}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>📅 Date</Text>
-                <Text style={styles.infoValue}>
+              <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📅 Date</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>
                   {event.date?.toDate().toLocaleDateString('fr-FR', { 
                     weekday: 'long', 
                     day: 'numeric', 
@@ -79,9 +82,9 @@ export default function EventDetailsScreen() {
                 </Text>
               </View>
 
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>🕐 Heure</Text>
-                <Text style={styles.infoValue}>
+              <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>🕐 Heure</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>
                   {event.isAllDay 
                     ? 'Toute la journée' 
                     : event.startTime && event.endTime
@@ -92,25 +95,25 @@ export default function EventDetailsScreen() {
               </View>
 
               {event.category && (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>🏷️ Catégorie</Text>
+                <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>🏷️ Catégorie</Text>
                   <View style={styles.categoryContainer}>
                     <View style={[styles.categoryDot, { backgroundColor: event.category.color }]} />
-                    <Text style={styles.infoValue}>{event.category.name}</Text>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>{event.category.name}</Text>
                   </View>
                 </View>
               )}
 
               {event.description && (
-                <View style={styles.descriptionSection}>
-                  <Text style={styles.descriptionLabel}>📝 Description</Text>
-                  <Text style={styles.descriptionText}>{event.description}</Text>
+                <View style={[styles.descriptionSection, { backgroundColor: colors.cardBackground }]}>
+                  <Text style={[styles.descriptionLabel, { color: colors.textSecondary }]}>📝 Description</Text>
+                  <Text style={[styles.descriptionText, { color: colors.text }]}>{event.description}</Text>
                 </View>
               )}
             </View>
 
             <TouchableOpacity 
-              style={styles.editButton}
+              style={[styles.editButton, { backgroundColor: colors.tint }]}
               onPress={() => router.push(`/edit-event?eventId=${event.id}`)}
             >
               <Text style={styles.editButtonText}>Modifier l'événement</Text>
