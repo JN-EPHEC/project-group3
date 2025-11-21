@@ -148,8 +148,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.welcomeSection}>
-            <Text style={[styles.greeting, { color: colors.textTertiary }]}>Bonjour,</Text>
-            <Text style={[styles.name, { color: colors.text }]}>{firstName || 'Maya'}</Text>
+            <Text style={[styles.greeting, { color: colors.textTertiary }]}>Bonjour {firstName}</Text>
           </View>
 
           <View style={styles.section}>

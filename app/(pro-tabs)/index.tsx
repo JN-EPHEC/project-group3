@@ -2,14 +2,17 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { auth, db } from '../../constants/firebase';
+import { Colors } from '../../constants/theme';
 
 export default function ProHomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [firstName, setFirstName] = useState('');
   const [loading, setLoading] = useState(true);
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -39,31 +42,31 @@ export default function ProHomeScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" color="#FFCEB0" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={styles.title}>Espace Professionnel</Text>
+            <Text style={[styles.title, { color: colors.tint }]}>Espace Professionnel</Text>
           </View>
 
           <View style={styles.welcomeSection}>
-            <Text style={styles.greeting}>Bonjour,</Text>
-            <Text style={styles.name}>{firstName}</Text>
+            <Text style={[styles.greeting, { color: colors.textTertiary }]}>Bonjour,</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{firstName}</Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#FFCEB0' }]}>Tableau de bord</Text>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsText}>Bienvenue dans votre espace professionnel</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Tableau de bord</Text>
+            <View style={[styles.statsCard, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.statsText, { color: colors.text }]}>Bienvenue dans votre espace professionnel</Text>
             </View>
           </View>
         </View>
