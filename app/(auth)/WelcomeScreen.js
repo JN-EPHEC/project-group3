@@ -1,27 +1,31 @@
 import { router } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { Colors } from '../../constants/theme';
 
 const WelcomeScreen = () => {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.contentContainer}>
-        <Text style={styles.title}>WeKid</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: colors.tint }]}>WeKid</Text>
+        <Text style={[styles.subtitle, { color: colors.tint }]}>
           La platforme qui facilite la co-parentalité et met le bien-être de vos enfants au centre
         </Text>
       </View>
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.registerButton}
+          style={[styles.registerButton, { backgroundColor: colors.tint }]}
           onPress={() => router.push('UserTypeScreen')}
         >
-          <Text style={styles.buttonText}>Inscription</Text>
+          <Text style={[styles.buttonText, { color: '#fff' }]}>Inscription</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.loginButton}
           onPress={() => router.push('LoginScreen')}
         >
-          <Text style={styles.loginText}>J'ai déjà un compte</Text>
+          <Text style={[styles.loginText, { color: colors.text }]}>J'ai déjà un compte</Text>
         </TouchableOpacity>
       </View>
     </View>

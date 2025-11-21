@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { auth, createFamilyForUser, joinFamilyByCode } from '../../constants/firebase';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { auth, joinFamilyByCode } from '../../constants/firebase';
+import { Colors } from '../../constants/theme';
 
 export default function FamilyCodeScreen() {
   const router = useRouter();
@@ -10,6 +11,8 @@ export default function FamilyCodeScreen() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -49,48 +52,49 @@ export default function FamilyCodeScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
       </TouchableOpacity>
       <View style={styles.contentWrapper}>
-        <Text style={styles.title}>Code de famille</Text>
-        <Text style={styles.subtitle}>Entrez le code de votre famille pour la rejoindre, ou créez la vôtre !</Text>
+        <Text style={[styles.title, { color: colors.tint }]}>Code de famille</Text>
+        <Text style={[styles.subtitle, { color: colors.tint }]}>Entrez le code de votre famille pour la rejoindre, ou créez la vôtre !</Text>
 
         <View style={styles.formContainer}>
-          <Text style={styles.label}>Code de famille</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Code de famille</Text>
           <TextInput
             value={codeInput}
             onChangeText={setCodeInput}
             placeholder="Ex: AB12CD"
-            style={styles.input}
+            placeholderTextColor={colors.textSecondary}
+            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
             autoCapitalize="characters"
           />
-          <TouchableOpacity onPress={handleJoinByCode} disabled={loading} style={styles.joinButton}>
-            <Text style={styles.joinButtonText}>Rejoindre</Text>
+          <TouchableOpacity onPress={handleJoinByCode} disabled={loading} style={[styles.joinButton, { backgroundColor: colors.tint }]}>
+            <Text style={[styles.joinButtonText, { color: '#fff' }]}>Rejoindre</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.separatorContainer}>
-          <View style={styles.line} />
-          <Text style={styles.separatorText}>OU</Text>
-          <View style={styles.line} />
+          <View style={[styles.line, { backgroundColor: colors.text }]} />
+          <Text style={[styles.separatorText, { color: colors.text }]}>OU</Text>
+          <View style={[styles.line, { backgroundColor: colors.text }]} />
         </View>
 
         <TouchableOpacity
           onPress={handleCreateFamily}
-          style={styles.createButton}
+          style={[styles.createButton, { borderColor: colors.tint }]}
           disabled={loading}
         >
-          <Text style={styles.createButtonText}>Créer une famille</Text>
+          <Text style={[styles.createButtonText, { color: colors.tint }]}>Créer une famille</Text>
         </TouchableOpacity>
 
-        {loading && <ActivityIndicator style={styles.loader} size="large" color="#FFFFFF" />}
+        {loading && <ActivityIndicator style={styles.loader} size="large" color={colors.tint} />}
         {message && <Text style={styles.message}>{message}</Text>}
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text style={[styles.error, { color: colors.dangerButton }]}>{error}</Text>}
       </View>
     </View>
   );

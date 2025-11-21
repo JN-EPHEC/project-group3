@@ -1,11 +1,14 @@
 import { router } from 'expo-router';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Colors } from '../../constants/theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const UserTypeScreen = () => {
   const buttonScale1 = new Animated.Value(1);
   const buttonScale2 = new Animated.Value(1);
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   const handlePressIn = (scale) => {
     Animated.spring(scale, {
@@ -29,17 +32,17 @@ const UserTypeScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Pressable 
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
       </Pressable>
       
       <View style={styles.contentContainer}>
-        <Text style={styles.title}>WeKid</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: colors.tint }]}>WeKid</Text>
+        <Text style={[styles.subtitle, { color: colors.tint }]}>
           La plateforme qui facilite la co-parentalité et met le bien-être de vos enfants au centre
         </Text>
       </View>
@@ -48,25 +51,25 @@ const UserTypeScreen = () => {
         <AnimatedPressable
           style={[
             styles.button,
-            { transform: [{ scale: buttonScale1 }] }
+            { transform: [{ scale: buttonScale1 }], backgroundColor: colors.tint }
           ]}
           onPressIn={() => handlePressIn(buttonScale1)}
           onPressOut={() => handlePressOut(buttonScale1)}
           onPress={() => handleUserTypeSelection('parent')}
         >
-          <Text style={styles.buttonText}>Je suis parent</Text>
+          <Text style={[styles.buttonText, { color: '#fff' }]}>Je suis parent</Text>
         </AnimatedPressable>
         
         <AnimatedPressable
           style={[
             styles.button,
-            { transform: [{ scale: buttonScale2 }] }
+            { transform: [{ scale: buttonScale2 }], backgroundColor: colors.tint }
           ]}
           onPressIn={() => handlePressIn(buttonScale2)}
           onPressOut={() => handlePressOut(buttonScale2)}
           onPress={() => handleUserTypeSelection('professionnel')}
         >
-          <Text style={styles.buttonText}>Je suis professionnel</Text>
+          <Text style={[styles.buttonText, { color: '#fff' }]}>Je suis professionnel</Text>
         </AnimatedPressable>
       </View>
     </View>

@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Share, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { auth, createFamilyForUser } from '../../constants/firebase';
+import { Colors } from '../../constants/theme';
 
 export default function CreationFamilyCodeScreen() {
   const router = useRouter();
@@ -9,6 +10,8 @@ export default function CreationFamilyCodeScreen() {
   const [loading, setLoading] = useState(false);
   const [familyCode, setFamilyCode] = useState(null);
   const [error, setError] = useState(null);
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -59,63 +62,63 @@ export default function CreationFamilyCodeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
       </TouchableOpacity>
 
       <View style={styles.contentWrapper}>
         {!familyCode ? (
           <>
-            <Text style={styles.title}>Créer une famille</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: colors.tint }]}>Créer une famille</Text>
+            <Text style={[styles.subtitle, { color: colors.tint }]}>
               Un code unique sera généré pour votre famille. Partagez-le avec vos proches !
             </Text>
 
             <TouchableOpacity
               onPress={handleCreateFamily}
               disabled={loading}
-              style={styles.createButton}
+              style={[styles.createButton, { backgroundColor: colors.tint }]}
             >
-              <Text style={styles.createButtonText}>
+              <Text style={[styles.createButtonText, { color: '#fff' }]}>
                 {loading ? 'Création en cours...' : 'Créer ma famille'}
               </Text>
             </TouchableOpacity>
 
-            {error && <Text style={styles.error}>{error}</Text>}
+            {error && <Text style={[styles.error, { color: colors.dangerButton }]}>{error}</Text>}
           </>
         ) : (
           <>
-            <Text style={styles.title}>Famille créée !</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: colors.tint }]}>Famille créée !</Text>
+            <Text style={[styles.subtitle, { color: colors.tint }]}>
               Votre code famille a été généré avec succès
             </Text>
 
             <View style={styles.codeContainer}>
-              <Text style={styles.codeLabel}>Votre code famille</Text>
-              <View style={styles.codeBox}>
-                <Text style={styles.codeText}>{familyCode}</Text>
+              <Text style={[styles.codeLabel, { color: colors.text }]}>Votre code famille</Text>
+              <View style={[styles.codeBox, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.codeText, { color: colors.tint }]}>{familyCode}</Text>
               </View>
-              <Text style={styles.codeHint}>
+              <Text style={[styles.codeHint, { color: colors.text }]}>
                 Partagez ce code avec les membres de votre famille
               </Text>
             </View>
 
             <TouchableOpacity 
-              style={styles.shareButton}
+              style={[styles.shareButton, { backgroundColor: colors.tint }]}
               onPress={handleShareCode}
             >
-              <Text style={styles.shareButtonText}>Partager le code</Text>
+              <Text style={[styles.shareButtonText, { color: '#fff' }]}>Partager le code</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.homeButton}
+              style={[styles.homeButton, { borderColor: colors.text }]}
               onPress={handleGoToHome}
             >
-              <Text style={styles.homeButtonText}>Accéder à mon espace</Text>
+              <Text style={[styles.homeButtonText, { color: colors.text }]}>Accéder à mon espace</Text>
             </TouchableOpacity>
           </>
         )}

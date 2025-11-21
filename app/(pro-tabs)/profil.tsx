@@ -2,11 +2,14 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { auth, db, signOut } from '../../constants/firebase';
+import { Colors } from '../../constants/theme';
 
 export default function ProProfilScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -50,51 +53,51 @@ export default function ProProfilScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" color="#FFCEB0" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={styles.title}>Profil</Text>
+            <Text style={[styles.title, { color: colors.tint }]}>Profil</Text>
           </View>
 
           <View style={styles.userInfoSection}>
-            <Text style={styles.name}>{firstName} {lastName}</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{firstName} {lastName}</Text>
           </View>
 
           <View style={styles.avatarSection}>
-            <View style={styles.avatarCircle}>
-              <IconSymbol name="person.fill" size={60} color="#FFCEB0" />
+            <View style={[styles.avatarCircle, { backgroundColor: colors.secondaryCardBackground }]}>
+              <IconSymbol name="person.fill" size={60} color={colors.tint} />
             </View>
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#FFCEB0' }]}>Informations du compte</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Informations du compte</Text>
             
-            <View style={styles.infoCard}>
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.infoRow}>
-                <IconSymbol name="person" size={20} color="#666" />
+                <IconSymbol name="person" size={20} color={colors.textSecondary} />
                 <View style={styles.infoText}>
-                  <Text style={styles.infoLabel}>Nom</Text>
-                  <Text style={styles.infoValue}>{firstName} {lastName}</Text>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Nom</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>{firstName} {lastName}</Text>
                 </View>
               </View>
             </View>
 
-            <View style={styles.infoCard}>
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.infoRow}>
-                <IconSymbol name="envelope" size={20} color="#666" />
+                <IconSymbol name="envelope" size={20} color={colors.textSecondary} />
                 <View style={styles.infoText}>
-                  <Text style={styles.infoLabel}>Email</Text>
-                  <Text style={styles.infoValue}>{email}</Text>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>{email}</Text>
                 </View>
               </View>
             </View>
