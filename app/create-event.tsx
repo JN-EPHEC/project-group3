@@ -1,11 +1,14 @@
 import { Stack, useRouter } from 'expo-router';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { useRef, useState } from 'react';
-import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
+import { Colors } from '../constants/theme';
 
 export default function CreateEventScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date());
@@ -152,14 +155,14 @@ export default function CreateEventScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <ScrollView style={styles.scrollView}>
           <View style={styles.container}>
             <View style={styles.form}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Titre *</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Titre *</Text>
                 <TextInput 
-                  style={[styles.input, titleError && styles.inputError]} 
+                  style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }, titleError && styles.inputError]} 
                   placeholder="Ex: Rendez-vous médecin" 
                   value={title} 
                   onChangeText={(text) => {
@@ -168,30 +171,30 @@ export default function CreateEventScreen() {
                       setTitleError('');
                     }
                   }} 
-                  placeholderTextColor="#999" 
+                  placeholderTextColor={colors.textSecondary} 
                 />
                 {titleError ? <Text style={styles.errorText}>{titleError}</Text> : null}
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Date</Text>
-                <TouchableOpacity style={styles.dateButton} onPress={() => { setSelectedDay(date.getDate()); setSelectedMonth(date.getMonth()); setSelectedYear(date.getFullYear()); setShowDatePicker(true); }}>
-                  <Text style={styles.dateButtonText}>{date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Date</Text>
+                <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => { setSelectedDay(date.getDate()); setSelectedMonth(date.getMonth()); setSelectedYear(date.getFullYear()); setShowDatePicker(true); }}>
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}>{date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Catégorie</Text>
-                <TouchableOpacity style={styles.categoryButton} onPress={() => setShowCategoryPicker(true)}>
+                <Text style={[styles.label, { color: colors.text }]}>Catégorie</Text>
+                <TouchableOpacity style={[styles.categoryButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowCategoryPicker(true)}>
                   <View style={styles.categoryDisplay}>
                     <View style={[styles.categoryColorDot, { backgroundColor: category.color }]} />
-                    <Text style={styles.categoryButtonText}>{category.name}</Text>
+                    <Text style={[styles.categoryButtonText, { color: colors.text }]}>{category.name}</Text>
                   </View>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.toggleContainer}>
-                <Text style={styles.label}>Toute la journée</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Toute la journée</Text>
                 <TouchableOpacity style={[styles.toggle, isAllDay && styles.toggleActive]} onPress={() => setIsAllDay(!isAllDay)}>
                   <View style={[styles.toggleCircle, isAllDay && styles.toggleCircleActive]} />
                 </TouchableOpacity>
@@ -200,28 +203,28 @@ export default function CreateEventScreen() {
               {!isAllDay && (
                 <>
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Heure de début</Text>
-                    <TouchableOpacity style={styles.dateButton} onPress={() => { setSelectedStartHour(startTime.getHours()); setSelectedStartMinute(startTime.getMinutes()); setShowStartTimePicker(true); }}>
-                      <Text style={styles.dateButtonText}>{startTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
+                    <Text style={[styles.label, { color: colors.text }]}>Heure de début</Text>
+                    <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => { setSelectedStartHour(startTime.getHours()); setSelectedStartMinute(startTime.getMinutes()); setShowStartTimePicker(true); }}>
+                      <Text style={[styles.dateButtonText, { color: colors.text }]}>{startTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
                     </TouchableOpacity>
                   </View>
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Heure de fin</Text>
-                    <TouchableOpacity style={styles.dateButton} onPress={() => { setSelectedEndHour(endTime.getHours()); setSelectedEndMinute(endTime.getMinutes()); setShowEndTimePicker(true); }}>
-                      <Text style={styles.dateButtonText}>{endTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
+                    <Text style={[styles.label, { color: colors.text }]}>Heure de fin</Text>
+                    <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => { setSelectedEndHour(endTime.getHours()); setSelectedEndMinute(endTime.getMinutes()); setShowEndTimePicker(true); }}>
+                      <Text style={[styles.dateButtonText, { color: colors.text }]}>{endTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
                     </TouchableOpacity>
                   </View>
                 </>
               )}
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Description</Text>
-                <TextInput style={[styles.input, styles.textArea]} placeholder="Ajouter une description..." value={description} onChangeText={setDescription} multiline numberOfLines={4} textAlignVertical="top" placeholderTextColor="#999" />
+                <Text style={[styles.label, { color: colors.text }]}>Description</Text>
+                <TextInput style={[styles.input, styles.textArea, { backgroundColor: colors.cardBackground, color: colors.text }]} placeholder="Ajouter une description..." value={description} onChangeText={setDescription} multiline numberOfLines={4} textAlignVertical="top" placeholderTextColor={colors.textSecondary} />
               </View>
 
               <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.cancelButtonStyle} onPress={() => router.back()}>
-                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                <TouchableOpacity style={[styles.cancelButtonStyle, { backgroundColor: colors.cardBackground }]} onPress={() => router.back()}>
+                  <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.createButtonStyle, (loading || !title.trim()) && styles.disabled]} onPress={handleCreateEvent} disabled={loading || !title.trim()}>
                   <Text style={styles.createButtonText}>{loading ? 'Création...' : 'Créer'}</Text>
@@ -252,34 +255,34 @@ export default function CreateEventScreen() {
           }, 300);
         }}>
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Sélectionner une date</Text>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionner une date</Text>
               <View style={styles.pickerRow}>
                 <ScrollView ref={dayScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {days.map((day) => (
-                    <TouchableOpacity key={day} style={[styles.pickerItem, selectedDay === day && styles.pickerItemSelected]} onPress={() => setSelectedDay(day)}>
-                      <Text style={[styles.pickerText, selectedDay === day && styles.pickerTextSelected]}>{day}</Text>
+                    <TouchableOpacity key={day} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedDay === day && styles.pickerItemSelected]} onPress={() => setSelectedDay(day)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedDay === day && styles.pickerTextSelected]}>{day}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
                 <ScrollView ref={monthScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {months.map((month, index) => (
-                    <TouchableOpacity key={index} style={[styles.pickerItem, selectedMonth === index && styles.pickerItemSelected]} onPress={() => setSelectedMonth(index)}>
-                      <Text style={[styles.pickerText, selectedMonth === index && styles.pickerTextSelected]}>{month}</Text>
+                    <TouchableOpacity key={index} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedMonth === index && styles.pickerItemSelected]} onPress={() => setSelectedMonth(index)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedMonth === index && styles.pickerTextSelected]}>{month}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
                 <ScrollView ref={yearScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {years.map((year) => (
-                    <TouchableOpacity key={year} style={[styles.pickerItem, selectedYear === year && styles.pickerItemSelected]} onPress={() => setSelectedYear(year)}>
-                      <Text style={[styles.pickerText, selectedYear === year && styles.pickerTextSelected]}>{year}</Text>
+                    <TouchableOpacity key={year} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedYear === year && styles.pickerItemSelected]} onPress={() => setSelectedYear(year)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedYear === year && styles.pickerTextSelected]}>{year}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowDatePicker(false)}>
-                  <Text style={styles.modalCancelText}>Annuler</Text>
+                <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowDatePicker(false)}>
+                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmDate}>
                   <Text style={styles.modalConfirmText}>Confirmer</Text>
@@ -306,28 +309,28 @@ export default function CreateEventScreen() {
           }, 300);
         }}>
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Heure de début</Text>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Heure de début</Text>
               <View style={styles.pickerRow}>
                 <ScrollView ref={startHourScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {hours.map((hour) => (
-                    <TouchableOpacity key={hour} style={[styles.pickerItem, selectedStartHour === hour && styles.pickerItemSelected]} onPress={() => setSelectedStartHour(hour)}>
-                      <Text style={[styles.pickerText, selectedStartHour === hour && styles.pickerTextSelected]}>{hour.toString().padStart(2, '0')}</Text>
+                    <TouchableOpacity key={hour} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedStartHour === hour && styles.pickerItemSelected]} onPress={() => setSelectedStartHour(hour)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedStartHour === hour && styles.pickerTextSelected]}>{hour.toString().padStart(2, '0')}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <Text style={styles.timeSeparator}>:</Text>
+                <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
                 <ScrollView ref={startMinuteScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {minutes.map((minute) => (
-                    <TouchableOpacity key={minute} style={[styles.pickerItem, selectedStartMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedStartMinute(minute)}>
-                      <Text style={[styles.pickerText, selectedStartMinute === minute && styles.pickerTextSelected]}>{minute.toString().padStart(2, '0')}</Text>
+                    <TouchableOpacity key={minute} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedStartMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedStartMinute(minute)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedStartMinute === minute && styles.pickerTextSelected]}>{minute.toString().padStart(2, '0')}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowStartTimePicker(false)}>
-                  <Text style={styles.modalCancelText}>Annuler</Text>
+                <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowStartTimePicker(false)}>
+                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmStartTime}>
                   <Text style={styles.modalConfirmText}>Confirmer</Text>
@@ -354,28 +357,28 @@ export default function CreateEventScreen() {
           }, 300);
         }}>
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Heure de fin</Text>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Heure de fin</Text>
               <View style={styles.pickerRow}>
                 <ScrollView ref={endHourScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {hours.map((hour) => (
-                    <TouchableOpacity key={hour} style={[styles.pickerItem, selectedEndHour === hour && styles.pickerItemSelected]} onPress={() => setSelectedEndHour(hour)}>
-                      <Text style={[styles.pickerText, selectedEndHour === hour && styles.pickerTextSelected]}>{hour.toString().padStart(2, '0')}</Text>
+                    <TouchableOpacity key={hour} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedEndHour === hour && styles.pickerItemSelected]} onPress={() => setSelectedEndHour(hour)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedEndHour === hour && styles.pickerTextSelected]}>{hour.toString().padStart(2, '0')}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <Text style={styles.timeSeparator}>:</Text>
+                <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
                 <ScrollView ref={endMinuteScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {minutes.map((minute) => (
-                    <TouchableOpacity key={minute} style={[styles.pickerItem, selectedEndMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedEndMinute(minute)}>
-                      <Text style={[styles.pickerText, selectedEndMinute === minute && styles.pickerTextSelected]}>{minute.toString().padStart(2, '0')}</Text>
+                    <TouchableOpacity key={minute} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedEndMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedEndMinute(minute)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedEndMinute === minute && styles.pickerTextSelected]}>{minute.toString().padStart(2, '0')}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowEndTimePicker(false)}>
-                  <Text style={styles.modalCancelText}>Annuler</Text>
+                <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowEndTimePicker(false)}>
+                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmEndTime}>
                   <Text style={styles.modalConfirmText}>Confirmer</Text>
@@ -387,8 +390,8 @@ export default function CreateEventScreen() {
 
         <Modal visible={showCategoryPicker} transparent={true} animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Sélectionner une catégorie</Text>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionner une catégorie</Text>
               
               <ScrollView style={styles.categoryList} showsVerticalScrollIndicator={false}>
                 {categories.map((cat, index) => (
@@ -396,6 +399,7 @@ export default function CreateEventScreen() {
                     key={index} 
                     style={[
                       styles.categoryItem, 
+                      { backgroundColor: colors.cardBackground },
                       category.name === cat.name && styles.categoryItemSelected
                     ]} 
                     onPress={() => {
@@ -404,15 +408,15 @@ export default function CreateEventScreen() {
                     }}
                   >
                     <View style={[styles.categoryColorDot, { backgroundColor: cat.color }]} />
-                    <Text style={[styles.categoryItemText, category.name === cat.name && styles.categoryItemTextSelected]}>
+                    <Text style={[styles.categoryItemText, { color: colors.text }, category.name === cat.name && styles.categoryItemTextSelected]}>
                       {cat.name}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
 
-              <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowCategoryPicker(false)}>
-                <Text style={styles.modalCancelText}>Annuler</Text>
+              <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowCategoryPicker(false)}>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
               </TouchableOpacity>
             </View>
           </View>

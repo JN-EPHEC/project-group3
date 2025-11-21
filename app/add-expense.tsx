@@ -1,14 +1,17 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { auth, db, getUserFamily, storage } from '../constants/firebase';
 
 export default function AddExpenseScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
@@ -181,9 +184,9 @@ export default function AddExpenseScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" color="#87CEEB" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
@@ -192,58 +195,58 @@ export default function AddExpenseScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <ScrollView style={styles.scrollView}>
           <View style={styles.container}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <Text style={styles.backButtonText}>←</Text>
+              <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
             </TouchableOpacity>
 
             <View style={styles.header}>
-              <Text style={styles.title}>Ajouter une dépense</Text>
+              <Text style={[styles.title, { color: colors.tint }]}>Ajouter une dépense</Text>
             </View>
 
             <View style={styles.form}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Description *</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Description *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
                   placeholder="Ex: T-shirt pour Louis"
                   value={description}
                   onChangeText={setDescription}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Montant (€) *</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Montant (€) *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
                   placeholder="0.00"
                   value={amount}
                   onChangeText={setAmount}
                   keyboardType="decimal-pad"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Catégorie *</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Catégorie *</Text>
                 <TouchableOpacity 
-                  style={styles.categoryButton}
+                  style={[styles.categoryButton, { backgroundColor: colors.cardBackground }]}
                   onPress={() => setShowCategoryPicker(true)}
                 >
-                  <Text style={[styles.categoryButtonText, !category && { color: '#999' }]}>
+                  <Text style={[styles.categoryButtonText, { color: category ? colors.text : colors.textSecondary }]}>
                     {category || 'Sélectionner une catégorie'}
                   </Text>
-                  <IconSymbol name="chevron.down" size={20} color="#666" />
+                  <IconSymbol name="chevron.down" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Date</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Date</Text>
                 <TouchableOpacity 
-                  style={styles.dateButton}
+                  style={[styles.dateButton, { backgroundColor: colors.cardBackground }]}
                   onPress={() => {
                     setSelectedDay(date.getDate());
                     setSelectedMonth(date.getMonth());
@@ -251,14 +254,14 @@ export default function AddExpenseScreen() {
                     setShowDatePicker(true);
                   }}
                 >
-                  <Text style={styles.dateButtonText}>
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
                     {date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   </Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Ticket de caisse / Photo de l'achat</Text>
+                <Text style={[styles.label, { color: colors.text }]}>Ticket de caisse / Photo de l'achat</Text>
                 {imageUri ? (
                   <View style={styles.imagePreview}>
                     <Image source={{ uri: imageUri }} style={styles.previewImage} />
@@ -271,24 +274,24 @@ export default function AddExpenseScreen() {
                   </View>
                 ) : (
                   <View style={styles.imageButtons}>
-                    <TouchableOpacity style={styles.imageButton} onPress={handlePickImage}>
-                      <IconSymbol name="photo" size={24} color="#87CEEB" />
-                      <Text style={styles.imageButtonText}>Galerie</Text>
+                    <TouchableOpacity style={[styles.imageButton, { backgroundColor: colors.cardBackground }]} onPress={handlePickImage}>
+                      <IconSymbol name="photo" size={24} color={colors.tint} />
+                      <Text style={[styles.imageButtonText, { color: colors.tint }]}>Galerie</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.imageButton} onPress={handleTakePhoto}>
-                      <IconSymbol name="camera.fill" size={24} color="#87CEEB" />
-                      <Text style={styles.imageButtonText}>Caméra</Text>
+                    <TouchableOpacity style={[styles.imageButton, { backgroundColor: colors.cardBackground }]} onPress={handleTakePhoto}>
+                      <IconSymbol name="camera.fill" size={24} color={colors.tint} />
+                      <Text style={[styles.imageButtonText, { color: colors.tint }]}>Caméra</Text>
                     </TouchableOpacity>
                   </View>
                 )}
               </View>
 
               <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
-                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                <TouchableOpacity style={[styles.cancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => router.back()}>
+                  <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={[styles.saveButton, saving && styles.disabled]} 
+                  style={[styles.saveButton, { backgroundColor: colors.tint }, saving && styles.disabled]} 
                   onPress={handleSaveExpense}
                   disabled={saving}
                 >
@@ -321,34 +324,34 @@ export default function AddExpenseScreen() {
           }, 300);
         }}>
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Sélectionner une date</Text>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionner une date</Text>
               <View style={styles.pickerRow}>
                 <ScrollView ref={dayScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {days.map((day) => (
-                    <TouchableOpacity key={day} style={[styles.pickerItem, selectedDay === day && styles.pickerItemSelected]} onPress={() => setSelectedDay(day)}>
-                      <Text style={[styles.pickerText, selectedDay === day && styles.pickerTextSelected]}>{day}</Text>
+                    <TouchableOpacity key={day} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedDay === day && styles.pickerItemSelected]} onPress={() => setSelectedDay(day)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedDay === day && styles.pickerTextSelected]}>{day}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
                 <ScrollView ref={monthScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {months.map((month, index) => (
-                    <TouchableOpacity key={index} style={[styles.pickerItem, selectedMonth === index && styles.pickerItemSelected]} onPress={() => setSelectedMonth(index)}>
-                      <Text style={[styles.pickerText, selectedMonth === index && styles.pickerTextSelected]}>{month}</Text>
+                    <TouchableOpacity key={index} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedMonth === index && styles.pickerItemSelected]} onPress={() => setSelectedMonth(index)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedMonth === index && styles.pickerTextSelected]}>{month}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
                 <ScrollView ref={yearScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {years.map((year) => (
-                    <TouchableOpacity key={year} style={[styles.pickerItem, selectedYear === year && styles.pickerItemSelected]} onPress={() => setSelectedYear(year)}>
-                      <Text style={[styles.pickerText, selectedYear === year && styles.pickerTextSelected]}>{year}</Text>
+                    <TouchableOpacity key={year} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedYear === year && styles.pickerItemSelected]} onPress={() => setSelectedYear(year)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedYear === year && styles.pickerTextSelected]}>{year}</Text>
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
               </View>
               <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowDatePicker(false)}>
-                  <Text style={styles.modalCancelText}>Annuler</Text>
+                <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowDatePicker(false)}>
+                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmDate}>
                   <Text style={styles.modalConfirmText}>Confirmer</Text>
@@ -361,19 +364,19 @@ export default function AddExpenseScreen() {
         {/* Category Picker Modal */}
         <Modal visible={showCategoryPicker} transparent={true} animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Sélectionner une catégorie</Text>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionner une catégorie</Text>
               
               <ScrollView style={styles.categoryList}>
                 {categories.map((cat, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={styles.categoryItem}
+                    style={[styles.categoryItem, { borderBottomColor: colors.border }]}
                     onPress={() => handleSelectCategory(cat.name)}
                   >
-                    <Text style={styles.categoryItemText}>{cat.name}</Text>
+                    <Text style={[styles.categoryItemText, { color: colors.text }]}>{cat.name}</Text>
                     {category === cat.name && (
-                      <IconSymbol name="checkmark" size={20} color="#87CEEB" />
+                      <IconSymbol name="checkmark" size={20} color={colors.tint} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -381,15 +384,15 @@ export default function AddExpenseScreen() {
                 {showNewCategoryInput ? (
                   <View style={styles.newCategoryInput}>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
                       placeholder="Nom de la catégorie"
                       value={newCategoryName}
                       onChangeText={setNewCategoryName}
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       autoFocus
                     />
                     <TouchableOpacity 
-                      style={styles.addCategoryButton}
+                      style={[styles.addCategoryButton, { backgroundColor: colors.tint }]}
                       onPress={handleAddNewCategory}
                     >
                       <Text style={styles.addCategoryButtonText}>Ajouter</Text>
@@ -400,21 +403,21 @@ export default function AddExpenseScreen() {
                     style={styles.newCategoryButton}
                     onPress={() => setShowNewCategoryInput(true)}
                   >
-                    <IconSymbol name="plus.circle" size={20} color="#87CEEB" />
-                    <Text style={styles.newCategoryButtonText}>Nouvelle catégorie</Text>
+                    <IconSymbol name="plus.circle" size={20} color={colors.tint} />
+                    <Text style={[styles.newCategoryButtonText, { color: colors.tint }]}>Nouvelle catégorie</Text>
                   </TouchableOpacity>
                 )}
               </ScrollView>
 
               <TouchableOpacity 
-                style={styles.modalCloseButton}
+                style={[styles.modalCloseButton, { backgroundColor: colors.cardBackground }]}
                 onPress={() => {
                   setShowCategoryPicker(false);
                   setShowNewCategoryInput(false);
                   setNewCategoryName('');
                 }}
               >
-                <Text style={styles.modalCloseText}>Fermer</Text>
+                <Text style={[styles.modalCloseText, { color: colors.textSecondary }]}>Fermer</Text>
               </TouchableOpacity>
             </View>
           </View>

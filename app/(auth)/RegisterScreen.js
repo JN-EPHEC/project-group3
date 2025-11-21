@@ -4,7 +4,8 @@ import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { Colors } from '../../constants/theme';
 
 const RegisterScreen = () => {
   const [firstName, setFirstName] = useState('');
@@ -14,6 +15,8 @@ const RegisterScreen = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [imageUri, setImageUri] = useState(null);
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   const { userType } = useLocalSearchParams();
   const auth = getAuth();
@@ -112,82 +115,82 @@ const RegisterScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <TouchableOpacity 
         style={styles.backButton}
         onPress={() => router.back()}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
       </TouchableOpacity>
 
       <View style={styles.contentContainer}>
-        <Text style={styles.title}>Inscription</Text>
+        <Text style={[styles.title, { color: colors.tint }]}>Inscription</Text>
         
         <View style={styles.formContainer}>
-          <Text style={styles.label}>Nom*</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Nom*</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
             placeholder="Dupont"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             value={lastName}
             onChangeText={setLastName}
             autoCapitalize="words"
           />
 
-          <Text style={styles.label}>Prénom*</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Prénom*</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
             placeholder="Maya"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             value={firstName}
             onChangeText={setFirstName}
             autoCapitalize="words"
           />
 
-          <Text style={styles.label}>Email*</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Email*</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
             placeholder="votre@email.be"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
           />
 
-          <Text style={styles.label}>Mot de passe*</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Mot de passe*</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
             placeholder="Mot de passe"
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
           />
 
-          <Text style={styles.label}>Photo de profil</Text>
+          <Text style={[styles.label, { color: colors.text }]}>Photo de profil</Text>
           <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
             {imageUri ? (
               <Image source={{ uri: imageUri }} style={styles.photoPlaceholder} />
             ) : (
-              <View style={styles.photoPlaceholder}>
-                <Text style={styles.photoIcon}>✎</Text>
+              <View style={[styles.photoPlaceholder, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.photoIcon, { color: colors.textSecondary }]}>✎</Text>
               </View>
             )}
           </TouchableOpacity>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#0000ff" />
+        <ActivityIndicator size="large" color={colors.tint} />
       ) : (
         <TouchableOpacity 
-          style={styles.registerButton} 
+          style={[styles.registerButton, { backgroundColor: colors.tint }]} 
           onPress={handleRegister} 
           disabled={loading}
         >
-          <Text style={styles.registerButtonText}>Créer le compte</Text>
+          <Text style={[styles.registerButtonText, { color: '#fff' }]}>Créer le compte</Text>
         </TouchableOpacity>
       )}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: colors.dangerButton }]}>{error}</Text> : null}
     </View>
     </View>
     </View>

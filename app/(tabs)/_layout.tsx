@@ -1,11 +1,46 @@
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
-import React from 'react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import { Image, Platform, useColorScheme } from 'react-native';
+import { auth, db, getUserFamily } from '../../constants/firebase';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const setupUnreadListener = async () => {
+      try {
+        const userFamily = await getUserFamily(currentUser.uid);
+        if (!userFamily?.id) return;
+
+        const conversationsQuery = query(
+          collection(db, 'conversations'),
+          where('familyId', '==', userFamily.id),
+          where('participants', 'array-contains', currentUser.uid)
+        );
+
+        const unsubscribe = onSnapshot(conversationsQuery, (snapshot) => {
+          const total = snapshot.docs.reduce((sum, doc) => {
+            const data = doc.data();
+            return sum + (data.unreadCount?.[currentUser.uid] || 0);
+          }, 0);
+          setUnreadCount(total);
+        });
+
+        return unsubscribe;
+      } catch (error) {
+        console.error('Error setting up unread listener:', error);
+      }
+    };
+
+    setupUnreadListener();
+  }, []);
 
   return (
     <Tabs
@@ -13,6 +48,18 @@ export default function TabLayout() {
         tabBarActiveTintColor: isDark ? '#87CEEB' : '#87CEEB',
         tabBarInactiveTintColor: isDark ? '#666' : '#999',
         tabBarShowLabel: true,
+        tabBarBadgeStyle: {
+          backgroundColor: isDark ? '#007AFF' : '#87CEEB',
+          color: '#FFFFFF',
+          fontSize: 12,
+          fontWeight: '700',
+          minWidth: 20,
+          height: 20,
+          borderRadius: 10,
+          lineHeight: 20,
+          textAlign: 'center',
+          paddingHorizontal: 6,
+        } as any,
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
@@ -91,6 +138,7 @@ export default function TabLayout() {
         name="Message"
         options={{
           title: 'Messages',
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarIcon: ({ focused, color, size }) => (
             <Image 
               source={require('../../ImageAndLogo/logomessage.png')}

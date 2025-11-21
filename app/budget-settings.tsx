@@ -1,12 +1,15 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
 import { Stack, useRouter } from 'expo-router';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
 export default function BudgetSettingsScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,9 +101,9 @@ export default function BudgetSettingsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" color="#87CEEB" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
@@ -109,39 +112,39 @@ export default function BudgetSettingsScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <ScrollView style={styles.scrollView}>
           <View style={styles.container}>
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <Text style={styles.backButtonText}>←</Text>
+              <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
             </TouchableOpacity>
 
             <View style={styles.header}>
-              <Text style={styles.title}>Paramètres de budget</Text>
-              <Text style={styles.subtitle}>Définissez les limites de dépenses par catégorie selon votre convention</Text>
+              <Text style={[styles.title, { color: colors.tint }]}>Paramètres de budget</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Définissez les limites de dépenses par catégorie selon votre convention</Text>
             </View>
 
             <View style={styles.categoriesSection}>
               {categories.map((category, index) => (
-                <View key={index} style={styles.categoryCard}>
+                <View key={index} style={[styles.categoryCard, { backgroundColor: colors.cardBackground }]}>
                   <View style={styles.categoryInputs}>
                     <TextInput
-                      style={styles.categoryNameInput}
+                      style={[styles.categoryNameInput, { backgroundColor: colors.background, color: colors.text }]}
                       placeholder="Nom de la catégorie"
                       value={category.name}
                       onChangeText={(value) => handleUpdateCategory(index, 'name', value)}
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                     />
-                    <View style={styles.limitInputContainer}>
+                    <View style={[styles.limitInputContainer, { backgroundColor: colors.background }]}>
                       <TextInput
-                        style={styles.limitInput}
+                        style={[styles.limitInput, { color: colors.text }]}
                         placeholder="0"
                         value={category.limit.toString()}
                         onChangeText={(value) => handleUpdateCategory(index, 'limit', value)}
                         keyboardType="decimal-pad"
-                        placeholderTextColor="#999"
+                        placeholderTextColor={colors.textSecondary}
                       />
-                      <Text style={styles.currencySymbol}>€</Text>
+                      <Text style={[styles.currencySymbol, { color: colors.textSecondary }]}>€</Text>
                     </View>
                   </View>
                   <TouchableOpacity 
@@ -153,25 +156,25 @@ export default function BudgetSettingsScreen() {
                 </View>
               ))}
 
-              <TouchableOpacity style={styles.addCategoryButton} onPress={handleAddCategory}>
-                <IconSymbol name="plus.circle" size={24} color="#87CEEB" />
-                <Text style={styles.addCategoryText}>Ajouter une catégorie</Text>
+              <TouchableOpacity style={[styles.addCategoryButton, { backgroundColor: colors.cardBackground }]} onPress={handleAddCategory}>
+                <IconSymbol name="plus.circle" size={24} color={colors.tint} />
+                <Text style={[styles.addCategoryText, { color: colors.tint }]}>Ajouter une catégorie</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.infoCard}>
-              <IconSymbol name="info.circle" size={20} color="#87CEEB" />
-              <Text style={styles.infoText}>
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              <IconSymbol name="info.circle" size={20} color={colors.tint} />
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                 Ces limites seront visibles par les deux parents et permettront de suivre les dépenses selon votre convention de divorce.
               </Text>
             </View>
 
             <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
-                <Text style={styles.cancelButtonText}>Annuler</Text>
+              <TouchableOpacity style={[styles.cancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => router.back()}>
+                <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.saveButton, saving && styles.disabled]} 
+                style={[styles.saveButton, { backgroundColor: colors.tint }, saving && styles.disabled]} 
                 onPress={handleSave}
                 disabled={saving}
               >
