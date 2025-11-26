@@ -7,6 +7,26 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { Colors } from '../../constants/theme';
 
+// Fonction de validation détaillée pour expliquer l'erreur spécifique
+const getPasswordError = (password) => {
+  if (password.length < 8 || password.length > 16) {
+    return "Le mot de passe doit contenir entre 8 et 16 caractères.";
+  }
+  if (!/[A-Z]/.test(password)) {
+    return "Le mot de passe doit contenir au moins une lettre majuscule.";
+  }
+  if (!/[a-z]/.test(password)) {
+    return "Le mot de passe doit contenir au moins une lettre minuscule.";
+  }
+  if (!/\d/.test(password)) {
+    return "Le mot de passe doit contenir au moins un chiffre.";
+  }
+  if (!/[@$!%*?&]/.test(password)) {
+    return "Le mot de passe doit contenir un caractère spécial (@$!%*?&).";
+  }
+  return null; // Aucune erreur
+};
+
 const RegisterScreen = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -28,14 +48,29 @@ const RegisterScreen = () => {
     setLoading(true);
     setError('');
 
-    if (!firstName || !lastName || !email || !password) {
-      setError('Veuillez remplir tous les champs obligatoires');
+    // Nettoyage des espaces inutiles
+    const cleanFirstName = firstName.trim();
+    const cleanLastName = lastName.trim();
+    const cleanEmail = email.trim();
+
+    // 1. Vérification des champs requis
+    if (!cleanFirstName || !cleanLastName || !cleanEmail || !password) {
+      setError('Veuillez remplir tous les champs obligatoires.');
+      setLoading(false);
+      return;
+    }
+
+    // 2. Validation détaillée du mot de passe
+    const passwordError = getPasswordError(password);
+    if (passwordError) {
+      setError(passwordError); // Affiche le problème spécifique
       setLoading(false);
       return;
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      // Création Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       const user = userCredential.user;
 
       let photoURL = null;
@@ -47,15 +82,15 @@ const RegisterScreen = () => {
           await uploadBytes(storageRef, blob);
           photoURL = await getDownloadURL(storageRef);
         } catch (uploadError) {
-          setError('Inscription réussie mais échec upload image: ' + uploadError.message);
+          console.log('Erreur upload image: ' + uploadError.message);
         }
       }
 
       const userDoc = {
         uid: user.uid,
-        firstName,
-        lastName,
-        email: email.toLowerCase(),
+        firstName: cleanFirstName,
+        lastName: cleanLastName,
+        email: cleanEmail.toLowerCase(),
         userType: userType || 'parent',
         createdAt: serverTimestamp(),
       };
@@ -70,20 +105,17 @@ const RegisterScreen = () => {
         router.replace('FamilyCodeScreen');
       }
     } catch (error) {
-      // Gestion des erreurs Firebase avec messages en français
+      // Gestion des erreurs Firebase
       let errorMessage = '';
       switch (error?.code) {
-        case 'auth/weak-password':
-          errorMessage = 'Le mot de passe doit au moins contenir 6 caractères';
-          break;
         case 'auth/email-already-in-use':
-          errorMessage = 'Cette adresse email est déjà utilisée';
+          errorMessage = 'Cette adresse email est déjà utilisée.';
           break;
         case 'auth/invalid-email':
-          errorMessage = 'Adresse email invalide';
+          errorMessage = 'Adresse email invalide.';
           break;
         default:
-          errorMessage = error.message || 'Une erreur est survenue lors de l\'inscription';
+          errorMessage = error.message || 'Une erreur est survenue lors de l\'inscription.';
       }
       setError(errorMessage);
     } finally {
@@ -161,7 +193,7 @@ const RegisterScreen = () => {
           <Text style={[styles.label, { color: colors.text }]}>Mot de passe*</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-            placeholder="Mot de passe"
+            placeholder="8-16 car, Maj, Min, Chiffre, Spécial"
             placeholderTextColor={colors.textSecondary}
             value={password}
             onChangeText={setPassword}
