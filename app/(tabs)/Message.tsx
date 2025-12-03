@@ -3,7 +3,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../../constants/firebase';
@@ -15,6 +15,7 @@ export default function MessageScreen() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -40,21 +41,23 @@ export default function MessageScreen() {
         
         setFamilyMembers(members);
 
-        // Récupérer les conversations
+        // Écouter les conversations en temps réel
         const messagesQuery = query(
           collection(db, 'conversations'),
           where('familyId', '==', userFamily.id),
           where('participants', 'array-contains', uid),
           orderBy('lastMessageTime', 'desc')
         );
-        const messagesSnapshot = await getDocs(messagesQuery);
         
-        const convs = messagesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setConversations(convs);
+        const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+          const convs = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setConversations(convs);
+        });
+
+        return unsubscribe;
       }
     } catch (error) {
       console.error("Error fetching conversations:", error);
@@ -63,9 +66,24 @@ export default function MessageScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchConversations();
+      const unsubscribe = fetchConversations();
+      return () => {
+        if (unsubscribe && typeof unsubscribe.then === 'function') {
+          unsubscribe.then((unsub: any) => unsub && unsub());
+        }
+      };
     }, [fetchConversations])
   );
+
+  // Calculer le nombre total de messages non lus
+  useEffect(() => {
+    if (user?.uid) {
+      const total = conversations.reduce((sum, conv) => {
+        return sum + (conv.unreadCount?.[user.uid] || 0);
+      }, 0);
+      setTotalUnreadCount(total);
+    }
+  }, [conversations, user]);
 
   useEffect(() => {
     const currentUser = auth.currentUser;

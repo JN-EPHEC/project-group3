@@ -1,16 +1,20 @@
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Colors } from '../../constants/theme';
 
 export default function ProMessageScreen() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={styles.title}>Messages Professionnels</Text>
+            <Text style={[styles.title, { color: colors.tint }]}>Messages Professionnels</Text>
           </View>
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#FFCEB0' }]}>Mes conversations</Text>
-            <Text style={styles.emptyText}>Fonctionnalité à venir</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Mes conversations</Text>
+            <Text style={[styles.emptyText, { color: colors.textTertiary }]}>Fonctionnalité à venir</Text>
           </View>
         </View>
       </ScrollView>

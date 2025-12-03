@@ -1,12 +1,15 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { db } from '../constants/firebase';
 
 export default function ExpenseDetailsScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const { expenseId } = useLocalSearchParams();
   const [expense, setExpense] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -76,9 +79,9 @@ export default function ExpenseDetailsScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
           <View style={styles.containerCentered}>
-            <ActivityIndicator size="large" color="#87CEEB" />
+            <ActivityIndicator size="large" color={colors.tint} />
           </View>
         </SafeAreaView>
       </>
@@ -89,10 +92,10 @@ export default function ExpenseDetailsScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
           <View style={styles.containerCentered}>
-            <Text style={styles.errorText}>Dépense introuvable</Text>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={[styles.errorText, { color: colors.textSecondary }]}>Dépense introuvable</Text>
+            <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.tint }]} onPress={() => router.back()}>
               <Text style={styles.backButtonText}>Retour</Text>
             </TouchableOpacity>
           </View>
@@ -104,34 +107,34 @@ export default function ExpenseDetailsScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <ScrollView style={styles.scrollView}>
           <View style={styles.container}>
-            <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
-              <Text style={styles.closeButtonText}>✕</Text>
+            <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.cardBackground }]} onPress={() => router.back()}>
+              <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
             </TouchableOpacity>
 
             <View style={styles.header}>
-              <Text style={styles.title}>{expense.description}</Text>
-              <Text style={styles.amount}>{expense.amount?.toFixed(2)} €</Text>
+              <Text style={[styles.title, { color: colors.text }]}>{expense.description}</Text>
+              <Text style={[styles.amount, { color: colors.tint }]}>{expense.amount?.toFixed(2)} €</Text>
             </View>
 
             {expense.receiptUrl && (
               <View style={styles.imageSection}>
-                <Text style={styles.imageLabel}>Ticket de caisse</Text>
+                <Text style={[styles.imageLabel, { color: colors.text }]}>Ticket de caisse</Text>
                 <Image source={{ uri: expense.receiptUrl }} style={styles.receiptImage} />
               </View>
             )}
 
             <View style={styles.infoSection}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>📦 Catégorie</Text>
-                <Text style={styles.infoValue}>{expense.category || 'Non catégorisé'}</Text>
+              <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📦 Catégorie</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{expense.category || 'Non catégorisé'}</Text>
               </View>
 
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>📅 Date</Text>
-                <Text style={styles.infoValue}>
+              <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📅 Date</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>
                   {expense.date?.toDate ? expense.date.toDate().toLocaleDateString('fr-FR', { 
                     weekday: 'long', 
                     day: 'numeric', 
@@ -144,7 +147,7 @@ export default function ExpenseDetailsScreen() {
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity 
-                style={styles.editButton}
+                style={[styles.editButton, { backgroundColor: colors.tint }]}
                 onPress={() => router.push(`/edit-expense?expenseId=${expense.id}`)}
               >
                 <IconSymbol name="pencil" size={20} color="#fff" />

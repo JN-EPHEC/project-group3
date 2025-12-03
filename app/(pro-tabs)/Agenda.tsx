@@ -5,6 +5,7 @@ import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebas
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../../constants/firebase';
+import { Colors } from '../../constants/theme';
 
 export default function AgendaScreen() {
   const router = useRouter();
@@ -14,7 +15,8 @@ export default function AgendaScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   const fetchEvents = useCallback(async () => {
     const currentUser = auth.currentUser;
@@ -186,9 +188,9 @@ export default function AgendaScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       </SafeAreaView>
     );
@@ -199,45 +201,47 @@ export default function AgendaScreen() {
   const selectedDateEvents = getEventsForSelectedDate();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Agenda partagé</Text>
+            <Text style={[styles.title, { color: colors.text }]}>Agenda partagé</Text>
             <View style={styles.headerButtons}>
-              <View style={styles.todayButton}>
+              <View style={[styles.todayButton, { backgroundColor: colors.secondaryCardBackground }]}>
                 <TouchableOpacity onPress={goToToday}>
-                  <Text style={styles.todayButtonText}>Aujourd'hui</Text>
+                  <Text style={[styles.todayButtonText, { color: colors.text }]}>Aujourd'hui</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => {
-                  router.push('/create-event');
-                }}>
-                  <Text style={styles.addButtonText}>+</Text>
+                <TouchableOpacity 
+                  onPress={() => {
+                    router.push('/create-event');
+                  }}
+                >
+                  <Text style={[styles.addButtonText, { color: colors.tint }]}>+</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
 
           {/* Calendar */}
-          <View style={styles.calendarContainer}>
+          <View style={[styles.calendarContainer, { backgroundColor: colors.cardBackground }]}>
             {/* Month Navigation */}
             <View style={styles.monthHeader}>
               <TouchableOpacity onPress={() => changeMonth(-1)}>
-                <Text style={styles.navButton}>{'<'}</Text>
+                <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'<'}</Text>
               </TouchableOpacity>
-              <Text style={styles.monthText}>
+              <Text style={[styles.monthText, { color: colors.text }]}>
                 {currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
               </Text>
               <TouchableOpacity onPress={() => changeMonth(1)}>
-                <Text style={styles.navButton}>{'>'}</Text>
+                <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'>'}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Week Days */}
             <View style={styles.weekDaysRow}>
               {weekDays.map((day) => (
-                <Text key={day} style={styles.weekDayText}>{day}</Text>
+                <Text key={day} style={[styles.weekDayText, { color: colors.textTertiary }]}>{day}</Text>
               ))}
             </View>
 
@@ -254,14 +258,14 @@ export default function AgendaScreen() {
                 >
                   <View style={[
                     styles.dayCircle,
-                    isToday(day.date) && styles.todayCircle,
-                    isSelected(day.date) && styles.selectedCircle,
+                    isSelected(day.date) && { backgroundColor: colors.secondaryCardBackground },
                   ]}>
                     <Text style={[
                       styles.dayText,
-                      !day.isCurrentMonth && styles.otherMonthText,
-                      isToday(day.date) && styles.todayText,
-                      isSelected(day.date) && styles.selectedText,
+                      { color: colors.text },
+                      !day.isCurrentMonth && { color: colors.textTertiary, opacity: 0.3 },
+                      isToday(day.date) && !isSelected(day.date) && { color: '#dd2e2eff', fontWeight: '700' },
+                      isSelected(day.date) && { color: colors.tint, fontWeight: '700' },
                     ]}>
                       {day.date.getDate()}
                     </Text>
@@ -286,7 +290,7 @@ export default function AgendaScreen() {
 
           {/* Selected Date Events */}
           <View style={styles.eventsSection}>
-            <Text style={styles.eventsSectionTitle}>
+            <Text style={[styles.eventsSectionTitle, { color: colors.textSecondary }]}>
               {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </Text>
             
@@ -294,17 +298,17 @@ export default function AgendaScreen() {
               selectedDateEvents.map((event: any) => (
                 <TouchableOpacity 
                   key={event.id} 
-                  style={styles.eventCard}
+                  style={[styles.eventCard, { backgroundColor: colors.cardBackground }]}
                   onPress={() => router.push(`/event-details?eventId=${event.id}`)}
                 >
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventTime}>
+                  <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                  <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
                     {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                   </Text>
                 </TouchableOpacity>
               ))
             ) : (
-              <Text style={styles.noEventsText}>Aucun évènement à ce jour</Text>
+              <Text style={[styles.noEventsText, { color: colors.textTertiary }]}>Aucun évènement à ce jour</Text>
             )}
           </View>
 
