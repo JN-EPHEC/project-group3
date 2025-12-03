@@ -143,11 +143,10 @@ export default function MessageScreen() {
           <View style={styles.headerButtons}>
             {familyMembers.length > 0 && (
               <TouchableOpacity 
-                style={[styles.newMessageButton, { backgroundColor: colors.secondaryCardBackground }]}
+                style={[styles.addButton, { backgroundColor: colors.primaryButton }]}
                 onPress={handleNewMessage}
               >
-                <Text style={[styles.newMessageButtonText, { color: colors.tint }]}>Nouveau</Text>
-                <Text style={[styles.addButtonText, { color: colors.tint }]}>+</Text>
+                <Text style={styles.addButtonText}>+</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -255,22 +254,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  newMessageButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  addButton: {
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 10,
     borderRadius: 20,
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
-  },
-  newMessageButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
   },
   addButtonText: {
     fontSize: 24,
+    color: '#FFFFFF',
     fontWeight: '300',
-    lineHeight: 24,
+    lineHeight: 20,
   },
   scrollView: {
     flex: 1,
