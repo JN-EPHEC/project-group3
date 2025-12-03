@@ -1,22 +1,22 @@
 import { initializeApp } from 'firebase/app';
 import {
-  createUserWithEmailAndPassword,
-  signOut as fbSignOut,
-  getAuth,
-  signInWithEmailAndPassword
+    createUserWithEmailAndPassword,
+    signOut as fbSignOut,
+    getAuth,
+    signInWithEmailAndPassword
 } from 'firebase/auth';
 import {
-  addDoc,
-  arrayUnion,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  getFirestore,
-  query,
-  setDoc,
-  updateDoc,
-  where
+    addDoc,
+    arrayUnion,
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    getFirestore,
+    query,
+    setDoc,
+    updateDoc,
+    where
 } from 'firebase/firestore';
 
 import firebaseConfig from './firebaseenv.js';
@@ -177,4 +177,17 @@ export async function signInAndCheck(email, password) {
   const familyId = result.familyId || null;
   const needsFamilyCode = roles.includes('parent') && !familyId;
   return { ...result, needsFamilyCode };
+}
+
+/**
+ * Get the family currency (returns currency code or 'EUR' as default).
+ */
+export async function getFamilyCurrency(uid) {
+  const family = await getUserFamily(uid);
+  if (!family?.id) return 'EUR';
+  
+  const familyRef = doc(db, 'families', family.id);
+  const familySnap = await getDoc(familyRef);
+  
+  return familySnap.exists() ? (familySnap.data().currency || 'EUR') : 'EUR';
 }

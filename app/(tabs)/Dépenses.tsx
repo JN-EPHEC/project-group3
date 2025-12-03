@@ -16,6 +16,7 @@ export default function DepensesScreen() {
   const [partnerShare, setPartnerShare] = useState(0);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<any[]>([]);
+  const [currency, setCurrency] = useState('€');
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -28,6 +29,22 @@ export default function DepensesScreen() {
       const userFamily = await getUserFamily(uid);
       
       if (userFamily?.id) {
+        // Récupérer la devise de la famille
+        const familyRef = doc(db, 'families', userFamily.id);
+        const familySnap = await getDoc(familyRef);
+        if (familySnap.exists()) {
+          const currencyCode = familySnap.data().currency || 'EUR';
+          const currencySymbols: { [key: string]: string } = {
+            'EUR': '€',
+            'USD': '$',
+            'GBP': '£',
+            'CHF': 'CHF',
+            'CAD': 'CAD',
+            'JPY': '¥'
+          };
+          setCurrency(currencySymbols[currencyCode] || '€');
+        }
+
         // Récupérer les dépenses
         const expensesQuery = query(
           collection(db, 'expenses'),
@@ -137,11 +154,11 @@ export default function DepensesScreen() {
           <View style={styles.summarySection}>
             <View style={[styles.summaryCard, { backgroundColor: colors.secondaryCardBackground }]}>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Total dépenses</Text>
-              <Text style={[styles.summaryAmount, { color: colors.text }]}>{totalExpenses.toFixed(2)} €</Text>
+              <Text style={[styles.summaryAmount, { color: colors.text }]}>{totalExpenses.toFixed(2)} {currency}</Text>
             </View>
             <View style={[styles.summaryCard, { backgroundColor: colors.tertiaryCardBackground }]}>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Mes dépenses</Text>
-              <Text style={[styles.summaryAmount, { color: colors.text }]}>{myShare.toFixed(2)} €</Text>
+              <Text style={[styles.summaryAmount, { color: colors.text }]}>{myShare.toFixed(2)} {currency}</Text>
             </View>
           </View>
 
@@ -159,7 +176,7 @@ export default function DepensesScreen() {
                     <View style={styles.budgetHeader}>
                       <Text style={[styles.budgetName, { color: colors.text }]}>{category.name}</Text>
                       <Text style={[styles.budgetAmount, { color: colors.textSecondary }, isOverBudget && styles.overBudget]}>
-                        {spent.toFixed(2)} € / {category.limit.toFixed(2)} €
+                        {spent.toFixed(2)} {currency} / {category.limit.toFixed(2)} {currency}
                       </Text>
                     </View>
                     <View style={[styles.progressBarContainer, { backgroundColor: colors.border }]}>
@@ -212,7 +229,7 @@ export default function DepensesScreen() {
                       </Text>
                     </View>
                   </View>
-                  <Text style={[styles.expenseAmount, { color: colors.tint }]}>{expense.amount?.toFixed(2)} €</Text>
+                  <Text style={[styles.expenseAmount, { color: colors.tint }]}>{expense.amount?.toFixed(2)} {currency}</Text>
                 </TouchableOpacity>
               ))
             ) : (
