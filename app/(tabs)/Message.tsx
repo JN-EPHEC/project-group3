@@ -171,7 +171,11 @@ export default function MessageScreen() {
         </View>
 
         {/* Conversations List */}
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+        >
           {conversations.length > 0 ? (
             conversations.map((conv: any) => {
               const otherParticipant = conv.participants?.find((p: string) => p !== user?.uid);
@@ -289,6 +293,9 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollViewContent: {
+    paddingBottom: 120,
   },
   conversationCard: {
     flexDirection: 'row',

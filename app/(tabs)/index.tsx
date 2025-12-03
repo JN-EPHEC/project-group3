@@ -249,7 +249,12 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollView: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 120,
+  },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row',
