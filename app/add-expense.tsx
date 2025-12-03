@@ -1,483 +1,321 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import * as ImagePicker from 'expo-image-picker';
-import { Stack, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { auth, db, getUserFamily, storage } from '../constants/firebase';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { auth, db, getUserFamily } from '../constants/firebase';
+
+const CATEGORIES = [
+  'Alimentation',
+  'Transport',
+  'Santé',
+  'Éducation',
+  'Loisirs',
+  'Vêtements',
+  'Logement',
+  'Autre'
+];
 
 export default function AddExpenseScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const params = useLocalSearchParams();
+  const [loading, setLoading] = useState(false);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('');
-  const [categories, setCategories] = useState<any[]>([]);
-  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [date, setDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-
-  const dayScrollRef = useRef<any>(null);
-  const monthScrollRef = useRef<any>(null);
-  const yearScrollRef = useRef<any>(null);
+  const [category, setCategory] = useState('Alimentation');
+  const [currency, setCurrency] = useState('€');
+  const [productImage, setProductImage] = useState<string | null>(null);
+  const [barcode, setBarcode] = useState<string | null>(null);
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
-    const fetchCategories = async () => {
+    // Si un produit scanné est passé en paramètre
+    if (params.scannedProduct) {
+      try {
+        const product = JSON.parse(params.scannedProduct as string);
+        setDescription(product.name + (product.brand ? ` - ${product.brand}` : ''));
+        setCategory(product.category || 'Alimentation');
+        setProductImage(product.image);
+        setBarcode(product.barcode);
+      } catch (error) {
+        console.error('Error parsing scanned product:', error);
+      }
+    }
+
+    // Récupérer la devise de la famille
+    const fetchCurrency = async () => {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
 
-      try {
-        const userFamily = await getUserFamily(currentUser.uid);
-        if (userFamily?.id) {
-          const budgetDoc = await getDoc(doc(db, 'budgets', userFamily.id));
-          if (budgetDoc.exists()) {
-            setCategories(budgetDoc.data().categories || []);
-          }
+      const userFamily = await getUserFamily(currentUser.uid);
+      if (userFamily?.id) {
+        const familyRef = doc(db, 'families', userFamily.id);
+        const familySnap = await getDoc(familyRef);
+        if (familySnap.exists()) {
+          const currencyCode = familySnap.data().currency || 'EUR';
+          const currencySymbols: { [key: string]: string } = {
+            'EUR': '€',
+            'USD': '$',
+            'GBP': '£',
+            'CHF': 'CHF',
+            'CAD': 'CAD',
+            'JPY': '¥'
+          };
+          setCurrency(currencySymbols[currencyCode] || '€');
         }
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-      } finally {
-        setLoading(false);
       }
     };
 
-    fetchCategories();
-  }, []);
+    fetchCurrency();
+  }, [params]);
 
-  const handlePickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Autorisez l\'accès aux images pour ajouter un ticket de caisse.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImageUri(result.assets[0].uri);
-    }
-  };
-
-  const handleTakePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission requise', 'Autorisez l\'accès à la caméra pour prendre une photo.');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImageUri(result.assets[0].uri);
-    }
-  };
-
-  const handleSelectCategory = (categoryName: string) => {
-    setCategory(categoryName);
-    setShowCategoryPicker(false);
-    setShowNewCategoryInput(false);
-  };
-
-  const handleAddNewCategory = () => {
-    if (!newCategoryName.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un nom de catégorie');
-      return;
-    }
-    setCategory(newCategoryName.trim());
-    setShowCategoryPicker(false);
-    setShowNewCategoryInput(false);
-    setNewCategoryName('');
-  };
-
-  const handleSaveExpense = async () => {
-    if (!description.trim() || !amount.trim() || !category) {
+  const handleSubmit = async () => {
+    if (!description.trim() || !amount.trim()) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
       return;
     }
 
-    const amountValue = parseFloat(amount);
-    if (isNaN(amountValue) || amountValue <= 0) {
-      Alert.alert('Erreur', 'Veuillez entrer un montant valide');
+    const amountNumber = parseFloat(amount);
+    if (isNaN(amountNumber) || amountNumber <= 0) {
+      Alert.alert('Erreur', 'Le montant doit être un nombre valide');
       return;
     }
 
-    setSaving(true);
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
+    setLoading(true);
     try {
-      const userFamily = await getUserFamily(currentUser.uid);
-      if (!userFamily?.id) {
-        Alert.alert('Erreur', 'Vous devez appartenir à une famille');
-        setSaving(false);
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        Alert.alert('Erreur', 'Vous devez être connecté');
         return;
       }
 
-      let receiptUrl = null;
-      if (imageUri) {
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const filename = `expenses/${userFamily.id}/${Date.now()}.jpg`;
-        const storageRef = ref(storage, filename);
-        await uploadBytes(storageRef, blob);
-        receiptUrl = await getDownloadURL(storageRef);
+      const userFamily = await getUserFamily(currentUser.uid);
+      if (!userFamily?.id) {
+        Alert.alert('Erreur', 'Aucune famille trouvée');
+        return;
       }
 
       await addDoc(collection(db, 'expenses'), {
         description: description.trim(),
-        amount: amountValue,
-        category: category,
-        date: Timestamp.fromDate(date),
-        paidBy: currentUser.uid,
+        amount: amountNumber,
+        category,
         familyId: userFamily.id,
-        receiptUrl: receiptUrl,
-        createdAt: serverTimestamp(),
+        paidBy: currentUser.uid,
+        date: serverTimestamp(),
+        productImage: productImage || null,
+        barcode: barcode || null,
+        createdAt: serverTimestamp()
       });
 
-      // Simplement revenir en arrière
-      router.back();
+      Alert.alert('Succès', 'Dépense ajoutée avec succès', [
+        { text: 'OK', onPress: () => router.back() }
+      ]);
     } catch (error) {
-      console.error('Error saving expense:', error);
+      console.error('Error adding expense:', error);
       Alert.alert('Erreur', 'Impossible d\'ajouter la dépense');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  const confirmDate = () => {
-    const newDate = new Date();
-    newDate.setFullYear(selectedYear);
-    newDate.setMonth(selectedMonth);
-    newDate.setDate(selectedDay);
-    setDate(newDate);
-    setShowDatePicker(false);
-  };
-
-  const getDaysInMonth = (month: number, year: number) => {
-    return new Date(year, month + 1, 0).getDate();
-  };
-
-  const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-  const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
-  const days = Array.from({ length: getDaysInMonth(selectedMonth, selectedYear) }, (_, i) => i + 1);
-
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" color={colors.tint} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.container}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <IconSymbol name="chevron.left" size={24} color={colors.tint} />
             </TouchableOpacity>
-
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.tint }]}>Ajouter une dépense</Text>
-            </View>
-
-            <View style={styles.form}>
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Description *</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-                  placeholder="Ex: T-shirt pour Louis"
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Montant (€) *</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-                  placeholder="0.00"
-                  value={amount}
-                  onChangeText={setAmount}
-                  keyboardType="decimal-pad"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Catégorie *</Text>
-                <TouchableOpacity 
-                  style={[styles.categoryButton, { backgroundColor: colors.cardBackground }]}
-                  onPress={() => setShowCategoryPicker(true)}
-                >
-                  <Text style={[styles.categoryButtonText, { color: category ? colors.text : colors.textSecondary }]}>
-                    {category || 'Sélectionner une catégorie'}
-                  </Text>
-                  <IconSymbol name="chevron.down" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Date</Text>
-                <TouchableOpacity 
-                  style={[styles.dateButton, { backgroundColor: colors.cardBackground }]}
-                  onPress={() => {
-                    setSelectedDay(date.getDate());
-                    setSelectedMonth(date.getMonth());
-                    setSelectedYear(date.getFullYear());
-                    setShowDatePicker(true);
-                  }}
-                >
-                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
-                    {date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Ticket de caisse / Photo de l'achat</Text>
-                {imageUri ? (
-                  <View style={styles.imagePreview}>
-                    <Image source={{ uri: imageUri }} style={styles.previewImage} />
-                    <TouchableOpacity 
-                      style={styles.removeImageButton}
-                      onPress={() => setImageUri(null)}
-                    >
-                      <IconSymbol name="xmark.circle.fill" size={24} color="#FF6B6B" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.imageButtons}>
-                    <TouchableOpacity style={[styles.imageButton, { backgroundColor: colors.cardBackground }]} onPress={handlePickImage}>
-                      <IconSymbol name="photo" size={24} color={colors.tint} />
-                      <Text style={[styles.imageButtonText, { color: colors.tint }]}>Galerie</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.imageButton, { backgroundColor: colors.cardBackground }]} onPress={handleTakePhoto}>
-                      <IconSymbol name="camera.fill" size={24} color={colors.tint} />
-                      <Text style={[styles.imageButtonText, { color: colors.tint }]}>Caméra</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity style={[styles.cancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => router.back()}>
-                  <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.saveButton, { backgroundColor: colors.tint }, saving && styles.disabled]} 
-                  onPress={handleSaveExpense}
-                  disabled={saving}
-                >
-                  <Text style={styles.saveButtonText}>{saving ? 'Enregistrement...' : 'Enregistrer'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            <Text style={[styles.title, { color: colors.tint }]}>Nouvelle dépense</Text>
+            <View style={{ width: 24 }} />
           </View>
-        </ScrollView>
 
-        {/* Date Picker Modal */}
-        <Modal visible={showDatePicker} transparent={true} animationType="slide" onShow={() => {
-          setTimeout(() => {
-            const itemHeight = 56;
-            const visibleItems = 3.5;
-            const centerOffset = (itemHeight * visibleItems) / 2 - itemHeight / 2;
-            
-            dayScrollRef.current?.scrollTo({ 
-              y: Math.max(0, (selectedDay - 1) * itemHeight - centerOffset), 
-              animated: true 
-            });
-            monthScrollRef.current?.scrollTo({ 
-              y: Math.max(0, selectedMonth * itemHeight - centerOffset), 
-              animated: true 
-            });
-            yearScrollRef.current?.scrollTo({ 
-              y: Math.max(0, years.indexOf(selectedYear) * itemHeight - centerOffset), 
-              animated: true 
-            });
-          }, 300);
-        }}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionner une date</Text>
-              <View style={styles.pickerRow}>
-                <ScrollView ref={dayScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
-                  {days.map((day) => (
-                    <TouchableOpacity key={day} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedDay === day && styles.pickerItemSelected]} onPress={() => setSelectedDay(day)}>
-                      <Text style={[styles.pickerText, { color: colors.text }, selectedDay === day && styles.pickerTextSelected]}>{day}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <ScrollView ref={monthScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
-                  {months.map((month, index) => (
-                    <TouchableOpacity key={index} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedMonth === index && styles.pickerItemSelected]} onPress={() => setSelectedMonth(index)}>
-                      <Text style={[styles.pickerText, { color: colors.text }, selectedMonth === index && styles.pickerTextSelected]}>{month}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <ScrollView ref={yearScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
-                  {years.map((year) => (
-                    <TouchableOpacity key={year} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedYear === year && styles.pickerItemSelected]} onPress={() => setSelectedYear(year)}>
-                      <Text style={[styles.pickerText, { color: colors.text }, selectedYear === year && styles.pickerTextSelected]}>{year}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmDate}>
-                  <Text style={styles.modalConfirmText}>Confirmer</Text>
-                </TouchableOpacity>
-              </View>
+          {/* Scan Button */}
+          <TouchableOpacity
+            style={[styles.scanButton, { backgroundColor: colors.secondaryCardBackground }]}
+            onPress={() => router.push('/scan-barcode')}
+          >
+            <IconSymbol name="barcode.viewfinder" size={24} color={colors.tint} />
+            <Text style={[styles.scanButtonText, { color: colors.tint }]}
+            >
+              Scanner un code-barres
+            </Text>
+          </TouchableOpacity>
+
+          {/* Product Image */}
+          {productImage && (
+            <View style={[styles.imageContainer, { backgroundColor: colors.cardBackground }]}>
+              <Image source={{ uri: productImage }} style={styles.productImage} />
             </View>
-          </View>
-        </Modal>
+          )}
 
-        {/* Category Picker Modal */}
-        <Modal visible={showCategoryPicker} transparent={true} animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionner une catégorie</Text>
-              
-              <ScrollView style={styles.categoryList}>
-                {categories.map((cat, index) => (
+          {/* Form */}
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Description *</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="Ex: Courses Carrefour"
+                placeholderTextColor={colors.textTertiary}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Montant * ({currency})</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
+                value={amount}
+                onChangeText={setAmount}
+                placeholder="0.00"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="decimal-pad"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Catégorie *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
+                {CATEGORIES.map((cat) => (
                   <TouchableOpacity
-                    key={index}
-                    style={[styles.categoryItem, { borderBottomColor: colors.border }]}
-                    onPress={() => handleSelectCategory(cat.name)}
+                    key={cat}
+                    style={[
+                      styles.categoryChip,
+                      { backgroundColor: colors.cardBackground },
+                      category === cat && { backgroundColor: colors.tint }
+                    ]}
+                    onPress={() => setCategory(cat)}
                   >
-                    <Text style={[styles.categoryItemText, { color: colors.text }]}>{cat.name}</Text>
-                    {category === cat.name && (
-                      <IconSymbol name="checkmark" size={20} color={colors.tint} />
-                    )}
+                    <Text style={[
+                      styles.categoryChipText,
+                      { color: colors.text },
+                      category === cat && { color: '#fff' }
+                    ]}>
+                      {cat}
+                    </Text>
                   </TouchableOpacity>
                 ))}
-
-                {showNewCategoryInput ? (
-                  <View style={styles.newCategoryInput}>
-                    <TextInput
-                      style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-                      placeholder="Nom de la catégorie"
-                      value={newCategoryName}
-                      onChangeText={setNewCategoryName}
-                      placeholderTextColor={colors.textSecondary}
-                      autoFocus
-                    />
-                    <TouchableOpacity 
-                      style={[styles.addCategoryButton, { backgroundColor: colors.tint }]}
-                      onPress={handleAddNewCategory}
-                    >
-                      <Text style={styles.addCategoryButtonText}>Ajouter</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.newCategoryButton}
-                    onPress={() => setShowNewCategoryInput(true)}
-                  >
-                    <IconSymbol name="plus.circle" size={20} color={colors.tint} />
-                    <Text style={[styles.newCategoryButtonText, { color: colors.tint }]}>Nouvelle catégorie</Text>
-                  </TouchableOpacity>
-                )}
               </ScrollView>
-
-              <TouchableOpacity 
-                style={[styles.modalCloseButton, { backgroundColor: colors.cardBackground }]}
-                onPress={() => {
-                  setShowCategoryPicker(false);
-                  setShowNewCategoryInput(false);
-                  setNewCategoryName('');
-                }}
-              >
-                <Text style={[styles.modalCloseText, { color: colors.textSecondary }]}>Fermer</Text>
-              </TouchableOpacity>
             </View>
+
+            {barcode && (
+              <View style={[styles.barcodeInfo, { backgroundColor: colors.secondaryCardBackground }]}>
+                <IconSymbol name="barcode" size={20} color={colors.textSecondary} />
+                <Text style={[styles.barcodeText, { color: colors.textSecondary }]}>
+                  Code-barres: {barcode}
+                </Text>
+              </View>
+            )}
           </View>
-        </Modal>
-      </SafeAreaView>
-    </>
+
+          {/* Submit Button */}
+          <TouchableOpacity
+            style={[styles.submitButton, { backgroundColor: colors.primaryButton }]}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>Ajouter la dépense</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff', paddingTop: 50 },
+  safeArea: { flex: 1 },
   scrollView: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
-  containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  backButton: { marginBottom: 20 },
-  backButtonText: { fontSize: 32, color: '#87CEEB', fontWeight: '300' },
-  header: { marginBottom: 32 },
-  title: { fontSize: 28, fontWeight: '700', color: '#87CEEB' },
-  form: { gap: 24 },
-  inputGroup: { gap: 8 },
-  label: { fontSize: 16, fontWeight: '600', color: '#111' },
-  input: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, fontSize: 16, color: '#111' },
-  categoryButton: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  categoryButtonText: { fontSize: 16, color: '#111' },
-  dateButton: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16 },
-  dateButtonText: { fontSize: 16, color: '#111', textTransform: 'capitalize' },
-  imageButtons: { flexDirection: 'row', gap: 12 },
-  imageButton: { flex: 1, backgroundColor: '#E7F7FF', borderRadius: 12, padding: 20, alignItems: 'center', gap: 8 },
-  imageButtonText: { fontSize: 14, fontWeight: '600', color: '#87CEEB' },
-  imagePreview: { position: 'relative' },
-  previewImage: { width: '100%', height: 200, borderRadius: 12 },
-  removeImageButton: { position: 'absolute', top: 8, right: 8 },
-  buttonContainer: { flexDirection: 'row', gap: 12, marginTop: 16 },
-  cancelButton: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  cancelButtonText: { fontSize: 16, fontWeight: '600', color: '#666' },
-  saveButton: { flex: 1, backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  saveButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  disabled: { opacity: 0.5 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 20 },
-  pickerRow: { flexDirection: 'row', gap: 10, marginBottom: 20, height: 200 },
-  pickerColumn: { flex: 1 },
-  pickerItem: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, marginBottom: 8, backgroundColor: '#F5F5F5' },
-  pickerItemSelected: { backgroundColor: '#87CEEB' },
-  pickerText: { fontSize: 16, textAlign: 'center', color: '#111' },
-  pickerTextSelected: { color: '#fff', fontWeight: '600' },
-  modalButtons: { flexDirection: 'row', gap: 12 },
-  modalCancelButton: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  modalCancelText: { fontSize: 16, fontWeight: '600', color: '#666' },
-  modalConfirmButton: { flex: 1, backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  modalConfirmText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  categoryList: { maxHeight: 400 },
-  categoryItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
-  categoryItemText: { fontSize: 16, color: '#111' },
-  newCategoryInput: { padding: 16, gap: 12 },
-  addCategoryButton: { backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  addCategoryButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  newCategoryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 8 },
-  newCategoryButtonText: { fontSize: 16, fontWeight: '600', color: '#87CEEB' },
-  modalCloseButton: { backgroundColor: '#F5F5F5', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
-  modalCloseText: { fontSize: 16, fontWeight: '600', color: '#666' },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: { fontSize: 28, fontWeight: '700' },
+  scanButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 24,
+    gap: 12,
+  },
+  scanButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  imageContainer: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  productImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 12,
+    resizeMode: 'contain',
+  },
+  form: { marginBottom: 24 },
+  inputGroup: { marginBottom: 20 },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  input: {
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
+  categoriesScroll: {
+    marginTop: 8,
+  },
+  categoryChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  categoryChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  barcodeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  barcodeText: {
+    fontSize: 14,
+  },
+  submitButton: {
+    borderRadius: 20,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });
