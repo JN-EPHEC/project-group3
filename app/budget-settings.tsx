@@ -1,99 +1,72 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import { Stack, useRouter } from 'expo-router';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
+
+const CURRENCIES = [
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'USD', symbol: '$', name: 'Dollar américain' },
+  { code: 'GBP', symbol: '£', name: 'Livre sterling' },
+  { code: 'CHF', symbol: 'CHF', name: 'Franc suisse' },
+  { code: 'CAD', symbol: 'CAD', name: 'Dollar canadien' },
+  { code: 'JPY', symbol: '¥', name: 'Yen japonais' },
+];
 
 export default function BudgetSettingsScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [familyId, setFamilyId] = useState<string | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState('EUR');
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
-    const fetchBudget = async () => {
+    const fetchFamilySettings = async () => {
       const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      if (!currentUser) {
+        router.replace('/(auth)/LoginScreen');
+        return;
+      }
 
       try {
         const userFamily = await getUserFamily(currentUser.uid);
         if (userFamily?.id) {
-          const budgetDoc = await getDoc(doc(db, 'budgets', userFamily.id));
-          if (budgetDoc.exists()) {
-            setCategories(budgetDoc.data().categories || []);
-          } else {
-            // Catégories par défaut
-            setCategories([
-              { name: 'Vêtements', limit: 50 },
-              { name: 'Alimentation', limit: 100 },
-              { name: 'Santé', limit: 150 },
-              { name: 'Éducation', limit: 200 },
-              { name: 'Loisirs', limit: 80 },
-            ]);
+          setFamilyId(userFamily.id);
+          const familyRef = doc(db, 'families', userFamily.id);
+          const familySnap = await getDoc(familyRef);
+          
+          if (familySnap.exists()) {
+            const data = familySnap.data();
+            setSelectedCurrency(data.currency || 'EUR');
           }
         }
       } catch (error) {
-        console.error('Error fetching budget:', error);
+        console.error("Error fetching family settings:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchBudget();
-  }, []);
+    fetchFamilySettings();
+  }, [router]);
 
-  const handleAddCategory = () => {
-    setCategories([...categories, { name: '', limit: 0 }]);
-  };
-
-  const handleRemoveCategory = (index: number) => {
-    const newCategories = categories.filter((_, i) => i !== index);
-    setCategories(newCategories);
-  };
-
-  const handleUpdateCategory = (index: number, field: 'name' | 'limit', value: string) => {
-    const newCategories = [...categories];
-    if (field === 'limit') {
-      newCategories[index][field] = parseFloat(value) || 0;
-    } else {
-      newCategories[index][field] = value;
-    }
-    setCategories(newCategories);
-  };
-
-  const handleSave = async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
-    // Validation
-    const invalidCategories = categories.filter(c => !c.name.trim() || c.limit <= 0);
-    if (invalidCategories.length > 0) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs avec des valeurs valides');
-      return;
-    }
-
+  const handleSaveCurrency = async (currencyCode: string) => {
+    if (!familyId) return;
+    
     setSaving(true);
     try {
-      const userFamily = await getUserFamily(currentUser.uid);
-      if (userFamily?.id) {
-        await setDoc(doc(db, 'budgets', userFamily.id), {
-          familyId: userFamily.id,
-          categories: categories,
-          updatedAt: serverTimestamp(),
-          updatedBy: currentUser.uid,
-        });
-
-        Alert.alert('Succès', 'Paramètres de budget sauvegardés', [
-          { text: 'OK', onPress: () => router.back() }
-        ]);
-      }
+      const familyRef = doc(db, 'families', familyId);
+      await updateDoc(familyRef, { currency: currencyCode });
+      setSelectedCurrency(currencyCode);
+      Alert.alert('Succès', 'La devise a été mise à jour pour toute la famille');
     } catch (error) {
-      console.error('Error saving budget:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder les paramètres');
+      console.error("Error updating currency:", error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la devise');
     } finally {
       setSaving(false);
     }
@@ -110,110 +83,132 @@ export default function BudgetSettingsScreen() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.container}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-              <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <IconSymbol name="chevron.left" size={24} color={colors.tint} />
             </TouchableOpacity>
+            <Text style={[styles.title, { color: colors.tint }]}>Paramètres Budget</Text>
+            <View style={{ width: 24 }} />
+          </View>
 
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.tint }]}>Paramètres de budget</Text>
-              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Définissez les limites de dépenses par catégorie selon votre convention</Text>
-            </View>
+          {/* Currency Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Devise</Text>
+            <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
+              Cette devise sera utilisée par tous les membres de la famille
+            </Text>
 
-            <View style={styles.categoriesSection}>
-              {categories.map((category, index) => (
-                <View key={index} style={[styles.categoryCard, { backgroundColor: colors.cardBackground }]}>
-                  <View style={styles.categoryInputs}>
-                    <TextInput
-                      style={[styles.categoryNameInput, { backgroundColor: colors.background, color: colors.text }]}
-                      placeholder="Nom de la catégorie"
-                      value={category.name}
-                      onChangeText={(value) => handleUpdateCategory(index, 'name', value)}
-                      placeholderTextColor={colors.textSecondary}
-                    />
-                    <View style={[styles.limitInputContainer, { backgroundColor: colors.background }]}>
-                      <TextInput
-                        style={[styles.limitInput, { color: colors.text }]}
-                        placeholder="0"
-                        value={category.limit.toString()}
-                        onChangeText={(value) => handleUpdateCategory(index, 'limit', value)}
-                        keyboardType="decimal-pad"
-                        placeholderTextColor={colors.textSecondary}
-                      />
-                      <Text style={[styles.currencySymbol, { color: colors.textSecondary }]}>€</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.removeButton}
-                    onPress={() => handleRemoveCategory(index)}
-                  >
-                    <IconSymbol name="trash" size={20} color="#FF6B6B" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              <TouchableOpacity style={[styles.addCategoryButton, { backgroundColor: colors.cardBackground }]} onPress={handleAddCategory}>
-                <IconSymbol name="plus.circle" size={24} color={colors.tint} />
-                <Text style={[styles.addCategoryText, { color: colors.tint }]}>Ajouter une catégorie</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
-              <IconSymbol name="info.circle" size={20} color={colors.tint} />
-              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                Ces limites seront visibles par les deux parents et permettront de suivre les dépenses selon votre convention de divorce.
-              </Text>
-            </View>
-
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={[styles.cancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => router.back()}>
-                <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.saveButton, { backgroundColor: colors.tint }, saving && styles.disabled]} 
-                onPress={handleSave}
+            {CURRENCIES.map((currency) => (
+              <TouchableOpacity
+                key={currency.code}
+                style={[
+                  styles.currencyCard,
+                  { backgroundColor: colors.cardBackground },
+                  selectedCurrency === currency.code && { 
+                    borderColor: colors.tint, 
+                    borderWidth: 2 
+                  }
+                ]}
+                onPress={() => handleSaveCurrency(currency.code)}
                 disabled={saving}
               >
-                <Text style={styles.saveButtonText}>{saving ? 'Sauvegarde...' : 'Sauvegarder'}</Text>
+                <View style={styles.currencyInfo}>
+                  <Text style={[styles.currencySymbol, { color: colors.text }]}>
+                    {currency.symbol}
+                  </Text>
+                  <View style={styles.currencyDetails}>
+                    <Text style={[styles.currencyName, { color: colors.text }]}>
+                      {currency.name}
+                    </Text>
+                    <Text style={[styles.currencyCode, { color: colors.textSecondary }]}>
+                      {currency.code}
+                    </Text>
+                  </View>
+                </View>
+                {selectedCurrency === currency.code && (
+                  <IconSymbol name="checkmark.circle.fill" size={24} color={colors.tint} />
+                )}
               </TouchableOpacity>
-            </View>
+            ))}
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </>
+
+          {saving && (
+            <View style={styles.savingIndicator}>
+              <ActivityIndicator size="small" color={colors.tint} />
+              <Text style={[styles.savingText, { color: colors.textSecondary }]}>
+                Enregistrement...
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fff', paddingTop: 50 },
+  safeArea: { flex: 1 },
   scrollView: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  backButton: { marginBottom: 20 },
-  backButtonText: { fontSize: 32, color: '#87CEEB', fontWeight: '300' },
-  header: { marginBottom: 32 },
-  title: { fontSize: 28, fontWeight: '700', color: '#87CEEB', marginBottom: 8 },
-  subtitle: { fontSize: 15, color: '#666', lineHeight: 22 },
-  categoriesSection: { marginBottom: 24 },
-  categoryCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, marginBottom: 12 },
-  categoryInputs: { flex: 1, gap: 12 },
-  categoryNameInput: { backgroundColor: '#fff', borderRadius: 8, padding: 12, fontSize: 16, color: '#111' },
-  limitInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 12 },
-  limitInput: { flex: 1, padding: 12, fontSize: 16, color: '#111' },
-  currencySymbol: { fontSize: 16, fontWeight: '600', color: '#666', marginLeft: 8 },
-  removeButton: { marginLeft: 12, padding: 8 },
-  addCategoryButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F7FF', borderRadius: 12, padding: 16, gap: 8 },
-  addCategoryText: { fontSize: 16, fontWeight: '600', color: '#87CEEB' },
-  infoCard: { flexDirection: 'row', backgroundColor: '#E7F7FF', borderRadius: 12, padding: 16, marginBottom: 24, gap: 12 },
-  infoText: { flex: 1, fontSize: 14, color: '#666', lineHeight: 20 },
-  buttonContainer: { flexDirection: 'row', gap: 12 },
-  cancelButton: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  cancelButtonText: { fontSize: 16, fontWeight: '600', color: '#666' },
-  saveButton: { flex: 1, backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  saveButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  disabled: { opacity: 0.5 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: { fontSize: 28, fontWeight: '700' },
+  section: { marginBottom: 32 },
+  sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
+  sectionDescription: { fontSize: 14, marginBottom: 16, lineHeight: 20 },
+  currencyCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  currencyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  currencySymbol: {
+    fontSize: 32,
+    fontWeight: '700',
+    width: 50,
+    textAlign: 'center',
+  },
+  currencyDetails: {
+    marginLeft: 16,
+  },
+  currencyName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  currencyCode: {
+    fontSize: 14,
+  },
+  savingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 16,
+  },
+  savingText: {
+    fontSize: 14,
+  },
 });
