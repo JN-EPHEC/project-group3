@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { db } from '../constants/firebase';
@@ -22,7 +22,7 @@ export default function EditEventScreen() {
   const [saving, setSaving] = useState(false);
   const [isAllDay, setIsAllDay] = useState(false);
   const [titleError, setTitleError] = useState('');
-  const [category, setCategory] = useState({ name: 'Activités', color: '#87CEEB' });
+  const [category, setCategory] = useState({ name: 'Loisirs', color: '#FFA07A' });
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   const [familyId, setFamilyId] = useState<string | null>(null);
@@ -33,15 +33,20 @@ export default function EditEventScreen() {
   const [newChildName, setNewChildName] = useState('');
   const [showAddChildForm, setShowAddChildForm] = useState(false);
 
+  // State for parent selection
+  const [allParents, setAllParents] = useState<any[]>([]);
+  const [selectedParents, setSelectedParents] = useState<string[]>([]);
+  const [initialSelectedParents, setInitialSelectedParents] = useState<string[]>([]);
+  const [showParentPicker, setShowParentPicker] = useState(false);
+
   const categories = [
-    { name: 'Activités', color: '#87CEEB' },
-    { name: 'Sport', color: '#FF6B6B' },
-    { name: 'Cours', color: '#4ECDC4' },
-    { name: 'Santé', color: '#95E1D3' },
     { name: 'Loisirs', color: '#FFA07A' },
+    { name: 'Garde', color: '#FFC085' },
+    { name: 'École', color: '#6AADE4' },
+    { name: 'Santé', color: '#95E1D3' },
     { name: 'Fête', color: '#FFD93D' },
     { name: 'Rendez-vous', color: '#A8E6CF' },
-    { name: 'Autre', color: '#B4A7D6' },
+    { name: 'Autres', color: '#B4A7D6' },
   ];
 
   const [initialTitle, setInitialTitle] = useState('');
@@ -50,6 +55,7 @@ export default function EditEventScreen() {
   const [initialStartTime, setInitialStartTime] = useState(new Date());
   const [initialEndTime, setInitialEndTime] = useState(new Date());
   const [initialIsAllDay, setInitialIsAllDay] = useState(false);
+  const [initialCategory, setInitialCategory] = useState({ name: 'Loisirs', color: '#FFA07A' });
 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -115,6 +121,21 @@ export default function EditEventScreen() {
     }
   };
 
+  const toggleParentSelection = (parentId: string) => {
+    setSelectedParents(prev =>
+      prev.includes(parentId)
+        ? prev.filter(id => id !== parentId)
+        : [...prev, parentId]
+    );
+  };
+
+  const getSelectedParentNames = () => {
+    return selectedParents
+      .map(id => allParents.find(parent => parent.id === id)?.firstName)
+      .filter(Boolean)
+      .join(', ');
+  };
+
   useEffect(() => {
     const fetchEvent = async () => {
       if (!eventId || typeof eventId !== 'string') return;
@@ -133,7 +154,7 @@ export default function EditEventScreen() {
           setDate(eventDate);
           setStartTime(eventStartTime);
           setEndTime(eventEndTime);
-          setCategory(eventData.category || { name: 'Activités', color: '#87CEEB' });
+          setCategory(eventData.category || { name: 'Loisirs', color: '#FFA07A' });
           setFamilyId(eventData.familyId || null);
 
           // Fetch and set children data
@@ -143,10 +164,20 @@ export default function EditEventScreen() {
               const familyData = familyDoc.data();
               setChildren(familyData.children || []);
             }
+            // Fetch parents from the same family
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('familyId', '==', eventData.familyId));
+            const querySnapshot = await getDocs(q);
+            const parentsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setAllParents(parentsList);
           }
           const currentChildrenIds = eventData.childrenIds || [];
           setSelectedChildren(currentChildrenIds);
           setInitialSelectedChildren(currentChildrenIds);
+
+          const currentParentIds = eventData.parentIds || [];
+          setSelectedParents(currentParentIds);
+          setInitialSelectedParents(currentParentIds);
           
           setInitialTitle(eventData.title || '');
           setInitialDescription(eventData.description || '');
@@ -154,6 +185,7 @@ export default function EditEventScreen() {
           setInitialStartTime(eventStartTime);
           setInitialEndTime(eventEndTime);
           setInitialIsAllDay(eventData.isAllDay || false);
+          setInitialCategory(eventData.category || { name: 'Loisirs', color: '#FFA07A' });
           
           setSelectedDay(eventDate.getDate());
           setSelectedMonth(eventDate.getMonth());
@@ -173,65 +205,72 @@ export default function EditEventScreen() {
     fetchEvent();
   }, [eventId]);
 
-  const hasChanges = () => {
-    // Compare arrays by converting to strings after sorting to ensure order doesn't matter
-    const childrenChanged = JSON.stringify([...selectedChildren].sort()) !== JSON.stringify([...initialSelectedChildren].sort());
-    return (
-      title !== initialTitle ||
-      description !== initialDescription ||
-      isAllDay !== initialIsAllDay ||
-      date.getTime() !== initialDate.getTime() ||
-      startTime.getTime() !== initialStartTime.getTime() ||
-      endTime.getTime() !== initialEndTime.getTime() ||
-      childrenChanged
-    );
-  };
-
-  const handleBack = () => {
-    if (hasChanges()) {
-      Alert.alert(
-        'Modifications non sauvegardées',
-        'Voulez-vous sauvegarder vos modifications avant de quitter ?',
-        [
-          { text: 'Ne pas sauvegarder', style: 'destructive', onPress: () => router.back() },
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Sauvegarder', onPress: handleUpdateEvent }
-        ]
-      );
-    } else {
-      router.back();
-    }
-  };
-
-  const handleUpdateEvent = async () => {
-    if (!title.trim()) {
-      setTitleError('Veuillez indiquer un titre pour l\'événement');
-      return;
-    }
-    setTitleError('');
-
-    setSaving(true);
-    try {
-      if (typeof eventId !== 'string') return;
-
-      const eventStartTime = new Date(date);
-      eventStartTime.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
-      
-      const eventEndTime = new Date(date);
-      eventEndTime.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
-
-      await updateDoc(doc(db, 'events', eventId), {
-        title: title.trim(),
-        description: description.trim(),
-        date: Timestamp.fromDate(eventStartTime),
-        startTime: Timestamp.fromDate(eventStartTime),
-        endTime: Timestamp.fromDate(eventEndTime),
-        isAllDay: isAllDay,
-        category: category,
-        childrenIds: selectedChildren,
-        updatedAt: Timestamp.now(),
-      });
-
+        const hasChanges = () => {
+          // Compare arrays by converting to strings after sorting to ensure order doesn't matter
+          const childrenChanged = JSON.stringify([...selectedChildren].sort()) !== JSON.stringify([...initialSelectedChildren].sort());
+          const parentsChanged = JSON.stringify([...selectedParents].sort()) !== JSON.stringify([...initialSelectedParents].sort());
+          return (
+            title !== initialTitle ||
+            description !== initialDescription ||
+            isAllDay !== initialIsAllDay ||
+            date.getTime() !== initialDate.getTime() ||
+            startTime.getTime() !== initialStartTime.getTime() ||
+            endTime.getTime() !== initialEndTime.getTime() ||
+            childrenChanged ||
+            parentsChanged ||
+            category.name !== initialCategory.name
+          );
+        };
+  
+        const handleBack = () => {
+          if (hasChanges()) {
+            Alert.alert(
+              'Modifications non sauvegardées',
+              'Voulez-vous sauvegarder vos modifications avant de quitter ?',
+              [
+                { text: 'Ne pas sauvegarder', style: 'destructive', onPress: () => router.back() },
+                { text: 'Annuler', style: 'cancel' },
+                { text: 'Sauvegarder', onPress: handleUpdateEvent }
+              ]
+            );
+          } else {
+            router.back();
+          }
+        };
+  
+        const handleUpdateEvent = async () => {
+          if (!title.trim()) {
+            setTitleError('Veuillez indiquer un titre pour l\'événement');
+            return;
+          }
+          if (selectedParents.length === 0) {
+            Alert.alert('Erreur', 'Veuillez sélectionner au moins un parent');
+            return;
+          }
+          setTitleError('');
+  
+          setSaving(true);
+          try {
+            if (typeof eventId !== 'string') return;
+  
+            const eventStartTime = new Date(date);
+            eventStartTime.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+            
+            const eventEndTime = new Date(date);
+            eventEndTime.setHours(endTime.getHours(), endTime.getMinutes(), 0, 0);
+  
+            await updateDoc(doc(db, 'events', eventId), {
+              title: title.trim(),
+              description: description.trim(),
+              date: Timestamp.fromDate(eventStartTime),
+              startTime: Timestamp.fromDate(eventStartTime),
+              endTime: Timestamp.fromDate(eventEndTime),
+              isAllDay: isAllDay,
+              category: category,
+              childrenIds: selectedChildren,
+              parentIds: selectedParents,
+              updatedAt: Timestamp.now(),
+            });
       // Redirection immédiate sans alert
       router.replace('/(tabs)/Agenda');
     } catch (error) {
@@ -333,6 +372,15 @@ export default function EditEventScreen() {
                 <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowChildrenPicker(true)}>
                   <Text style={[styles.dateButtonText, { color: colors.text }]}>
                     {getSelectedChildrenNames()}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Parents concernés</Text>
+                <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowParentPicker(true)}>
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
+                    {getSelectedParentNames() || 'Sélectionner les parents'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -621,6 +669,29 @@ export default function EditEventScreen() {
               )}
 
               <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground, marginTop: 20 }]} onPress={() => setShowChildrenPicker(false)}>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Fermer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={showParentPicker} transparent={true} animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Parents concernés</Text>
+              <ScrollView style={{ maxHeight: 200, marginBottom: 10 }}>
+                {allParents.map((parent: any) => (
+                  <TouchableOpacity
+                    key={parent.id}
+                    style={[styles.childItem, { backgroundColor: colors.cardBackground }]}
+                    onPress={() => toggleParentSelection(parent.id)}
+                  >
+                    <Text style={[styles.childName, { color: colors.text }]}>{parent.firstName}</Text>
+                    {selectedParents.includes(parent.id) && <Text style={styles.checkMark}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground, marginTop: 20 }]} onPress={() => setShowParentPicker(false)}>
                 <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Fermer</Text>
               </TouchableOpacity>
             </View>
