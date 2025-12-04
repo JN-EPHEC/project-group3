@@ -1,33 +1,38 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { auth, db } from '../constants/firebase';
 
 export default function EventDetailsScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const { eventId } = useLocalSearchParams();
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [childrenNames, setChildrenNames] = useState<string[]>([]);
+  const [parentNames, setParentNames] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchEvent = async () => {
-      if (!eventId || typeof eventId !== 'string') return;
+      if (!eventId || typeof eventId !== 'string') {
+        setLoading(false);
+        return;
+      }
 
       try {
         const eventDoc = await getDoc(doc(db, 'events', eventId));
         if (eventDoc.exists()) {
-          const eventData = eventDoc.data();
-          setEvent({ id: eventDoc.id, ...eventData });
-          
-          if (eventData.familyId && eventData.childrenIds?.length > 0) {
+          const eventData = { id: eventDoc.id, ...eventDoc.data() };
+          setEvent(eventData);
+
+          // Fetch children names
+          if (eventData.familyId && eventData.childrenIds && eventData.childrenIds.length > 0) {
             const familyDoc = await getDoc(doc(db, 'families', eventData.familyId));
             if (familyDoc.exists()) {
               const familyData = familyDoc.data();
@@ -37,6 +42,15 @@ export default function EventDetailsScreen() {
                 .map((child: any) => child.name);
               setChildrenNames(names);
             }
+          }
+
+          // Fetch parent names
+          if (eventData.parentIds && eventData.parentIds.length > 0) {
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('__name__', 'in', eventData.parentIds));
+            const querySnapshot = await getDocs(q);
+            const pNames = querySnapshot.docs.map(doc => doc.data().firstName);
+            setParentNames(pNames);
           }
           
           // Vérifier si l'utilisateur actuel est le créateur
@@ -56,30 +70,44 @@ export default function EventDetailsScreen() {
     fetchEvent();
   }, [eventId]);
 
-  const handleDeleteEvent = async () => {
+  const handleDeleteEvent = () => {
     if (!eventId || typeof eventId !== 'string') {
       Alert.alert('Erreur', 'ID d\'événement invalide');
       return;
     }
-    
-    setDeleting(true);
-    
-    try {
-      const eventRef = doc(db, 'events', eventId);
-      await deleteDoc(eventRef);
-      
-      // Attendre un peu pour s'assurer que Firestore a bien supprimé
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      router.back();
-    } catch (error: any) {
-      console.error('Error deleting event:', error);
-      Alert.alert(
-        'Erreur', 
-        `Impossible de supprimer l\'événement.\nCode: ${error?.code}\nMessage: ${error?.message}`
-      );
-      setDeleting(false);
-    }
+
+    Alert.alert(
+      'Confirmation',
+      'Êtes-vous sûr de vouloir supprimer cet événement ? Cette action est irréversible.',
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              const eventRef = doc(db, 'events', eventId);
+              await deleteDoc(eventRef);
+              
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              router.back();
+            } catch (error: any) {
+              console.error('Error deleting event:', error);
+              Alert.alert(
+                'Erreur', 
+                `Impossible de supprimer l\'événement.\nCode: ${error?.code}\nMessage: ${error?.message}`
+              );
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -136,8 +164,7 @@ export default function EventDetailsScreen() {
             {/* Date */}
             <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
               <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📅 Date</Text>
-              <Text style={[styles.infoValue, { color: colors.text }]}
-                >
+              <Text style={[styles.infoValue, { color: colors.text }]}                >
                 {event.date?.toDate ? event.date.toDate().toLocaleDateString('fr-FR', { 
                   weekday: 'long', 
                   day: 'numeric', 
@@ -150,8 +177,7 @@ export default function EventDetailsScreen() {
             {/* Horaire */}
             <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
               <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>🕐 Horaire</Text>
-              <Text style={[styles.infoValue, { color: colors.text }]}
-                >
+              <Text style={[styles.infoValue, { color: colors.text }]}                >
                 {event.isAllDay 
                   ? 'Toute la journée' 
                   : event.startTime && event.endTime
@@ -169,6 +195,14 @@ export default function EventDetailsScreen() {
               </View>
             )}
 
+            {/* Parents concernés */}
+            {parentNames.length > 0 && (
+              <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>👥 Parents concernés</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{parentNames.join(', ')}</Text>
+              </View>
+            )}
+
             {/* Description */}
             {event.description && (
               <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
@@ -181,7 +215,7 @@ export default function EventDetailsScreen() {
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity 
-                style={[styles.editButton, { backgroundColor: colors.tint }]}
+                style={[styles.editButton, { backgroundColor: colors.tint }]} 
                 onPress={() => router.push(`/edit-event?eventId=${event.id}`)}
               >
                 <IconSymbol name="pencil" size={20} color="#fff" />

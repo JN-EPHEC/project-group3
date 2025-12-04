@@ -1,5 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
@@ -20,13 +20,18 @@ export default function CreateEventScreen() {
   const [loading, setLoading] = useState(false);
   const [isAllDay, setIsAllDay] = useState(false);
   const [titleError, setTitleError] = useState('');
-  const [category, setCategory] = useState({ name: 'Activités', color: '#87CEEB' });
+  const [category, setCategory] = useState({ name: 'Loisirs', color: '#FFA07A' });
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
   const [showChildrenPicker, setShowChildrenPicker] = useState(false);
   const [newChildName, setNewChildName] = useState('');
   const [showAddChildForm, setShowAddChildForm] = useState(false);
+
+  // State for parent selection
+  const [allParents, setAllParents] = useState<any[]>([]);
+  const [selectedParents, setSelectedParents] = useState<string[]>([]);
+  const [showParentPicker, setShowParentPicker] = useState(false);
 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -45,14 +50,13 @@ export default function CreateEventScreen() {
   const endMinuteScrollRef = useRef<any>(null);
 
   const categories = [
-    { name: 'Activités', color: '#87CEEB' },
-    { name: 'Sport', color: '#FF6B6B' },
-    { name: 'Cours', color: '#4ECDC4' },
-    { name: 'Santé', color: '#95E1D3' },
     { name: 'Loisirs', color: '#FFA07A' },
+    { name: 'Garde', color: '#FFC085' },
+    { name: 'École', color: '#6AADE4' },
+    { name: 'Santé', color: '#95E1D3' },
     { name: 'Fête', color: '#FFD93D' },
     { name: 'Rendez-vous', color: '#A8E6CF' },
-    { name: 'Autre', color: '#B4A7D6' },
+    { name: 'Autres', color: '#B4A7D6' },
   ];
 
   useEffect(() => {
@@ -72,6 +76,17 @@ export default function CreateEventScreen() {
               setSelectedChildren(familyData.children.map((child: any) => child.id));
             }
           }
+
+          // Fetch parents from the same family
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('familyId', '==', family.id));
+          const querySnapshot = await getDocs(q);
+          const parentsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setAllParents(parentsList);
+          // Select current user by default
+          if (currentUser) {
+            setSelectedParents([currentUser.uid]);
+          }
         }
       } catch (error) {
         console.error('Error fetching children:', error);
@@ -88,6 +103,10 @@ export default function CreateEventScreen() {
     }
     if (selectedChildren.length === 0) {
       Alert.alert('Erreur', 'Veuillez sélectionner au moins un enfant');
+      return;
+    }
+    if (selectedParents.length === 0) {
+      Alert.alert('Erreur', 'Veuillez sélectionner au moins un parent');
       return;
     }
     setTitleError('');
@@ -124,6 +143,7 @@ export default function CreateEventScreen() {
         userID: currentUser.uid,
         familyId: family.id,
         childrenIds: selectedChildren,
+        parentIds: selectedParents,
         createdAt: Timestamp.now(),
       });
 
@@ -183,6 +203,21 @@ export default function CreateEventScreen() {
       console.error('Error adding child:', error);
       Alert.alert('Erreur', 'Impossible d\'ajouter l\'enfant');
     }
+  };
+
+  const toggleParentSelection = (parentId: string) => {
+    setSelectedParents(prev =>
+      prev.includes(parentId)
+        ? prev.filter(id => id !== parentId)
+        : [...prev, parentId]
+    );
+  };
+
+  const getSelectedParentNames = () => {
+    return selectedParents
+      .map(id => allParents.find(parent => parent.id === id)?.firstName)
+      .filter(Boolean)
+      .join(', ');
   };
 
   const confirmDate = () => {
@@ -266,6 +301,15 @@ export default function CreateEventScreen() {
                     onPress={() => setShowChildrenPicker(true)}
                   >
                     {getSelectedChildrenNames() || 'Sélectionner les enfants'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Parents concernés *</Text>
+                <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowParentPicker(true)}>
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
+                    {getSelectedParentNames() || 'Sélectionner les parents'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -449,6 +493,29 @@ export default function CreateEventScreen() {
 
               <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowCategoryPicker(false)}>
                 <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={showParentPicker} transparent={true} animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Parents concernés</Text>
+              <ScrollView style={{ maxHeight: 200, marginBottom: 10 }}>
+                {allParents.map((parent: any) => (
+                  <TouchableOpacity
+                    key={parent.id}
+                    style={[styles.childItem, { backgroundColor: colors.cardBackground }]}
+                    onPress={() => toggleParentSelection(parent.id)}
+                  >
+                    <Text style={[styles.childName, { color: colors.text }]}>{parent.firstName}</Text>
+                    {selectedParents.includes(parent.id) && <Text style={styles.checkMark}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground, marginTop: 20 }]} onPress={() => setShowParentPicker(false)}>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Fermer</Text>
               </TouchableOpacity>
             </View>
           </View>
