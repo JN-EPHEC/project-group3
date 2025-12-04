@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
-import { addDoc, collection, Timestamp } from 'firebase/firestore';
-import { useRef, useState } from 'react';
+import { addDoc, collection, doc, getDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
 import { Colors } from '../constants/theme';
@@ -22,6 +22,11 @@ export default function CreateEventScreen() {
   const [titleError, setTitleError] = useState('');
   const [category, setCategory] = useState({ name: 'Activités', color: '#87CEEB' });
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [children, setChildren] = useState<any[]>([]);
+  const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
+  const [showChildrenPicker, setShowChildrenPicker] = useState(false);
+  const [newChildName, setNewChildName] = useState('');
+  const [showAddChildForm, setShowAddChildForm] = useState(false);
 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -50,9 +55,39 @@ export default function CreateEventScreen() {
     { name: 'Autre', color: '#B4A7D6' },
   ];
 
+  useEffect(() => {
+    const fetchChildren = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      try {
+        const family = await getUserFamily(currentUser.uid);
+        if (family?.id) {
+          const familyDoc = await getDoc(doc(db, 'families', family.id));
+          if (familyDoc.exists()) {
+            const familyData = familyDoc.data();
+            setChildren(familyData.children || []);
+            // Sélectionner tous les enfants par défaut
+            if (familyData.children && familyData.children.length > 0) {
+              setSelectedChildren(familyData.children.map((child: any) => child.id));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching children:', error);
+      }
+    };
+
+    fetchChildren();
+  }, []);
+
   const handleCreateEvent = async () => {
     if (!title.trim()) {
       setTitleError('Veuillez indiquer un titre pour l\'événement');
+      return;
+    }
+    if (selectedChildren.length === 0) {
+      Alert.alert('Erreur', 'Veuillez sélectionner au moins un enfant');
       return;
     }
     setTitleError('');
@@ -88,6 +123,7 @@ export default function CreateEventScreen() {
         category: category,
         userID: currentUser.uid,
         familyId: family.id,
+        childrenIds: selectedChildren,
         createdAt: Timestamp.now(),
       });
 
@@ -97,6 +133,55 @@ export default function CreateEventScreen() {
       Alert.alert('Erreur', 'Impossible de créer l\'événement');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleChildSelection = (childId: string) => {
+    setSelectedChildren(prev => 
+      prev.includes(childId) 
+        ? prev.filter(id => id !== childId)
+        : [...prev, childId]
+    );
+  };
+
+  const getSelectedChildrenNames = () => {
+    return selectedChildren
+      .map(id => children.find(child => child.id === id)?.name)
+      .filter(Boolean)
+      .join(', ');
+  };
+
+  const handleAddChild = async () => {
+    if (!newChildName.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un nom pour l\'enfant');
+      return;
+    }
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      const family = await getUserFamily(currentUser.uid);
+      if (!family?.id) return;
+
+      const newChild = {
+        id: `${Date.now()}`,
+        name: newChildName.trim(),
+      };
+
+      const updatedChildren = [...children, newChild];
+      await updateDoc(doc(db, 'families', family.id), {
+        children: updatedChildren,
+      });
+
+      setChildren(updatedChildren);
+      setSelectedChildren([...selectedChildren, newChild.id]);
+      setNewChildName('');
+      setShowAddChildForm(false);
+      Alert.alert('Succès', 'Enfant ajouté avec succès');
+    } catch (error) {
+      console.error('Error adding child:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter l\'enfant');
     }
   };
 
@@ -115,7 +200,6 @@ export default function CreateEventScreen() {
     newTime.setMinutes(selectedStartMinute);
     setStartTime(newTime);
     
-    // Ajuster l'heure de fin si elle est avant l'heure de début
     const newEndTime = new Date(endTime);
     if (newTime.getTime() >= newEndTime.getTime()) {
       newEndTime.setTime(newTime.getTime() + 60 * 60 * 1000);
@@ -132,7 +216,6 @@ export default function CreateEventScreen() {
     newTime.setHours(selectedEndHour);
     newTime.setMinutes(selectedEndMinute);
     
-    // Vérifier que l'heure de fin est après l'heure de début
     if (newTime.getTime() <= startTime.getTime()) {
       Alert.alert('Erreur', 'L\'heure de fin doit être après l\'heure de début');
       return;
@@ -174,6 +257,17 @@ export default function CreateEventScreen() {
                   placeholderTextColor={colors.textSecondary} 
                 />
                 {titleError ? <Text style={styles.errorText}>{titleError}</Text> : null}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Enfants concernés *</Text>
+                <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowChildrenPicker(true)}>
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}
+                    onPress={() => setShowChildrenPicker(true)}
+                  >
+                    {getSelectedChildrenNames() || 'Sélectionner les enfants'}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
@@ -234,108 +328,46 @@ export default function CreateEventScreen() {
           </View>
         </ScrollView>
 
-        <Modal visible={showDatePicker} transparent={true} animationType="slide" onShow={() => {
-          setTimeout(() => {
-            const itemHeight = 56;
-            const visibleItems = 3.5; // Nombre d'éléments visibles dans le picker
-            const centerOffset = (itemHeight * visibleItems) / 2 - itemHeight / 2;
-            
-            dayScrollRef.current?.scrollTo({ 
-              y: Math.max(0, (selectedDay - 1) * itemHeight - centerOffset), 
-              animated: true 
-            });
-            monthScrollRef.current?.scrollTo({ 
-              y: Math.max(0, selectedMonth * itemHeight - centerOffset), 
-              animated: true 
-            });
-            yearScrollRef.current?.scrollTo({ 
-              y: Math.max(0, years.indexOf(selectedYear) * itemHeight - centerOffset), 
-              animated: true 
-            });
-          }, 300);
-        }}>
+        <Modal visible={showChildrenPicker} transparent={true} animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionner une date</Text>
-              <View style={styles.pickerRow}>
-                <ScrollView ref={dayScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
-                  {days.map((day) => (
-                    <TouchableOpacity key={day} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedDay === day && styles.pickerItemSelected]} onPress={() => setSelectedDay(day)}>
-                      <Text style={[styles.pickerText, { color: colors.text }, selectedDay === day && styles.pickerTextSelected]}>{day}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <ScrollView ref={monthScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
-                  {months.map((month, index) => (
-                    <TouchableOpacity key={index} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedMonth === index && styles.pickerItemSelected]} onPress={() => setSelectedMonth(index)}>
-                      <Text style={[styles.pickerText, { color: colors.text }, selectedMonth === index && styles.pickerTextSelected]}>{month}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <ScrollView ref={yearScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
-                  {years.map((year) => (
-                    <TouchableOpacity key={year} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedYear === year && styles.pickerItemSelected]} onPress={() => setSelectedYear(year)}>
-                      <Text style={[styles.pickerText, { color: colors.text }, selectedYear === year && styles.pickerTextSelected]}>{year}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmDate}>
-                  <Text style={styles.modalConfirmText}>Confirmer</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Enfants concernés</Text>
+              
+              <ScrollView style={{ maxHeight: 200, marginBottom: 10 }}>
+                {children.map((child: any) => (
+                  <TouchableOpacity 
+                    key={child.id} 
+                    style={[styles.childItem, { backgroundColor: colors.cardBackground }]} 
+                    onPress={() => toggleChildSelection(child.id)}
+                  >
+                    <Text style={[styles.childName, { color: colors.text }]}>{child.name}</Text>
+                    {selectedChildren.includes(child.id) && <Text style={styles.checkMark}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
 
-        <Modal visible={showStartTimePicker} transparent={true} animationType="slide" onShow={() => {
-          setTimeout(() => {
-            const itemHeight = 56;
-            const visibleItems = 3.5;
-            const centerOffset = (itemHeight * visibleItems) / 2 - itemHeight / 2;
-            
-            startHourScrollRef.current?.scrollTo({ 
-              y: Math.max(0, selectedStartHour * itemHeight - centerOffset), 
-              animated: true 
-            });
-            startMinuteScrollRef.current?.scrollTo({ 
-              y: Math.max(0, selectedStartMinute * itemHeight - centerOffset), 
-              animated: true 
-            });
-          }, 300);
-        }}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Heure de début</Text>
-              <View style={styles.pickerRow}>
-                <ScrollView ref={startHourScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
-                  {hours.map((hour) => (
-                    <TouchableOpacity key={hour} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedStartHour === hour && styles.pickerItemSelected]} onPress={() => setSelectedStartHour(hour)}>
-                      <Text style={[styles.pickerText, { color: colors.text }, selectedStartHour === hour && styles.pickerTextSelected]}>{hour.toString().padStart(2, '0')}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
-                <ScrollView ref={startMinuteScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
-                  {minutes.map((minute) => (
-                    <TouchableOpacity key={minute} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedStartMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedStartMinute(minute)}>
-                      <Text style={[styles.pickerText, { color: colors.text }, selectedStartMinute === minute && styles.pickerTextSelected]}>{minute.toString().padStart(2, '0')}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowStartTimePicker(false)}>
-                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
+              {showAddChildForm ? (
+                <View style={styles.addChildContainer}>
+                  <TextInput 
+                    style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text, marginBottom: 10 }]}
+                    placeholder="Nom de l'enfant"
+                    value={newChildName}
+                    onChangeText={setNewChildName}
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <TouchableOpacity style={[styles.modalConfirmButton]} onPress={handleAddChild}>
+                    <Text style={styles.modalConfirmText}>Ajouter l'enfant</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.addChildButton} onPress={() => setShowAddChildForm(true)}>
+                  <Text style={styles.addChildButtonText}>+ Ajouter un enfant</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmStartTime}>
-                  <Text style={styles.modalConfirmText}>Confirmer</Text>
-                </TouchableOpacity>
-              </View>
+              )}
+
+              <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground, marginTop: 20 }]} onPress={() => setShowChildrenPicker(false)}>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Fermer</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -474,4 +506,32 @@ const styles = StyleSheet.create({
   categoryItemSelected: { backgroundColor: '#87CEEB' },
   categoryItemText: { fontSize: 16, color: '#111', marginLeft: 10 },
   categoryItemTextSelected: { color: '#fff', fontWeight: '600' },
+  childItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  childName: {
+    fontSize: 16,
+  },
+  checkMark: {
+    fontSize: 20,
+    color: '#87CEEB',
+  },
+  addChildContainer: {
+    marginTop: 10,
+  },
+  addChildButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  addChildButtonText: {
+    fontSize: 16,
+    color: '#87CEEB',
+    fontWeight: '600',
+  },
 });

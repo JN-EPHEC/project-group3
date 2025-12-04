@@ -25,6 +25,14 @@ export default function EditEventScreen() {
   const [category, setCategory] = useState({ name: 'Activités', color: '#87CEEB' });
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
+  const [familyId, setFamilyId] = useState<string | null>(null);
+  const [children, setChildren] = useState<any[]>([]);
+  const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
+  const [initialSelectedChildren, setInitialSelectedChildren] = useState<string[]>([]);
+  const [showChildrenPicker, setShowChildrenPicker] = useState(false);
+  const [newChildName, setNewChildName] = useState('');
+  const [showAddChildForm, setShowAddChildForm] = useState(false);
+
   const categories = [
     { name: 'Activités', color: '#87CEEB' },
     { name: 'Sport', color: '#FF6B6B' },
@@ -59,6 +67,54 @@ export default function EditEventScreen() {
   const endHourScrollRef = useRef<any>(null);
   const endMinuteScrollRef = useRef<any>(null);
 
+  const toggleChildSelection = (childId: string) => {
+    setSelectedChildren(prev => 
+      prev.includes(childId) 
+        ? prev.filter(id => id !== childId)
+        : [...prev, childId]
+    );
+  };
+
+  const getSelectedChildrenNames = () => {
+    if (children.length === 0) return 'Chargement...';
+    return selectedChildren
+      .map(id => children.find(child => child.id === id)?.name)
+      .filter(Boolean)
+      .join(', ') || 'Aucun enfant sélectionné';
+  };
+
+  const handleAddChild = async () => {
+    if (!newChildName.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un nom pour l\'enfant');
+      return;
+    }
+    if (!familyId) {
+      Alert.alert('Erreur', 'ID de famille non trouvé.');
+      return;
+    }
+
+    try {
+      const newChild = {
+        id: `${Date.now()}`,
+        name: newChildName.trim(),
+      };
+
+      const updatedChildren = [...children, newChild];
+      await updateDoc(doc(db, 'families', familyId), {
+        children: updatedChildren,
+      });
+
+      setChildren(updatedChildren);
+      setSelectedChildren([...selectedChildren, newChild.id]);
+      setNewChildName('');
+      setShowAddChildForm(false);
+      Alert.alert('Succès', 'Enfant ajouté avec succès');
+    } catch (error) {
+      console.error('Error adding child:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter l\'enfant');
+    }
+  };
+
   useEffect(() => {
     const fetchEvent = async () => {
       if (!eventId || typeof eventId !== 'string') return;
@@ -78,6 +134,19 @@ export default function EditEventScreen() {
           setStartTime(eventStartTime);
           setEndTime(eventEndTime);
           setCategory(eventData.category || { name: 'Activités', color: '#87CEEB' });
+          setFamilyId(eventData.familyId || null);
+
+          // Fetch and set children data
+          if (eventData.familyId) {
+            const familyDoc = await getDoc(doc(db, 'families', eventData.familyId));
+            if (familyDoc.exists()) {
+              const familyData = familyDoc.data();
+              setChildren(familyData.children || []);
+            }
+          }
+          const currentChildrenIds = eventData.childrenIds || [];
+          setSelectedChildren(currentChildrenIds);
+          setInitialSelectedChildren(currentChildrenIds);
           
           setInitialTitle(eventData.title || '');
           setInitialDescription(eventData.description || '');
@@ -105,13 +174,16 @@ export default function EditEventScreen() {
   }, [eventId]);
 
   const hasChanges = () => {
+    // Compare arrays by converting to strings after sorting to ensure order doesn't matter
+    const childrenChanged = JSON.stringify([...selectedChildren].sort()) !== JSON.stringify([...initialSelectedChildren].sort());
     return (
       title !== initialTitle ||
       description !== initialDescription ||
       isAllDay !== initialIsAllDay ||
       date.getTime() !== initialDate.getTime() ||
       startTime.getTime() !== initialStartTime.getTime() ||
-      endTime.getTime() !== initialEndTime.getTime()
+      endTime.getTime() !== initialEndTime.getTime() ||
+      childrenChanged
     );
   };
 
@@ -156,6 +228,7 @@ export default function EditEventScreen() {
         endTime: Timestamp.fromDate(eventEndTime),
         isAllDay: isAllDay,
         category: category,
+        childrenIds: selectedChildren,
         updatedAt: Timestamp.now(),
       });
 
@@ -253,6 +326,15 @@ export default function EditEventScreen() {
                   placeholderTextColor={colors.textSecondary} 
                 />
                 {titleError ? <Text style={styles.errorText}>{titleError}</Text> : null}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Enfants concernés</Text>
+                <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowChildrenPicker(true)}>
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
+                    {getSelectedChildrenNames()}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
@@ -500,6 +582,50 @@ export default function EditEventScreen() {
             </View>
           </View>
         </Modal>
+
+        <Modal visible={showChildrenPicker} transparent={true} animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Enfants concernés</Text>
+              
+              <ScrollView style={{ maxHeight: 200, marginBottom: 10 }}>
+                {children.map((child: any) => (
+                  <TouchableOpacity 
+                    key={child.id} 
+                    style={[styles.childItem, { backgroundColor: colors.cardBackground }]} 
+                    onPress={() => toggleChildSelection(child.id)}
+                  >
+                    <Text style={[styles.childName, { color: colors.text }]}>{child.name}</Text>
+                    {selectedChildren.includes(child.id) && <Text style={styles.checkMark}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {showAddChildForm ? (
+                <View style={styles.addChildContainer}>
+                  <TextInput 
+                    style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text, marginBottom: 10 }]}
+                    placeholder="Nom de l'enfant"
+                    value={newChildName}
+                    onChangeText={setNewChildName}
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <TouchableOpacity style={[styles.modalConfirmButton]} onPress={handleAddChild}>
+                    <Text style={styles.modalConfirmText}>Ajouter l'enfant</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.addChildButton} onPress={() => setShowAddChildForm(true)}>
+                  <Text style={styles.addChildButtonText}>+ Ajouter un enfant</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground, marginTop: 20 }]} onPress={() => setShowChildrenPicker(false)}>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Fermer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </>
   );
@@ -554,4 +680,32 @@ const styles = StyleSheet.create({
   categoryItemSelected: { backgroundColor: '#87CEEB' },
   categoryItemText: { fontSize: 16, color: '#111', marginLeft: 10 },
   categoryItemTextSelected: { color: '#fff', fontWeight: '600' },
+  childItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  childName: {
+    fontSize: 16,
+  },
+  checkMark: {
+    fontSize: 20,
+    color: '#87CEEB',
+  },
+  addChildContainer: {
+    marginTop: 10,
+  },
+  addChildButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  addChildButtonText: {
+    fontSize: 16,
+    color: '#87CEEB',
+    fontWeight: '600',
+  },
 });
