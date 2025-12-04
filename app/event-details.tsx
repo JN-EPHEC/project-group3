@@ -15,6 +15,7 @@ export default function EventDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [childrenNames, setChildrenNames] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -25,6 +26,18 @@ export default function EventDetailsScreen() {
         if (eventDoc.exists()) {
           const eventData = eventDoc.data();
           setEvent({ id: eventDoc.id, ...eventData });
+          
+          if (eventData.familyId && eventData.childrenIds?.length > 0) {
+            const familyDoc = await getDoc(doc(db, 'families', eventData.familyId));
+            if (familyDoc.exists()) {
+              const familyData = familyDoc.data();
+              const allChildren = familyData.children || [];
+              const names = allChildren
+                .filter((child: any) => eventData.childrenIds.includes(child.id))
+                .map((child: any) => child.name);
+              setChildrenNames(names);
+            }
+          }
           
           // Vérifier si l'utilisateur actuel est le créateur
           const currentUser = auth.currentUser;
@@ -147,6 +160,14 @@ export default function EventDetailsScreen() {
                 }
               </Text>
             </View>
+
+            {/* Enfants concernés */}
+            {childrenNames.length > 0 && (
+              <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>👧👦 Enfants concernés</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{childrenNames.join(', ')}</Text>
+              </View>
+            )}
 
             {/* Description */}
             {event.description && (
