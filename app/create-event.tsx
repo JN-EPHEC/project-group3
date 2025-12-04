@@ -297,9 +297,7 @@ export default function CreateEventScreen() {
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>Enfants concernés *</Text>
                 <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowChildrenPicker(true)}>
-                  <Text style={[styles.dateButtonText, { color: colors.text }]}
-                    onPress={() => setShowChildrenPicker(true)}
-                  >
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
                     {getSelectedChildrenNames() || 'Sélectionner les enfants'}
                   </Text>
                 </TouchableOpacity>
@@ -443,7 +441,9 @@ export default function CreateEventScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
+                <View>
+                  <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
+                </View>
                 <ScrollView ref={endMinuteScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {minutes.map((minute) => (
                     <TouchableOpacity key={minute} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedEndMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedEndMinute(minute)}>

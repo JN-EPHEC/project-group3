@@ -528,7 +528,6 @@ export default function EditEventScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
                 <ScrollView ref={startMinuteScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {minutes.map((minute) => (
                     <TouchableOpacity key={minute} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedStartMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedStartMinute(minute)}>
@@ -576,7 +575,9 @@ export default function EditEventScreen() {
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
-                <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
+                <View>
+                  <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
+                </View>
                 <ScrollView ref={endMinuteScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
                   {minutes.map((minute) => (
                     <TouchableOpacity key={minute} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedEndMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedEndMinute(minute)}>

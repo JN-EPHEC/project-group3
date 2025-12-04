@@ -70,7 +70,12 @@ export default function EventDetailsScreen() {
     fetchEvent();
   }, [eventId]);
 
-  const handleDeleteEvent = () => {
+  const handleDeleteEvent = async () => {
+    if (!isOwner) {
+      Alert.alert('Permission refusée', 'Vous n\'êtes pas autorisé à supprimer cet événement.');
+      return;
+    }
+
     if (!eventId || typeof eventId !== 'string') {
       Alert.alert('Erreur', 'ID d\'événement invalide');
       return;
@@ -93,9 +98,16 @@ export default function EventDetailsScreen() {
               const eventRef = doc(db, 'events', eventId);
               await deleteDoc(eventRef);
               
-              await new Promise(resolve => setTimeout(resolve, 500));
-              
-              router.back();
+              // Délai pour permettre la mise à jour de l'interface utilisateur avant de revenir en arrière
+              setTimeout(() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  // Fallback si router.back() n'est pas possible
+                  router.replace('/(tabs)/Agenda'); 
+                }
+              }, 500);
+
             } catch (error: any) {
               console.error('Error deleting event:', error);
               Alert.alert(
@@ -164,7 +176,7 @@ export default function EventDetailsScreen() {
             {/* Date */}
             <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
               <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📅 Date</Text>
-              <Text style={[styles.infoValue, { color: colors.text }]}                >
+              <Text style={[styles.infoValue, { color: colors.text }]}>
                 {event.date?.toDate ? event.date.toDate().toLocaleDateString('fr-FR', { 
                   weekday: 'long', 
                   day: 'numeric', 
@@ -177,7 +189,7 @@ export default function EventDetailsScreen() {
             {/* Horaire */}
             <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
               <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>🕐 Horaire</Text>
-              <Text style={[styles.infoValue, { color: colors.text }]}                >
+              <Text style={[styles.infoValue, { color: colors.text }]}>
                 {event.isAllDay 
                   ? 'Toute la journée' 
                   : event.startTime && event.endTime
