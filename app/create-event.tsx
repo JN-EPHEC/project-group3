@@ -370,6 +370,114 @@ export default function CreateEventScreen() {
           </View>
         </ScrollView>
 
+        <Modal visible={showDatePicker} transparent={true} animationType="slide" onShow={() => {
+          setTimeout(() => {
+            const itemHeight = 56;
+            const visibleItems = 3.5;
+            const centerOffset = (itemHeight * visibleItems) / 2 - itemHeight / 2;
+            
+            dayScrollRef.current?.scrollTo({ 
+              y: Math.max(0, (selectedDay - 1) * itemHeight - centerOffset), 
+              animated: true 
+            });
+            monthScrollRef.current?.scrollTo({ 
+              y: Math.max(0, selectedMonth * itemHeight - centerOffset), 
+              animated: true 
+            });
+            yearScrollRef.current?.scrollTo({ 
+              y: Math.max(0, years.indexOf(selectedYear) * itemHeight - centerOffset), 
+              animated: true 
+            });
+          }, 300);
+        }}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionner une date</Text>
+              <View style={styles.pickerRow}>
+                <ScrollView ref={dayScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                  {days.map((day) => (
+                    <TouchableOpacity key={day} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedDay === day && styles.pickerItemSelected]} onPress={() => setSelectedDay(day)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedDay === day && styles.pickerTextSelected]}>{day}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <ScrollView ref={monthScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                  {months.map((month, index) => (
+                    <TouchableOpacity key={index} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedMonth === index && styles.pickerItemSelected]} onPress={() => setSelectedMonth(index)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedMonth === index && styles.pickerTextSelected]}>{month}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <ScrollView ref={yearScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                  {years.map((year) => (
+                    <TouchableOpacity key={year} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedYear === year && styles.pickerItemSelected]} onPress={() => setSelectedYear(year)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedYear === year && styles.pickerTextSelected]}>{year}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowDatePicker(false)}>
+                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmDate}>
+                  <Text style={styles.modalConfirmText}>Confirmer</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={showStartTimePicker} transparent={true} animationType="slide" onShow={() => {
+          setTimeout(() => {
+            const itemHeight = 56;
+            const visibleItems = 3.5;
+            const centerOffset = (itemHeight * visibleItems) / 2 - itemHeight / 2;
+            
+            startHourScrollRef.current?.scrollTo({ 
+              y: Math.max(0, selectedStartHour * itemHeight - centerOffset), 
+              animated: true 
+            });
+            startMinuteScrollRef.current?.scrollTo({ 
+              y: Math.max(0, selectedStartMinute * itemHeight - centerOffset), 
+              animated: true 
+            });
+          }, 300);
+        }}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Heure de début</Text>
+              <View style={styles.pickerRow}>
+                <ScrollView ref={startHourScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                  {hours.map((hour) => (
+                    <TouchableOpacity key={hour} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedStartHour === hour && styles.pickerItemSelected]} onPress={() => setSelectedStartHour(hour)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedStartHour === hour && styles.pickerTextSelected]}>{hour.toString().padStart(2, '0')}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View>
+                  <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
+                </View>
+                <ScrollView ref={startMinuteScrollRef} style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
+                  {minutes.map((minute) => (
+                    <TouchableOpacity key={minute} style={[styles.pickerItem, { backgroundColor: colors.cardBackground }, selectedStartMinute === minute && styles.pickerItemSelected]} onPress={() => setSelectedStartMinute(minute)}>
+                      <Text style={[styles.pickerText, { color: colors.text }, selectedStartMinute === minute && styles.pickerTextSelected]}>{minute.toString().padStart(2, '0')}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowStartTimePicker(false)}>
+                  <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmStartTime}>
+                  <Text style={styles.modalConfirmText}>Confirmer</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         <Modal visible={showChildrenPicker} transparent={true} animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
