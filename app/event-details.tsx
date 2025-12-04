@@ -1,9 +1,10 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { doc, getDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
-import { db } from '../constants/firebase';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { auth, db } from '../constants/firebase';
 
 export default function EventDetailsScreen() {
   const router = useRouter();
@@ -12,18 +13,28 @@ export default function EventDetailsScreen() {
   const { eventId } = useLocalSearchParams();
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
       if (!eventId || typeof eventId !== 'string') return;
-      
+
       try {
         const eventDoc = await getDoc(doc(db, 'events', eventId));
         if (eventDoc.exists()) {
-          setEvent({ id: eventDoc.id, ...eventDoc.data() });
+          const eventData = eventDoc.data();
+          setEvent({ id: eventDoc.id, ...eventData });
+          
+          // Vérifier si l'utilisateur actuel est le créateur
+          const currentUser = auth.currentUser;
+          if (currentUser && eventData.userID === currentUser.uid) {
+            setIsOwner(true);
+          }
         }
       } catch (error) {
         console.error('Error fetching event:', error);
+        Alert.alert('Erreur', 'Impossible de charger l\'événement');
       } finally {
         setLoading(false);
       }
@@ -32,26 +43,58 @@ export default function EventDetailsScreen() {
     fetchEvent();
   }, [eventId]);
 
+  const handleDeleteEvent = async () => {
+    if (!eventId || typeof eventId !== 'string') {
+      Alert.alert('Erreur', 'ID d\'événement invalide');
+      return;
+    }
+    
+    setDeleting(true);
+    
+    try {
+      const eventRef = doc(db, 'events', eventId);
+      await deleteDoc(eventRef);
+      
+      // Attendre un peu pour s'assurer que Firestore a bien supprimé
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      router.back();
+    } catch (error: any) {
+      console.error('Error deleting event:', error);
+      Alert.alert(
+        'Erreur', 
+        `Impossible de supprimer l\'événement.\nCode: ${error?.code}\nMessage: ${error?.message}`
+      );
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" color={colors.tint} />
-        </View>
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+          <View style={styles.containerCentered}>
+            <ActivityIndicator size="large" color={colors.tint} />
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
   if (!event) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <View style={styles.containerCentered}>
-          <Text style={[styles.errorText, { color: colors.textSecondary }]}>Événement introuvable</Text>
-          <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.tint }]} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>Retour</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+          <View style={styles.containerCentered}>
+            <Text style={[styles.errorText, { color: colors.textSecondary }]}>Événement introuvable</Text>
+            <TouchableOpacity style={[styles.backButton, { backgroundColor: colors.tint }]} onPress={() => router.back()}>
+              <Text style={styles.backButtonText}>Retour</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
@@ -66,58 +109,77 @@ export default function EventDetailsScreen() {
             </TouchableOpacity>
 
             <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.tint }]}>{event.title}</Text>
+              <Text style={[styles.title, { color: colors.text }]}>{event.title}</Text>
             </View>
 
-            <View style={styles.infoSection}>
+            {/* Catégorie */}
+            {event.category && (
               <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📅 Date</Text>
-                <Text style={[styles.infoValue, { color: colors.text }]}>
-                  {event.date?.toDate().toLocaleDateString('fr-FR', { 
-                    weekday: 'long', 
-                    day: 'numeric', 
-                    month: 'long', 
-                    year: 'numeric' 
-                  })}
-                </Text>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📂 Catégorie</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{event.category.name}</Text>
               </View>
+            )}
 
-              <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>🕐 Heure</Text>
-                <Text style={[styles.infoValue, { color: colors.text }]}>
-                  {event.isAllDay 
-                    ? 'Toute la journée' 
-                    : event.startTime && event.endTime
-                      ? `${event.startTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${event.endTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
-                      : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-                  }
-                </Text>
-              </View>
-
-              {event.category && (
-                <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
-                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>🏷️ Catégorie</Text>
-                  <View style={styles.categoryContainer}>
-                    <View style={[styles.categoryDot, { backgroundColor: event.category.color }]} />
-                    <Text style={[styles.infoValue, { color: colors.text }]}>{event.category.name}</Text>
-                  </View>
-                </View>
-              )}
-
-              {event.description && (
-                <View style={[styles.descriptionSection, { backgroundColor: colors.cardBackground }]}>
-                  <Text style={[styles.descriptionLabel, { color: colors.textSecondary }]}>📝 Description</Text>
-                  <Text style={[styles.descriptionText, { color: colors.text }]}>{event.description}</Text>
-                </View>
-              )}
+            {/* Date */}
+            <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📅 Date</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}
+                >
+                {event.date?.toDate ? event.date.toDate().toLocaleDateString('fr-FR', { 
+                  weekday: 'long', 
+                  day: 'numeric', 
+                  month: 'long', 
+                  year: 'numeric' 
+                }) : 'Date inconnue'}
+              </Text>
             </View>
 
-            <TouchableOpacity 
-              style={[styles.editButton, { backgroundColor: colors.tint }]}
-              onPress={() => router.push(`/edit-event?eventId=${event.id}`)}
-            >
-              <Text style={styles.editButtonText}>Modifier l'événement</Text>
-            </TouchableOpacity>
+            {/* Horaire */}
+            <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>🕐 Horaire</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}
+                >
+                {event.isAllDay 
+                  ? 'Toute la journée' 
+                  : event.startTime && event.endTime
+                    ? `${event.startTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${event.endTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Heure non disponible'
+                }
+              </Text>
+            </View>
+
+            {/* Description */}
+            {event.description && (
+              <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📝 Description</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{event.description}</Text>
+              </View>
+            )}
+
+            <View style={styles.infoSection} />
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity 
+                style={[styles.editButton, { backgroundColor: colors.tint }]}
+                onPress={() => router.push(`/edit-event?eventId=${event.id}`)}
+              >
+                <IconSymbol name="pencil" size={20} color="#fff" />
+                <Text style={styles.editButtonText}>Modifier</Text>
+              </TouchableOpacity>
+
+              {isOwner && (
+                <TouchableOpacity 
+                  style={[styles.deleteButton, deleting && styles.disabled]}
+                  onPress={handleDeleteEvent}
+                  disabled={deleting}
+                >
+                  <IconSymbol name="trash" size={20} color="#fff" />
+                  <Text style={styles.deleteButtonText}>
+                    {deleting ? 'Suppression...' : 'Supprimer'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -128,23 +190,22 @@ export default function EventDetailsScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#fff', paddingTop: 50 },
   scrollView: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 18 },
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   closeButton: { alignSelf: 'flex-end', width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5F5F5', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   closeButtonText: { fontSize: 24, color: '#666', fontWeight: '300' },
-  header: { marginBottom: 32 },
-  title: { fontSize: 32, fontWeight: '700', color: '#87CEEB' },
+  header: { marginBottom: 32, alignItems: 'center' },
+  title: { fontSize: 28, fontWeight: '700', color: '#111', textAlign: 'center' },
   infoSection: { marginBottom: 32 },
   infoRow: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16, marginBottom: 12 },
   infoLabel: { fontSize: 14, color: '#666', marginBottom: 8, fontWeight: '600' },
-  infoValue: { fontSize: 16, color: '#111', textTransform: 'capitalize' },
-  categoryContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  categoryDot: { width: 14, height: 14, borderRadius: 7, marginRight: 8 },
-  descriptionSection: { backgroundColor: '#F5F5F5', borderRadius: 12, padding: 16 },
-  descriptionLabel: { fontSize: 14, color: '#666', marginBottom: 8, fontWeight: '600' },
-  descriptionText: { fontSize: 16, color: '#111', lineHeight: 24 },
-  editButton: { backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
+  infoValue: { fontSize: 16, color: '#111' },
+  buttonContainer: { flexDirection: 'row', gap: 12 },
+  editButton: { flex: 1, backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   editButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  deleteButton: { flex: 1, backgroundColor: '#FF6B6B', borderRadius: 12, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  deleteButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  disabled: { opacity: 0.5 },
   errorText: { fontSize: 18, color: '#666', marginBottom: 20 },
   backButton: { backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
   backButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
