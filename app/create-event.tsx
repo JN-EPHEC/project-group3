@@ -1,9 +1,4 @@
 import { Stack, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from 'firebase/firestore';
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { auth, db, getUserFamily } from '../constants/firebase';
-import { Colors } from '../constants/theme';
 
 export default function CreateEventScreen() {
   const router = useRouter();
@@ -11,6 +6,7 @@ export default function CreateEventScreen() {
   const colors = Colors[colorScheme];
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
   const [date, setDate] = useState(new Date());
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date(new Date().getTime() + 60 * 60 * 1000));
@@ -135,6 +131,7 @@ export default function CreateEventScreen() {
       await addDoc(collection(db, 'events'), {
         title: title.trim(),
         description: description.trim(),
+        location: location.trim(),
         date: Timestamp.fromDate(eventStartTime),
         startTime: Timestamp.fromDate(eventStartTime),
         endTime: Timestamp.fromDate(eventEndTime),
@@ -356,6 +353,17 @@ export default function CreateEventScreen() {
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>Description</Text>
                 <TextInput style={[styles.input, styles.textArea, { backgroundColor: colors.cardBackground, color: colors.text }]} placeholder="Ajouter une description..." value={description} onChangeText={setDescription} multiline numberOfLines={4} textAlignVertical="top" placeholderTextColor={colors.textSecondary} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Lieu</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
+                  placeholder="Ex: 123 Rue de la Paix, Paris"
+                  value={location}
+                  onChangeText={setLocation}
+                  placeholderTextColor={colors.textSecondary}
+                />
               </View>
 
               <View style={styles.buttonContainer}>
