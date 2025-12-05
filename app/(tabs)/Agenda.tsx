@@ -235,6 +235,7 @@ export default function AgendaScreen() {
                 onPress={() => router.push(`/event-details?eventId=${event.id}`)}
               >
                 <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                {event.location && <Text style={[styles.eventLocation, { color: colors.textSecondary }]}>{event.location}</Text>}
                 <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
                   {event.isAllDay
                     ? 'Toute la journée'
@@ -297,6 +298,7 @@ export default function AgendaScreen() {
                 onPress={() => router.push(`/event-details?eventId=${event.id}`)}
               >
                 <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                {event.location && <Text style={[styles.eventLocation, { color: colors.textSecondary }]}>{event.location}</Text>}
                 <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
                   {event.isAllDay
                     ? 'Toute la journée'
@@ -463,6 +465,7 @@ export default function AgendaScreen() {
                       onPress={() => router.push(`/event-details?eventId=${event.id}`)}
                     >
                       <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                      {event.location && <Text style={[styles.eventLocation, { color: colors.textSecondary }]}>{event.location}</Text>}
                       <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
                         {event.isAllDay
                           ? 'Toute la journée'
@@ -639,6 +642,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  eventLocation: {
+    fontSize: 14,
+    marginBottom: 2,
   },
   eventTime: {
     fontSize: 14,
