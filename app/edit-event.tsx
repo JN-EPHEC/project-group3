@@ -1,9 +1,4 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from 'firebase/firestore';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { db } from '../constants/firebase';
-import { Colors } from '../constants/theme';
 
 export default function EditEventScreen() {
   const router = useRouter();
@@ -12,6 +7,7 @@ export default function EditEventScreen() {
   const { eventId } = useLocalSearchParams();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
   const [date, setDate] = useState(new Date());
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date(new Date().getTime() + 60 * 60 * 1000));
@@ -51,6 +47,7 @@ export default function EditEventScreen() {
 
   const [initialTitle, setInitialTitle] = useState('');
   const [initialDescription, setInitialDescription] = useState('');
+  const [initialLocation, setInitialLocation] = useState('');
   const [initialDate, setInitialDate] = useState(new Date());
   const [initialStartTime, setInitialStartTime] = useState(new Date());
   const [initialEndTime, setInitialEndTime] = useState(new Date());
@@ -150,6 +147,7 @@ export default function EditEventScreen() {
           
           setTitle(eventData.title || '');
           setDescription(eventData.description || '');
+          setLocation(eventData.location || '');
           setIsAllDay(eventData.isAllDay || false);
           setDate(eventDate);
           setStartTime(eventStartTime);
@@ -181,6 +179,7 @@ export default function EditEventScreen() {
           
           setInitialTitle(eventData.title || '');
           setInitialDescription(eventData.description || '');
+          setInitialLocation(eventData.location || '');
           setInitialDate(eventDate);
           setInitialStartTime(eventStartTime);
           setInitialEndTime(eventEndTime);
@@ -212,6 +211,7 @@ export default function EditEventScreen() {
           return (
             title !== initialTitle ||
             description !== initialDescription ||
+            location !== initialLocation ||
             isAllDay !== initialIsAllDay ||
             date.getTime() !== initialDate.getTime() ||
             startTime.getTime() !== initialStartTime.getTime() ||
@@ -262,6 +262,7 @@ export default function EditEventScreen() {
             await updateDoc(doc(db, 'events', eventId), {
               title: title.trim(),
               description: description.trim(),
+              location: location.trim(),
               date: Timestamp.fromDate(eventStartTime),
               startTime: Timestamp.fromDate(eventStartTime),
               endTime: Timestamp.fromDate(eventEndTime),
@@ -429,6 +430,17 @@ export default function EditEventScreen() {
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>Description</Text>
                 <TextInput style={[styles.input, styles.textArea, { backgroundColor: colors.cardBackground, color: colors.text }]} placeholder="Ajouter une description..." value={description} onChangeText={setDescription} multiline numberOfLines={4} textAlignVertical="top" placeholderTextColor={colors.textSecondary} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Lieu</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
+                  placeholder="Ex: 123 Rue de la Paix, Paris"
+                  value={location}
+                  onChangeText={setLocation}
+                  placeholderTextColor={colors.textSecondary}
+                />
               </View>
 
               <View style={styles.buttonContainer}>

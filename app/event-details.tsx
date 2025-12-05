@@ -3,7 +3,7 @@ import { Colors } from '@/constants/theme';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { auth, db } from '../constants/firebase';
 
 export default function EventDetailsScreen() {
@@ -110,6 +110,20 @@ export default function EventDetailsScreen() {
     }
   };
 
+  const handleLocationPress = () => {
+    if (event?.location) {
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`;
+      Linking.canOpenURL(url)
+        .then((supported) => {
+          if (supported) {
+            Linking.openURL(url);
+          } else {
+            Alert.alert('Erreur', `Impossible d'ouvrir l'adresse: ${url}`);
+          }
+        });
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -201,6 +215,16 @@ export default function EventDetailsScreen() {
                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>👥 Parents concernés</Text>
                 <Text style={[styles.infoValue, { color: colors.text }]}>{parentNames.join(', ')}</Text>
               </View>
+            )}
+
+            {/* Lieu */}
+            {event.location && (
+              <TouchableOpacity onPress={handleLocationPress}>
+                <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>📍 Lieu</Text>
+                  <Text style={[styles.infoValue, { color: colors.tint, textDecorationLine: 'underline' }]}>{event.location}</Text>
+                </View>
+              </TouchableOpacity>
             )}
 
             {/* Description */}
