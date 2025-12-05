@@ -2,7 +2,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { doc, getDoc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
@@ -29,6 +29,10 @@ export default function EditExpenseScreen() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
+  const [familyMembers, setFamilyMembers] = useState<any[]>([]);
+  const [paidBy, setPaidBy] = useState<string | null>(null);
+  const [showMemberPicker, setShowMemberPicker] = useState(false);
+
   const dayScrollRef = useRef<any>(null);
   const monthScrollRef = useRef<any>(null);
   const yearScrollRef = useRef<any>(null);
@@ -49,6 +53,7 @@ export default function EditExpenseScreen() {
           setAmount(expenseData.amount?.toString() || '');
           setCategory(expenseData.category || '');
           setExistingImageUrl(expenseData.receiptUrl || null);
+          setPaidBy(expenseData.paidBy || null);
           
           const expenseDate = expenseData.date?.toDate() || new Date();
           setDate(expenseDate);
@@ -64,6 +69,13 @@ export default function EditExpenseScreen() {
           if (budgetDoc.exists()) {
             setCategories(budgetDoc.data().categories || []);
           }
+
+          // Récupérer les membres de la famille
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('familyId', '==', userFamily.id));
+          const querySnapshot = await getDocs(q);
+          const members = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setFamilyMembers(members);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -95,9 +107,20 @@ export default function EditExpenseScreen() {
     }
   };
 
+  const getPaidByName = () => {
+    if (!paidBy) return 'Sélectionner qui a payé';
+    const member = familyMembers.find(m => m.id === paidBy);
+    return member?.firstName || 'Inconnu';
+  };
+
   const handleUpdateExpense = async () => {
     if (!description.trim() || !amount.trim() || !category) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    if (!paidBy) {
+      Alert.alert('Erreur', 'Veuillez sélectionner qui a payé');
       return;
     }
 
@@ -134,6 +157,7 @@ export default function EditExpenseScreen() {
         category: category,
         date: Timestamp.fromDate(date),
         receiptUrl: receiptUrl,
+        paidBy: paidBy,
         updatedAt: serverTimestamp(),
       });
 
@@ -212,6 +236,19 @@ export default function EditExpenseScreen() {
                   keyboardType="decimal-pad"
                   placeholderTextColor={colors.textSecondary}
                 />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Qui a payé ? *</Text>
+                <TouchableOpacity 
+                  style={[styles.input, { backgroundColor: colors.cardBackground }]}
+                  onPress={() => setShowMemberPicker(true)}
+                >
+                  <Text style={[styles.categoryButtonText, { color: paidBy ? colors.text : colors.textSecondary }]}
+                  >
+                    {getPaidByName()}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
@@ -373,6 +410,33 @@ export default function EditExpenseScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Member Picker Modal */}
+        <Modal visible={showMemberPicker} transparent={true} animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Qui a payé ?</Text>
+              <ScrollView style={{ maxHeight: 300, marginBottom: 10 }}>
+                {familyMembers.map((member: any) => (
+                  <TouchableOpacity
+                    key={member.id}
+                    style={[styles.memberItem, { backgroundColor: colors.cardBackground }]}
+                    onPress={() => {
+                      setPaidBy(member.id);
+                      setShowMemberPicker(false);
+                    }}
+                  >
+                    <Text style={[styles.memberName, { color: colors.text }]}>{member.firstName}</Text>
+                    {paidBy === member.id && <Text style={styles.checkMark}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground, marginTop: 20 }]} onPress={() => setShowMemberPicker(false)}>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Fermer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </>
   );
@@ -423,6 +487,22 @@ const styles = StyleSheet.create({
   categoryList: { maxHeight: 400 },
   categoryItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   categoryItemText: { fontSize: 16, color: '#111' },
+  memberItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  memberName: {
+    fontSize: 16,
+  },
+  checkMark: {
+    fontSize: 20,
+    color: '#87CEEB',
+  },
   modalCloseButton: { backgroundColor: '#F5F5F5', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
   modalCloseText: { fontSize: 16, fontWeight: '600', color: '#666' },
 });
