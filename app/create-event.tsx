@@ -1,4 +1,10 @@
 import { Stack, useRouter } from 'expo-router';
+import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { auth, db, getUserFamily } from '../constants/firebase';
+import { Colors } from '../constants/theme';
+
 
 export default function CreateEventScreen() {
   const router = useRouter();
