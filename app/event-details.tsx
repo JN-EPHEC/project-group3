@@ -17,6 +17,7 @@ export default function EventDetailsScreen() {
   const [isOwner, setIsOwner] = useState(false);
   const [childrenNames, setChildrenNames] = useState<string[]>([]);
   const [parentNames, setParentNames] = useState<string[]>([]);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -81,45 +82,32 @@ export default function EventDetailsScreen() {
       return;
     }
 
-    Alert.alert(
-      'Confirmation',
-      'Êtes-vous sûr de vouloir supprimer cet événement ? Cette action est irréversible.',
-      [
-        {
-          text: 'Annuler',
-          style: 'cancel',
-        },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              const eventRef = doc(db, 'events', eventId);
-              await deleteDoc(eventRef);
-              
-              // Délai pour permettre la mise à jour de l'interface utilisateur avant de revenir en arrière
-              setTimeout(() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  // Fallback si router.back() n'est pas possible
-                  router.replace('/(tabs)/Agenda'); 
-                }
-              }, 500);
+    setShowDeleteConfirmation(true);
+  };
 
-            } catch (error: any) {
-              console.error('Error deleting event:', error);
-              Alert.alert(
-                'Erreur', 
-                `Impossible de supprimer l\'événement.\nCode: ${error?.code}\nMessage: ${error?.message}`
-              );
-              setDeleting(false);
-            }
-          },
-        },
-      ]
-    );
+  const confirmDeleteEvent = async () => {
+    setDeleting(true);
+    try {
+      const eventRef = doc(db, 'events', eventId);
+      await deleteDoc(eventRef);
+      
+      setTimeout(() => {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/(tabs)/Agenda'); 
+        }
+      }, 500);
+
+    } catch (error: any) {
+      console.error('Error deleting event:', error);
+      Alert.alert(
+        'Erreur', 
+        `Impossible de supprimer l\'événement.\nCode: ${error?.code}\nMessage: ${error?.message}`
+      );
+      setDeleting(false);
+      setShowDeleteConfirmation(false);
+    }
   };
 
   if (loading) {
@@ -236,9 +224,9 @@ export default function EventDetailsScreen() {
 
               {isOwner && (
                 <TouchableOpacity 
-                  style={[styles.deleteButton, deleting && styles.disabled]}
+                  style={[styles.deleteButton, (deleting || showDeleteConfirmation) && styles.disabled]}
                   onPress={handleDeleteEvent}
-                  disabled={deleting}
+                  disabled={deleting || showDeleteConfirmation}
                 >
                   <IconSymbol name="trash" size={20} color="#fff" />
                   <Text style={styles.deleteButtonText}>
@@ -247,6 +235,32 @@ export default function EventDetailsScreen() {
                 </TouchableOpacity>
               )}
             </View>
+
+            {showDeleteConfirmation && (
+              <View style={[styles.confirmationContainer, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.confirmationText, { color: colors.text }]}>
+                  Êtes-vous sûr de vouloir supprimer cet événement ? Cette action est irréversible.
+                </Text>
+                <View style={styles.confirmationButtonContainer}>
+                  <TouchableOpacity 
+                    style={[styles.confirmCancelButton, { backgroundColor: colors.cardBackground, borderColor: colors.textSecondary, borderWidth: 1 }]}
+                    onPress={() => setShowDeleteConfirmation(false)}
+                    disabled={deleting}
+                  >
+                    <Text style={[styles.confirmCancelButtonText, { color: colors.textSecondary }]}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.confirmDeleteButton, deleting && styles.disabled]}
+                    onPress={confirmDeleteEvent}
+                    disabled={deleting}
+                  >
+                    <Text style={styles.confirmDeleteButtonText}>
+                      {deleting ? 'Suppression...' : 'Confirmer la suppression'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -276,4 +290,11 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 18, color: '#666', marginBottom: 20 },
   backButton: { backgroundColor: '#87CEEB', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
   backButtonText: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  confirmationContainer: { marginTop: 20, paddingHorizontal: 16, paddingVertical: 16, borderRadius: 12, backgroundColor: '#F5F5F5', borderLeftWidth: 4, borderLeftColor: '#FF6B6B' },
+  confirmationText: { fontSize: 14, color: '#111', marginBottom: 16, lineHeight: 20 },
+  confirmationButtonContainer: { flexDirection: 'row', gap: 12 },
+  confirmCancelButton: { flex: 1, borderRadius: 8, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#999' },
+  confirmCancelButtonText: { fontSize: 14, fontWeight: '600', color: '#999' },
+  confirmDeleteButton: { flex: 1, backgroundColor: '#FF6B6B', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  confirmDeleteButtonText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 });
