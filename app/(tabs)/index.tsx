@@ -84,16 +84,43 @@ export default function HomeScreen() {
             setFamilyMembers(members);
           }
 
-          const messagesQuery = query(
-            collection(db, 'messages'),
-            where('participants', 'array-contains', uid),
-            orderBy('lastMessageTimestamp', 'desc'),
-            limit(3)
-          );
-          const messagesSnapshot = await getDocs(messagesQuery);
-          setMessages(
-            messagesSnapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) })) as { id: string; [key: string]: any }[]
-          );
+          if (userFamily?.id) {
+            const conversationsQuery = query(
+              collection(db, 'conversations'),
+              where('familyId', '==', userFamily.id),
+              where('participants', 'array-contains', uid),
+              orderBy('lastMessageTime', 'desc')
+            );
+            const conversationsSnapshot = await getDocs(conversationsQuery);
+            const conversations = conversationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            const conversationsWithDetails = await Promise.all(
+              conversations.map(async (conv) => {
+                const otherUserId = conv.participants.find((p: string) => p !== uid);
+                if (!otherUserId) return null;
+
+                const userDocRef = doc(db, 'users', otherUserId);
+                const userDocSnap = await getDoc(userDocRef);
+                const otherUserName = userDocSnap.exists() ? userDocSnap.data().firstName : 'Utilisateur';
+
+                const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
+
+                if (unreadCount > 0) {
+                  return {
+                    ...conv,
+                    otherUserName,
+                    otherUserId,
+                    unreadCount
+                  };
+                }
+                return null;
+              })
+            );
+            
+            setMessages(conversationsWithDetails.filter(c => c !== null) as any);
+          } else {
+            setMessages([]);
+          }
 
         } catch (error) {
           console.error("Error fetching data:", error);
@@ -217,16 +244,37 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Messages récents</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Messages non lus</Text>
             {messages.length > 0 ? (
               messages.map((msg: any) => (
-                <View key={msg.id} style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}>
-                  <Text style={[styles.rowCardText, { color: colors.textSecondary }]}>{msg.lastMessage}</Text>
-                </View>
+                <TouchableOpacity 
+                  key={msg.id} 
+                  style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}
+                  onPress={() => router.push({ 
+                    pathname: '/conversation', 
+                    params: { 
+                      conversationId: msg.id,
+                      otherUserId: msg.otherUserId,
+                      otherUserName: msg.otherUserName
+                    } 
+                  })}
+                >
+                  <View style={styles.messageContent}>
+                    <View>
+                      <Text style={[styles.messageSender, { color: colors.text }]}>{msg.otherUserName}</Text>
+                      <Text style={[styles.rowCardText, { color: colors.textSecondary, marginTop: 4 }]}>{msg.lastMessage}</Text>
+                    </View>
+                    {msg.unreadCount > 0 && (
+                       <View style={[styles.unreadBadge, { backgroundColor: colors.tint }]}>
+                        <Text style={styles.unreadText}>{msg.unreadCount}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
               ))
             ) : (
               <View style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucun message récent</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucun message non lu</Text>
               </View>
             )}
           </View>
@@ -335,5 +383,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  messageContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  messageSender: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  unreadBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  unreadText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
