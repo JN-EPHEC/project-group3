@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   messageFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 0.5,
     marginTop: 4,
   },
   statusContainer: {
