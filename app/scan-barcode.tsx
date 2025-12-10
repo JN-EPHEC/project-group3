@@ -2,8 +2,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ScanBarcodeScreen() {
@@ -13,6 +13,16 @@ export default function ScanBarcodeScreen() {
   const [loading, setLoading] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const [isCameraActive, setIsCameraActive] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsCameraActive(true);
+      return () => {
+        setIsCameraActive(false);
+      };
+    }, [])
+  );
 
   useEffect(() => {
     if (!permission?.granted) {
@@ -119,6 +129,7 @@ export default function ScanBarcodeScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: '#000' }]}>
       <View style={styles.cameraContainer}>
+        {isCameraActive && (
         <CameraView
           style={styles.camera}
           facing="back"
@@ -174,6 +185,7 @@ export default function ScanBarcodeScreen() {
             )}
           </View>
         </CameraView>
+        )}
       </View>
     </SafeAreaView>
   );
