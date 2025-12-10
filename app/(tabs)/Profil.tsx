@@ -4,9 +4,9 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily, signOut } from '../../constants/firebase';
 
 export default function ProfilScreen() {
@@ -17,6 +17,10 @@ export default function ProfilScreen() {
   const [email, setEmail] = useState('');
   const [familyCode, setFamilyCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -32,8 +36,12 @@ export default function ProfilScreen() {
           const userDocRef = doc(db, 'users', uid);
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
-            setFirstName(userDocSnap.data().firstName || 'Utilisateur');
-            setLastName(userDocSnap.data().lastName || '');
+            const userFirstName = userDocSnap.data().firstName || 'Utilisateur';
+            const userLastName = userDocSnap.data().lastName || '';
+            setFirstName(userFirstName);
+            setLastName(userLastName);
+            setEditFirstName(userFirstName);
+            setEditLastName(userLastName);
           }
 
           const family = await getUserFamily(uid);
@@ -63,6 +71,54 @@ export default function ProfilScreen() {
       console.log('Navigation called');
     } catch (error) {
       console.error('Error signing out:', error);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    
+    if (!editFirstName.trim() || !editLastName.trim()) {
+      Alert.alert('Erreur', 'Le prénom et le nom ne peuvent pas être vides');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, {
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim(),
+      });
+      
+      setFirstName(editFirstName.trim());
+      setLastName(editLastName.trim());
+      setIsEditing(false);
+      Alert.alert('Succès', 'Votre profil a été mis à jour');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour le profil');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditFirstName(firstName);
+    setEditLastName(lastName);
+    setIsEditing(false);
+  };
+
+  const handleShareFamilyCode = async () => {
+    if (!familyCode) return;
+
+    try {
+      await Share.share({
+        message: `Rejoins ma famille sur l'application ! Utilise ce code : ${familyCode}`,
+        title: 'Code famille',
+      });
+    } catch (error) {
+      console.error('Error sharing family code:', error);
+      Alert.alert('Erreur', 'Impossible de partager le code famille');
     }
   };
 
@@ -98,17 +154,80 @@ export default function ProfilScreen() {
 
           {/* Account Info */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Informations du compte</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Informations du compte</Text>
+              {!isEditing && (
+                <TouchableOpacity 
+                  onPress={() => setIsEditing(true)} 
+                  style={[styles.editButton, { backgroundColor: colors.tint }]}>
+                  <IconSymbol name="pencil" size={18} color="#fff" />
+                  <Text style={styles.editButtonText}>Modifier</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             
             <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.infoRow}>
                 <IconSymbol name="person" size={20} color={colors.textSecondary} />
                 <View style={styles.infoText}>
-                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Nom</Text>
-                  <Text style={[styles.infoValue, { color: colors.text }]}>{firstName} {lastName}</Text>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Prénom</Text>
+                  {isEditing ? (
+                    <TextInput
+                      style={[styles.input, { color: colors.text, borderColor: colors.textSecondary }]}
+                      value={editFirstName}
+                      onChangeText={setEditFirstName}
+                      placeholder="Prénom"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  ) : (
+                    <Text style={[styles.infoValue, { color: colors.text }]}>{firstName}</Text>
+                  )}
                 </View>
               </View>
             </View>
+
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              <View style={styles.infoRow}>
+                <IconSymbol name="person" size={20} color={colors.textSecondary} />
+                <View style={styles.infoText}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Nom</Text>
+                  {isEditing ? (
+                    <TextInput
+                      style={[styles.input, { color: colors.text, borderColor: colors.textSecondary }]}
+                      value={editLastName}
+                      onChangeText={setEditLastName}
+                      placeholder="Nom"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  ) : (
+                    <Text style={[styles.infoValue, { color: colors.text }]}>{lastName}</Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {isEditing && (
+              <View style={styles.editButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.cancelButton, { backgroundColor: colors.cardBackground }]} 
+                  onPress={handleCancelEdit}
+                  disabled={isSaving}
+                >
+                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.saveButton, { backgroundColor: colors.tint }]} 
+                  onPress={handleSaveProfile}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Enregistrer</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
 
             <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.infoRow}>
@@ -121,15 +240,20 @@ export default function ProfilScreen() {
             </View>
 
             {familyCode && (
-              <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              <TouchableOpacity 
+                style={[styles.infoCard, { backgroundColor: colors.cardBackground }]} 
+                onPress={handleShareFamilyCode}
+                activeOpacity={0.7}
+              >
                 <View style={styles.infoRow}>
                   <IconSymbol name="house" size={20} color={colors.textSecondary} />
                   <View style={styles.infoText}>
                     <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Code famille</Text>
                     <Text style={[styles.infoValue, { color: colors.text }]}>{familyCode}</Text>
                   </View>
+                  <IconSymbol name="square.and.arrow.up" size={20} color={colors.tint} />
                 </View>
-              </View>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -225,10 +349,28 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 28,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 22,
     fontWeight: '600',
-    marginBottom: 16,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 6,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   infoCard: {
     borderRadius: 20,
@@ -255,6 +397,49 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  input: {
+    fontSize: 16,
+    fontWeight: '600',
+    borderBottomWidth: 1,
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+  },
+  editButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    borderRadius: 20,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  saveButton: {
+    flex: 1,
+    borderRadius: 20,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
   settingCard: {
     borderRadius: 20,
@@ -289,9 +474,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   logoutText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+    marginLeft: 8,
     marginLeft: 10,
+    fontWeight: '700',
+    fontSize: 16,
+    color: '#fff',
   },
 });

@@ -211,6 +211,7 @@ export default function HomeScreen() {
                   >
                     <Text style={[styles.rowCardText, { color: colors.textSecondary }]}>{event.title}</Text>
                     <View style={styles.eventMetaRow}>
+                      {event.location ? <Text style={[styles.eventLocation, { color: colors.tint }]}>{event.location}</Text> : null}
                       <Text style={[styles.rowCardDate, { color: colors.tint }]}>
                         {event.date?.toDate().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                       </Text>
@@ -360,6 +361,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowCardDate: { fontSize: 13, fontWeight: '600' },
+  eventLocation: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   eventTime: {
     fontSize: 12,
     fontWeight: '600',
