@@ -1,3 +1,4 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs, wp } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -380,7 +381,7 @@ export default function AgendaScreen() {
                   router.push('/create-event');
                 }}
               >
-                <Text style={styles.addButtonText}>+</Text>
+                <IconSymbol name="plus" size={hs(20)} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </View>
@@ -542,19 +543,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   addButton: {
-    paddingHorizontal: hs(10),
-    paddingTop: vs(4),
-    paddingBottom: vs(8),
-    borderRadius: BORDER_RADIUS.medium,
-    flexDirection: 'row',
+    width: hs(34),
+    height: hs(34),
+    borderRadius: hs(17),
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  addButtonText: {
-    fontSize: FONT_SIZES.xlarge,
-    color: '#FFFFFF',
-    fontWeight: '300',
-    lineHeight: vs(18),
   },
   calendarContainer: {
     borderRadius: BORDER_RADIUS.large,
