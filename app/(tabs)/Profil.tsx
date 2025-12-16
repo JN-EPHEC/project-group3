@@ -391,15 +391,17 @@ export default function ProfilScreen() {
             </View>
           </View>
 
-          {/* Account Info */}
+          {/* Compte Section */}
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Informations du compte</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Compte</Text>
+            
+            <View style={styles.subSectionHeader}>
+              <Text style={[styles.subSectionTitle, { color: colors.textSecondary }]}>Informations personnelles</Text>
               {!isEditing && (
                 <TouchableOpacity 
                   onPress={() => setIsEditing(true)} 
                   style={[styles.editButton, { backgroundColor: colors.tint }]}>
-                  <IconSymbol name="pencil" size={18} color="#fff" />
+                  <IconSymbol name="pencil" size={14} color="#fff" />
                   <Text style={styles.editButtonText}>Modifier</Text>
                 </TouchableOpacity>
               )}
@@ -423,9 +425,9 @@ export default function ProfilScreen() {
                   )}
                 </View>
               </View>
-            </View>
+              
+              <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
-            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.infoRow}>
                 <IconSymbol name="person" size={20} color={colors.textSecondary} />
                 <View style={styles.infoText}>
@@ -441,6 +443,16 @@ export default function ProfilScreen() {
                   ) : (
                     <Text style={[styles.infoValue, { color: colors.text }]}>{lastName}</Text>
                   )}
+                </View>
+              </View>
+
+              <View style={[styles.separator, { backgroundColor: colors.border }]} />
+
+              <View style={styles.infoRow}>
+                <IconSymbol name="envelope" size={20} color={colors.textSecondary} />
+                <View style={styles.infoText}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>{email}</Text>
                 </View>
               </View>
             </View>
@@ -468,47 +480,33 @@ export default function ProfilScreen() {
               </View>
             )}
 
-            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
-              <View style={styles.infoRow}>
-                <IconSymbol name="envelope" size={20} color={colors.textSecondary} />
-                <View style={styles.infoText}>
-                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Email</Text>
-                  <Text style={[styles.infoValue, { color: colors.text }]}>{email}</Text>
-                </View>
-              </View>
-            </View>
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+              <IconSymbol name="lock" size={24} color={colors.textSecondary} />
+              <Text style={[styles.settingText, { color: colors.text }]}>Sécurités et confidentialité</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
 
-            {familyCode && (
-              <TouchableOpacity 
-                style={[styles.infoCard, { backgroundColor: colors.cardBackground }]} 
-                onPress={handleShareFamilyCode}
-                activeOpacity={0.7}
-              >
-                <View style={styles.infoRow}>
-                  <IconSymbol name="house" size={20} color={colors.textSecondary} />
-                  <View style={styles.infoText}>
-                    <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Code famille</Text>
-                    <Text style={[styles.infoValue, { color: colors.text }]}>{familyCode}</Text>
-                  </View>
-                  <IconSymbol name="square.and.arrow.up" size={20} color={colors.tint} />
-                </View>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+              <IconSymbol name="bell" size={24} color={colors.textSecondary} />
+              <Text style={[styles.settingText, { color: colors.text }]}>Notifications</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Famille Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Famille</Text>
 
             {familyMembers.length > 0 && (
               <View>
                 <TouchableOpacity 
-                  style={[styles.infoCard, { backgroundColor: colors.cardBackground }]} 
+                  style={[styles.settingCard, { backgroundColor: colors.cardBackground }]} 
                   onPress={() => setIsDropdownOpen(!isDropdownOpen)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.infoRow}>
-                    <IconSymbol name="person.2" size={20} color={colors.textSecondary} />
-                    <View style={styles.infoText}>
-                      <Text style={[styles.infoValue, { color: colors.text }]}>Membres de la famille</Text>
-                    </View>
-                    <IconSymbol name={isDropdownOpen ? "chevron.up" : "chevron.down"} size={20} color={colors.tint} />
-                  </View>
+                  <IconSymbol name="person.2" size={24} color={colors.textSecondary} />
+                  <Text style={[styles.settingText, { color: colors.text }]}>Membres de la famille</Text>
+                  <IconSymbol name={isDropdownOpen ? "chevron.up" : "chevron.down"} size={20} color={colors.tint} />
                 </TouchableOpacity>
 
                 {isDropdownOpen && (
@@ -527,17 +525,13 @@ export default function ProfilScreen() {
             {/* Children Section */}
             <View>
               <TouchableOpacity 
-                style={[styles.infoCard, { backgroundColor: colors.cardBackground }]} 
+                style={[styles.settingCard, { backgroundColor: colors.cardBackground }]} 
                 onPress={() => setIsChildrenDropdownOpen(!isChildrenDropdownOpen)}
                 activeOpacity={0.7}
               >
-                <View style={styles.infoRow}>
-                  <IconSymbol name="person.3" size={20} color={colors.textSecondary} />
-                  <View style={styles.infoText}>
-                    <Text style={[styles.infoValue, { color: colors.text }]}>Enfants</Text>
-                  </View>
-                  <IconSymbol name={isChildrenDropdownOpen ? "chevron.up" : "chevron.down"} size={20} color={colors.tint} />
-                </View>
+                <IconSymbol name="person.3" size={24} color={colors.textSecondary} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Enfants</Text>
+                <IconSymbol name={isChildrenDropdownOpen ? "chevron.up" : "chevron.down"} size={20} color={colors.tint} />
               </TouchableOpacity>
 
               {isChildrenDropdownOpen && (
@@ -600,27 +594,36 @@ export default function ProfilScreen() {
                 </View>
               )}
             </View>
+
+            <TouchableOpacity 
+              style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}
+              onPress={handleShareFamilyCode}
+            >
+              <IconSymbol name="square.and.arrow.up" size={24} color={colors.textSecondary} />
+              <Text style={[styles.settingText, { color: colors.text }]}>Inviter un membre</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
 
-          {/* Settings */}
+          {/* Support Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Paramètres</Text>
+            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Support</Text>
             
-            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
-              <IconSymbol name="bell" size={24} color={colors.textSecondary} />
-              <Text style={[styles.settingText, { color: colors.text }]}>Notifications</Text>
-              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
-              <IconSymbol name="lock" size={24} color={colors.textSecondary} />
-              <Text style={[styles.settingText, { color: colors.text }]}>Confidentialité</Text>
-              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]} onPress={() => router.push('/(tabs)/Aide')}>
               <IconSymbol name="questionmark.circle" size={24} color={colors.textSecondary} />
-              <Text style={[styles.settingText, { color: colors.text }]}>Aide</Text>
+              <Text style={[styles.settingText, { color: colors.text }]}>Centre d'aide</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+              <IconSymbol name="envelope" size={24} color={colors.textSecondary} />
+              <Text style={[styles.settingText, { color: colors.text }]}>Nous contacter</Text>
+              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+              <IconSymbol name="star" size={24} color={colors.textSecondary} />
+              <Text style={[styles.settingText, { color: colors.text }]}>Evaluer l'application</Text>
               <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -719,15 +722,21 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: V_SPACING.xxlarge,
   },
-  sectionHeader: {
+  subSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: V_SPACING.regular,
+    marginBottom: V_SPACING.small,
+    marginTop: V_SPACING.small,
+  },
+  subSectionTitle: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
   },
   sectionTitle: {
     fontSize: FONT_SIZES.xlarge,
     fontWeight: '600',
+    marginBottom: V_SPACING.medium,
   },
   editButton: {
     flexDirection: 'row',
@@ -751,6 +760,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: vs(2) },
     shadowRadius: hs(8),
     elevation: 2,
+  },
+  separator: {
+    height: 1,
+    marginVertical: V_SPACING.small,
+    marginLeft: SPACING.regular + 20, // Align with text
   },
   infoRow: {
     flexDirection: 'row',
