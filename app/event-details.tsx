@@ -238,25 +238,27 @@ export default function EventDetailsScreen() {
             <View style={styles.infoSection} />
 
             <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={[styles.editButton, { backgroundColor: colors.tint }]} 
-                onPress={() => router.push(`/edit-event?eventId=${event.id}`)}
-              >
-                <IconSymbol name="pencil" size={20} color="#fff" />
-                <Text style={styles.editButtonText}>Modifier</Text>
-              </TouchableOpacity>
-
               {isOwner && (
-                <TouchableOpacity 
-                  style={[styles.deleteButton, (deleting || showDeleteConfirmation) && styles.disabled]}
-                  onPress={handleDeleteEvent}
-                  disabled={deleting || showDeleteConfirmation}
-                >
-                  <IconSymbol name="trash" size={20} color="#fff" />
-                  <Text style={styles.deleteButtonText}>
-                    {deleting ? 'Suppression...' : 'Supprimer'}
-                  </Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity 
+                    style={[styles.editButton, { backgroundColor: colors.tint }]} 
+                    onPress={() => router.push(`/edit-event?eventId=${event.id}`)}
+                  >
+                    <IconSymbol name="pencil" size={20} color="#fff" />
+                    <Text style={styles.editButtonText}>Modifier</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.deleteButton, (deleting || showDeleteConfirmation) && styles.disabled]}
+                    onPress={handleDeleteEvent}
+                    disabled={deleting || showDeleteConfirmation}
+                  >
+                    <IconSymbol name="trash" size={20} color="#fff" />
+                    <Text style={styles.deleteButtonText}>
+                      {deleting ? 'Suppression...' : 'Supprimer'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
               )}
             </View>
 

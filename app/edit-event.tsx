@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { db } from '../constants/firebase';
+import { auth, db } from '../constants/firebase';
 import { Colors } from '../constants/theme';
 
 
@@ -147,6 +147,18 @@ export default function EditEventScreen() {
         const eventDoc = await getDoc(doc(db, 'events', eventId));
         if (eventDoc.exists()) {
           const eventData = eventDoc.data();
+
+          const currentUser = auth.currentUser;
+          if (currentUser && eventData.userID !== currentUser.uid) {
+            Alert.alert(
+              'Accès non autorisé',
+              'Vous n\'êtes pas autorisé à modifier cet événement.',
+              [{ text: 'OK', onPress: () => router.replace('/(tabs)/Agenda') }]
+            );
+            setLoading(false);
+            return;
+          }
+
           const eventDate = eventData.date?.toDate() || new Date();
           const eventStartTime = eventData.startTime?.toDate() || eventDate;
           const eventEndTime = eventData.endTime?.toDate() || new Date(eventDate.getTime() + 60 * 60 * 1000);
