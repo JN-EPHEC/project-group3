@@ -5,7 +5,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { CURRENCIES, getCurrencySymbol } from '../constants/currencies';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
 const CATEGORIES = [
@@ -26,7 +27,8 @@ export default function AddExpenseScreen() {
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Alimentation');
-  const [currency, setCurrency] = useState('€');
+  const [currency, setCurrency] = useState('EUR');
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [productImage, setProductImage] = useState<string | null>(null);
   const [barcode, setBarcode] = useState<string | null>(null);
   const colorScheme = useColorScheme() ?? 'light';
@@ -57,15 +59,7 @@ export default function AddExpenseScreen() {
         const familySnap = await getDoc(familyRef);
         if (familySnap.exists()) {
           const currencyCode = familySnap.data().currency || 'EUR';
-          const currencySymbols: { [key: string]: string } = {
-            'EUR': '€',
-            'USD': '$',
-            'GBP': '£',
-            'CHF': 'CHF',
-            'CAD': 'CAD',
-            'JPY': '¥'
-          };
-          setCurrency(currencySymbols[currencyCode] || '€');
+          setCurrency(currencyCode);
         }
       }
     };
@@ -103,6 +97,7 @@ export default function AddExpenseScreen() {
         description: description.trim(),
         amount: amountNumber,
         category,
+        currency,
         familyId: userFamily.id,
         paidBy: currentUser.uid,
         date: serverTimestamp(),
@@ -168,15 +163,21 @@ export default function AddExpenseScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>Montant * ({currency})</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="0.00"
-                placeholderTextColor={colors.textTertiary}
-                keyboardType="decimal-pad"
-              />
+              <Text style={[styles.label, { color: colors.text }]}>Montant *</Text>
+              <View style={styles.amountContainer}>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text, flex: 1 }]}
+                  value={amount}
+                  onChangeText={setAmount}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textTertiary}
+                  keyboardType="decimal-pad"
+                />
+                <TouchableOpacity style={[styles.currencyButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowCurrencyPicker(true)}>
+                  <Text style={[styles.currencyButtonText, { color: colors.text }]}>{getCurrencySymbol(currency)}</Text>
+                  <IconSymbol name="chevron.down" size={12} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
@@ -228,6 +229,32 @@ export default function AddExpenseScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal visible={showCurrencyPicker} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Choisir une devise</Text>
+            <ScrollView style={styles.currencyList}>
+              {CURRENCIES.map((curr) => (
+                <TouchableOpacity
+                  key={curr.code}
+                  style={[styles.currencyItem, { borderBottomColor: colors.border }]}
+                  onPress={() => {
+                    setCurrency(curr.code);
+                    setShowCurrencyPicker(false);
+                  }}
+                >
+                  <Text style={[styles.currencyItemText, { color: colors.text }]}>{curr.name} ({curr.symbol})</Text>
+                  {currency === curr.code && <IconSymbol name="checkmark" size={20} color={colors.tint} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={[styles.modalCloseButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowCurrencyPicker(false)}>
+              <Text style={[styles.modalCloseText, { color: colors.textSecondary }]}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -281,6 +308,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: V_SPACING.small,
   },
+  amountContainer: {
+    flexDirection: 'row',
+    gap: SPACING.small,
+  },
   input: {
     borderRadius: BORDER_RADIUS.medium,
     padding: SPACING.regular,
@@ -319,4 +350,14 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.medium,
     fontWeight: '700',
   },
+  currencyButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.regular, borderRadius: BORDER_RADIUS.medium, gap: 4 },
+  currencyButtonText: { fontSize: FONT_SIZES.medium, fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' },
+  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 20, textAlign: 'center' },
+  currencyList: { maxHeight: 400 },
+  currencyItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
+  currencyItemText: { fontSize: 16 },
+  modalCloseButton: { borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
+  modalCloseText: { fontSize: 16, fontWeight: '600' },
 });

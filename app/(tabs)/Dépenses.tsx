@@ -6,6 +6,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getCurrencySymbol } from '../../constants/currencies';
 import { auth, db, getUserFamily } from '../../constants/firebase';
 
 export default function DepensesScreen() {
@@ -35,15 +36,7 @@ export default function DepensesScreen() {
         const familySnap = await getDoc(familyRef);
         if (familySnap.exists()) {
           const currencyCode = familySnap.data().currency || 'EUR';
-          const currencySymbols: { [key: string]: string } = {
-            'EUR': '€',
-            'USD': '$',
-            'GBP': '£',
-            'CHF': 'CHF',
-            'CAD': 'CAD',
-            'JPY': '¥'
-          };
-          setCurrency(currencySymbols[currencyCode] || '€');
+          setCurrency(getCurrencySymbol(currencyCode));
         }
 
         // Récupérer les dépenses
@@ -230,7 +223,7 @@ export default function DepensesScreen() {
                       </Text>
                     </View>
                   </View>
-                  <Text style={[styles.expenseAmount, { color: colors.tint }]}>{expense.amount?.toFixed(2)} {currency}</Text>
+                  <Text style={[styles.expenseAmount, { color: colors.tint }]}>{expense.amount?.toFixed(2)} {expense.currency ? getCurrencySymbol(expense.currency) : currency}</Text>
                 </TouchableOpacity>
               ))
             ) : (

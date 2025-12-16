@@ -6,16 +6,8 @@ import { useRouter } from 'expo-router';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CURRENCIES } from '../constants/currencies';
 import { auth, db, getUserFamily } from '../constants/firebase';
-
-const CURRENCIES = [
-  { code: 'EUR', symbol: '€', name: 'Euro' },
-  { code: 'USD', symbol: '$', name: 'Dollar américain' },
-  { code: 'GBP', symbol: '£', name: 'Livre sterling' },
-  { code: 'CHF', symbol: 'CHF', name: 'Franc suisse' },
-  { code: 'CAD', symbol: 'CAD', name: 'Dollar canadien' },
-  { code: 'JPY', symbol: '¥', name: 'Yen japonais' },
-];
 
 export default function BudgetSettingsScreen() {
   const router = useRouter();
