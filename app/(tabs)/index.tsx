@@ -1,3 +1,4 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, rf, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs, wp } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -183,7 +184,7 @@ export default function HomeScreen() {
             <Text style={[styles.sectionTitle, { color: colors.tint }]}>Actions rapides</Text>
             <View style={styles.quickActionsRow}>
               <TouchableOpacity style={[styles.quickCard, { backgroundColor: colors.cardBackground }]} onPress={() => router.push('../create-event')}>
-                <Text style={[styles.plusIcon, { color: '#B0D7FF' }]}>+</Text>
+                <IconSymbol name="plus" size={hs(32)} color="#B0D7FF" style={styles.plusIcon} />
                 <Text style={[styles.quickCardText, { color: colors.text }]}>Nouvel évènement</Text>
               </TouchableOpacity>
 
@@ -337,9 +338,7 @@ const styles = StyleSheet.create({
     elevation: 2 
   },
   plusIcon: {
-    fontSize: rf(48),
-    fontWeight: '300',
-    lineHeight: vs(32),
+    height: hs(32), // provide a height for the container
     marginBottom: V_SPACING.tiny,
   },
   iconCircle: { 
