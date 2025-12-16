@@ -235,20 +235,20 @@ export default function AddExpenseScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollView: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: SPACING.large, paddingTop: 18, paddingBottom: 32 },
+  container: { flex: 1, paddingHorizontal: SPACING.large, paddingTop: V_SPACING.large, paddingBottom: V_SPACING.xxlarge },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: V_SPACING.xlarge,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: hs(40),
+    height: hs(40),
     justifyContent: 'center',
     alignItems: 'center',
   },
-  title: { fontSize: 28, fontWeight: '700' },
+  title: { fontSize: FONT_SIZES.huge, fontWeight: '700' },
   scanButton: {
     flexDirection: 'row',
     alignItems: 'center',

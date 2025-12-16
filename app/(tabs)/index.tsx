@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: SPACING.large,
-    paddingTop: 18,
+    paddingTop: V_SPACING.large,
     paddingBottom: SAFE_BOTTOM_SPACING,
   },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -310,10 +310,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: V_SPACING.regular,
   },
   title: {
-    fontSize: 28,
+    fontSize: FONT_SIZES.huge,
     fontWeight: '700',
   },
   welcomeSection: {
