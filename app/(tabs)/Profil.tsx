@@ -561,16 +561,16 @@ export default function ProfilScreen() {
                         </View>
                       ) : (
                         <>
-                          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
                               <IconSymbol name="person.circle" size={30} color={colors.tint} />
                               <Text style={[styles.memberName, { color: colors.text }]}>{child.name}</Text>
                           </View>
-                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 15}}>
-                            <TouchableOpacity onPress={() => { setEditingChildId(child.id); setEditingChildName(child.name); }}>
-                                <IconSymbol name="pencil" size={24} color={colors.tint} />
+                          <View style={{flexDirection: 'row', alignItems: 'center', gap: 15, marginLeft: 10}}>
+                            <TouchableOpacity onPress={() => { setEditingChildId(child.id); setEditingChildName(child.name); }} style={{ padding: 4 }}>
+                                <IconSymbol name="pencil" size={20} color={colors.tint} />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => handleDeleteChild(child.id)}>
-                                <IconSymbol name="trash" size={24} color={colors.dangerButton} />
+                            <TouchableOpacity onPress={() => handleDeleteChild(child.id)} style={{ padding: 4 }}>
+                                <IconSymbol name="trash" size={20} color={colors.dangerButton} />
                             </TouchableOpacity>
                           </View>
                         </>
