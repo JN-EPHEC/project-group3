@@ -49,7 +49,7 @@ export default function CreationFamilyCodeScreen() {
     
     try {
       await Share.share({
-        message: `Rejoins ma famille sur WeKid avec le code : ${familyCode}`,
+        message: `Rejoins ma famille sur WeKid avec le code : ${familyCode}\n\nPour télécharger l'application : https://wekid.com/app`,
         title: 'Code famille WeKid',
       });
     } catch (error) {
