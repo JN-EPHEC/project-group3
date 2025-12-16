@@ -1,5 +1,6 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
@@ -13,6 +14,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   SafeAreaView,
@@ -36,6 +38,7 @@ export default function ConversationScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<any[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(
     typeof conversationId === 'string' ? conversationId : null
   );
@@ -191,8 +194,28 @@ export default function ConversationScreen() {
     }
   };
 
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+
+      if (!result.canceled && result.assets) {
+        setSelectedFiles(prevFiles => [...prevFiles, ...result.assets]);
+      }
+    } catch (error) {
+      console.error('Error picking document:', error);
+    }
+  };
+
   const removeSelectedImage = (uri: string) => {
     setSelectedImages(prevImages => prevImages.filter(imageUri => imageUri !== uri));
+  };
+
+  const removeSelectedFile = (uri: string) => {
+    setSelectedFiles(prevFiles => prevFiles.filter(file => file.uri !== uri));
   };
   
   const handleDownloadImage = async (uri: string) => {
@@ -214,14 +237,20 @@ export default function ConversationScreen() {
     }
   };
 
+  const handleOpenFile = (url: string) => {
+    Linking.openURL(url).catch(err => console.error("Couldn't load file", err));
+  };
+
   const handleSendMessage = async () => {
-    if ((!inputText.trim() && selectedImages.length === 0) || !currentConversationId || !currentUser) return;
+    if ((!inputText.trim() && selectedImages.length === 0 && selectedFiles.length === 0) || !currentConversationId || !currentUser) return;
 
     const messageText = inputText.trim();
     const imagesToSend = [...selectedImages];
+    const filesToSend = [...selectedFiles];
     
     setInputText('');
     setSelectedImages([]);
+    setSelectedFiles([]);
     setSending(true);
 
     try {
@@ -239,6 +268,29 @@ export default function ConversationScreen() {
         }
       }
 
+      const fileUrls: {url: string, name: string, type: string}[] = [];
+      if (filesToSend.length > 0) {
+        for (const file of filesToSend) {
+          let blob;
+          if (file.file) {
+            blob = file.file;
+          } else {
+            const response = await fetch(file.uri);
+            blob = await response.blob();
+          }
+          
+          const filename = `conversations/${currentConversationId}/files/${Date.now()}_${file.name}`;
+          const storageRef = ref(storage, filename);
+          await uploadBytes(storageRef, blob);
+          const downloadURL = await getDownloadURL(storageRef);
+          fileUrls.push({
+            url: downloadURL,
+            name: file.name,
+            type: file.mimeType || 'application/octet-stream'
+          });
+        }
+      }
+
       const messageData: any = {
         senderId: currentUser.uid,
         timestamp: serverTimestamp(),
@@ -253,6 +305,18 @@ export default function ConversationScreen() {
         messageData.type = 'image';
         lastMessageText = `📷 ${imageUrls.length} Photo(s)`;
         lastMessageType = 'image';
+      }
+
+      if (fileUrls.length > 0) {
+        messageData.fileUrls = fileUrls;
+        if (!messageData.type) {
+          messageData.type = 'file';
+          lastMessageText = `📎 ${fileUrls.length} Fichier(s)`;
+          lastMessageType = 'file';
+        } else {
+          // If we have both images and files
+          lastMessageText += ` + 📎 ${fileUrls.length} Fichier(s)`;
+        }
       }
       
       if (messageText) {
@@ -295,6 +359,22 @@ export default function ConversationScreen() {
             {item.imageUrls.map((url: string, index: number) => (
               <TouchableOpacity key={index} onPress={() => setFullScreenImage(url)}>
                 <Image source={{ uri: url }} style={styles.messageImage} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        {item.fileUrls && item.fileUrls.length > 0 && (
+          <View style={styles.messageFilesContainer}>
+            {item.fileUrls.map((file: any, index: number) => (
+              <TouchableOpacity 
+                key={index} 
+                style={[styles.fileAttachment, isMe ? { backgroundColor: 'rgba(255, 255, 255, 0.2)' } : { backgroundColor: 'rgba(0,0,0,0.05)' }]}
+                onPress={() => handleOpenFile(file.url)}
+              >
+                <IconSymbol name="note.text" size={20} color={isMe ? '#fff' : colors.text} />
+                <Text style={[styles.fileName, isMe ? { color: '#fff' } : { color: colors.text }]} numberOfLines={1}>
+                  {file.name}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -409,10 +489,39 @@ export default function ConversationScreen() {
             </View>
           )}
 
+          {/* File Preview */}
+          {selectedFiles.length > 0 && (
+            <View style={[styles.previewContainer, { borderTopColor: colors.border }]}>
+              <FlatList
+                data={selectedFiles}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item, index) => item.uri + index}
+                renderItem={({ item }) => (
+                  <View style={styles.previewFileContainer}>
+                    <View style={[styles.previewFileIcon, { backgroundColor: colors.secondaryCardBackground }]}>
+                      <IconSymbol name="note.text" size={24} color={colors.tint} />
+                    </View>
+                    <Text style={[styles.previewFileName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+                    <TouchableOpacity
+                      style={styles.removeImageButton}
+                      onPress={() => removeSelectedFile(item.uri)}
+                    >
+                      <Text style={styles.removeImageButtonText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              />
+            </View>
+          )}
+
           {/* Input */}
           <View style={[styles.inputContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
             <TouchableOpacity style={styles.imageButton} onPress={handlePickImage} disabled={sending}>
               <IconSymbol name="photo" size={24} color={colors.tint} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.imageButton} onPress={handlePickDocument} disabled={sending}>
+              <IconSymbol name="paperclip" size={24} color={colors.tint} />
             </TouchableOpacity>
             <TextInput
               style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
@@ -424,9 +533,9 @@ export default function ConversationScreen() {
               placeholderTextColor={colors.textSecondary}
             />
             <TouchableOpacity 
-              style={[styles.sendButton, { backgroundColor: colors.tint }, (!inputText.trim() && selectedImages.length === 0 || sending) && styles.sendButtonDisabled]} 
+              style={[styles.sendButton, { backgroundColor: colors.tint }, (!inputText.trim() && selectedImages.length === 0 && selectedFiles.length === 0 || sending) && styles.sendButtonDisabled]} 
               onPress={handleSendMessage}
-              disabled={(!inputText.trim() && selectedImages.length === 0) || sending}
+              disabled={(!inputText.trim() && selectedImages.length === 0 && selectedFiles.length === 0) || sending}
             >
               <IconSymbol name="paperplane.fill" size={20} color="#fff" />
             </TouchableOpacity>
@@ -659,6 +768,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
     lineHeight: 20,
+  },
+  previewFileContainer: {
+    width: 100,
+    marginRight: 8,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  previewFileIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  previewFileName: {
+    fontSize: 12,
+    textAlign: 'center',
+    width: '100%',
+  },
+  messageFilesContainer: {
+    flexDirection: 'column',
+    gap: 4,
+    marginBottom: 4,
+    width: '100%',
+  },
+  fileAttachment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    gap: 8,
+  },
+  fileName: {
+    fontSize: 14,
+    flex: 1,
   },
   // Styles for Modal
   modalContainer: {
