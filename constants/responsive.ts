@@ -6,9 +6,9 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_WIDTH = 375;
 const BASE_HEIGHT = 812;
 
-// Facteur de scaling limité pour éviter un effet de zoom excessif
-const WIDTH_SCALE = Math.min(SCREEN_WIDTH / BASE_WIDTH, 1.2);
-const HEIGHT_SCALE = Math.min(SCREEN_HEIGHT / BASE_HEIGHT, 1.2);
+// Facteur de scaling pour s'adapter aux différentes tailles d'écran
+const WIDTH_SCALE = SCREEN_WIDTH / BASE_WIDTH;
+const HEIGHT_SCALE = SCREEN_HEIGHT / BASE_HEIGHT;
 
 // Fonction pour mettre à l'échelle les tailles basées sur la largeur de l'écran
 export const wp = (percentage: number): number => {
@@ -20,24 +20,22 @@ export const hp = (percentage: number): number => {
   return (SCREEN_HEIGHT * percentage) / 100;
 };
 
-// Fonction pour mettre à l'échelle les polices de manière très modérée
+// Fonction pour mettre à l'échelle les polices proportionnellement
 export const rf = (size: number): number => {
-  // Scaling très modéré pour les polices (max 10% de variation)
-  const scale = 1 + (WIDTH_SCALE - 1) * 0.3;
+  // Adaptation proportionnelle mais avec limites pour éviter trop petit ou trop grand
+  const scale = Math.min(Math.max(WIDTH_SCALE, 0.8), 1.2);
   return Math.round(size * scale);
 };
 
-// Fonction pour les espacements horizontaux (scaling limité)
+// Fonction pour les espacements horizontaux
 export const hs = (size: number): number => {
-  // Scaling limité à 15% maximum
-  const scale = 1 + (WIDTH_SCALE - 1) * 0.5;
+  const scale = Math.min(Math.max(WIDTH_SCALE, 0.85), 1.15);
   return Math.round(size * scale);
 };
 
-// Fonction pour les espacements verticaux (scaling limité)
+// Fonction pour les espacements verticaux
 export const vs = (size: number): number => {
-  // Scaling limité à 15% maximum
-  const scale = 1 + (HEIGHT_SCALE - 1) * 0.5;
+  const scale = Math.min(Math.max(HEIGHT_SCALE, 0.85), 1.15);
   return Math.round(size * scale);
 };
 
@@ -56,64 +54,64 @@ export const isSmallDevice = SCREEN_WIDTH < 360;
 // Vérifier si c'est un grand écran (> 768px, tablette)
 export const isTablet = SCREEN_WIDTH >= 768;
 
-// Font sizes standards avec scaling minimal
+// Font sizes avec adaptation pour petits écrans
 export const FONT_SIZES = {
-  tiny: isSmallDevice ? 9 : 10,
-  small: isSmallDevice ? 11 : 12,
-  regular: isSmallDevice ? 13 : 14,
-  medium: isSmallDevice ? 15 : 16,
-  large: isSmallDevice ? 17 : 18,
-  xlarge: isSmallDevice ? 19 : 20,
-  xxlarge: isSmallDevice ? 22 : 24,
-  huge: isSmallDevice ? 26 : 28,
-  massive: isSmallDevice ? 30 : 32,
+  tiny: rf(10),
+  small: rf(12),
+  regular: rf(14),
+  medium: rf(16),
+  large: rf(18),
+  xlarge: rf(20),
+  xxlarge: rf(24),
+  huge: rf(28),
+  massive: rf(32),
 };
 
-// Spacing standards
+// Spacing adaptatif
 export const SPACING = {
-  tiny: 4,
-  small: 8,
-  medium: 12,
-  regular: 16,
-  large: 20,
-  xlarge: 24,
-  xxlarge: 32,
-  huge: 40,
+  tiny: hs(4),
+  small: hs(8),
+  medium: hs(12),
+  regular: hs(16),
+  large: hs(20),
+  xlarge: hs(24),
+  xxlarge: hs(32),
+  huge: hs(40),
 };
 
-// Vertical spacing standards
+// Vertical spacing adaptatif
 export const V_SPACING = {
-  tiny: 4,
-  small: 8,
-  medium: 12,
-  regular: 16,
-  large: 20,
-  xlarge: 24,
-  xxlarge: 28,
-  huge: 40,
+  tiny: vs(4),
+  small: vs(8),
+  medium: vs(12),
+  regular: vs(16),
+  large: vs(20),
+  xlarge: vs(24),
+  xxlarge: vs(28),
+  huge: vs(40),
 };
 
-// Border radius standards
+// Border radius adaptatif
 export const BORDER_RADIUS = {
-  small: 8,
-  medium: 12,
-  large: 16,
-  xlarge: 20,
-  round: 50,
+  small: hs(8),
+  medium: hs(12),
+  large: hs(16),
+  xlarge: hs(20),
+  round: hs(50),
 };
 
-// Icon sizes standards
+// Icon sizes adaptatif
 export const ICON_SIZES = {
-  tiny: 16,
-  small: 20,
-  medium: 24,
-  large: 28,
-  xlarge: 32,
-  xxlarge: 40,
+  tiny: hs(16),
+  small: hs(20),
+  medium: hs(24),
+  large: hs(28),
+  xlarge: hs(32),
+  xxlarge: hs(40),
 };
 
 // Tab bar height
-export const TAB_BAR_HEIGHT = 70;
+export const TAB_BAR_HEIGHT = vs(70);
 
 // Safe bottom spacing for tab bar
-export const SAFE_BOTTOM_SPACING = 100;
+export const SAFE_BOTTOM_SPACING = vs(100);
