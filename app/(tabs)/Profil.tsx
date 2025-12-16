@@ -10,6 +10,10 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily, signOut } from '../../constants/firebase';
 
+import { Image } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+
 export default function ProfilScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -24,6 +28,7 @@ export default function ProfilScreen() {
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -39,12 +44,16 @@ export default function ProfilScreen() {
           const userDocRef = doc(db, 'users', uid);
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
-            const userFirstName = userDocSnap.data().firstName || 'Utilisateur';
-            const userLastName = userDocSnap.data().lastName || '';
+            const userData = userDocSnap.data();
+            const userFirstName = userData.firstName || 'Utilisateur';
+            const userLastName = userData.lastName || '';
             setFirstName(userFirstName);
             setLastName(userLastName);
             setEditFirstName(userFirstName);
             setEditLastName(userLastName);
+            if (userData.profileImage) {
+              setProfileImage(userData.profileImage);
+            }
           }
 
           const family = await getUserFamily(uid);
@@ -81,6 +90,93 @@ export default function ProfilScreen() {
       router.replace('/(auth)/LoginScreen');
     }
   }, [router]);
+
+  const uploadImage = async (uri: string) => {
+    if (!user) return null;
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const storage = getStorage();
+    const storageRef = ref(storage, `profile_images/${user.uid}`);
+    await uploadBytes(storageRef, blob);
+    return await getDownloadURL(storageRef);
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission refusée', 'Vous devez autoriser l\'accès à la galerie pour changer votre photo de profil.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const imageUri = result.assets[0].uri;
+      setIsSaving(true);
+      try {
+        const uploadURL = await uploadImage(imageUri);
+        if (uploadURL && user) {
+          const userDocRef = doc(db, 'users', user.uid);
+          await updateDoc(userDocRef, { profileImage: uploadURL });
+          setProfileImage(uploadURL);
+          Alert.alert('Succès', 'Votre photo de profil a été mise à jour.');
+        }
+      } catch (error) {
+        console.error("Error uploading image:", error);
+        Alert.alert('Erreur', 'Impossible de mettre à jour la photo de profil.');
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const handleRemoveImage = async () => {
+    if (!user) return;
+  
+    Alert.alert(
+      "Supprimer la photo",
+      "Êtes-vous sûr de vouloir supprimer votre photo de profil ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: async () => {
+            setIsSaving(true);
+            try {
+              const userDocRef = doc(db, 'users', user.uid);
+              await updateDoc(userDocRef, { profileImage: null });
+  
+              const storage = getStorage();
+              const imageRef = ref(storage, `profile_images/${user.uid}`);
+              try {
+                await getDownloadURL(imageRef); // Check if file exists
+                await deleteObject(imageRef);
+              } catch (error: any) {
+                if (error.code !== 'storage/object-not-found') {
+                  throw error;
+                }
+                // If the file doesn't exist, we don't need to do anything.
+              }
+  
+              setProfileImage(null);
+              Alert.alert('Succès', 'Votre photo de profil a été supprimée.');
+            } catch (error) {
+              console.error("Error removing image:", error);
+              Alert.alert('Erreur', 'Impossible de supprimer la photo de profil.');
+            } finally {
+              setIsSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleLogout = async () => {
     console.log('=== handleLogout triggered ===');
@@ -168,8 +264,27 @@ export default function ProfilScreen() {
 
           {/* Profile Avatar */}
           <View style={styles.avatarSection}>
-            <View style={[styles.avatarCircle, { backgroundColor: colors.secondaryCardBackground }]}>
-              <IconSymbol name="person.fill" size={60} color={colors.tint} />
+            <TouchableOpacity onPress={handlePickImage} style={[styles.avatarCircle, { backgroundColor: colors.secondaryCardBackground }]}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+              ) : (
+                <IconSymbol name="person.fill" size={60} color={colors.tint} />
+              )}
+               {isSaving && (
+                <View style={styles.avatarLoading}>
+                  <ActivityIndicator size="large" color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
+            <View style={styles.avatarActions}>
+              <TouchableOpacity onPress={handlePickImage} style={[styles.avatarButton, { backgroundColor: colors.tint }]}>
+                <Text style={styles.avatarButtonText}>Modifier la photo</Text>
+              </TouchableOpacity>
+              {profileImage && (
+              <TouchableOpacity onPress={handleRemoveImage} style={[styles.avatarButton, { backgroundColor: colors.dangerButton }]}>
+                <Text style={styles.avatarButtonText}>Supprimer la photo</Text>
+              </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -392,6 +507,34 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: vs(4) },
     shadowRadius: hs(12),
     elevation: 4,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarLoading: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarActions: {
+    flexDirection: 'row',
+    gap: SPACING.medium,
+    marginTop: V_SPACING.regular,
+  },
+  avatarButton: {
+    paddingHorizontal: SPACING.regular,
+    paddingVertical: vs(8),
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  avatarButtonText: {
+    color: '#fff',
+    fontSize: FONT_SIZES.regular,
+    fontWeight: '600',
   },
   section: {
     marginBottom: V_SPACING.xxlarge,

@@ -6,7 +6,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
 import { auth, db, getUserFamily } from '../../constants/firebase';
 
 export default function MessageScreen() {
@@ -196,15 +196,20 @@ export default function MessageScreen() {
                     params: {
                       conversationId: conv.id,
                       otherUserId: otherParticipant,
-                      otherUserName: `${otherUserData?.firstName || 'Co-parent'} ${otherUserData?.lastName || ''}`
+                      otherUserName: `${otherUserData?.firstName || 'Co-parent'} ${otherUserData?.lastName || ''}`,
+                      otherUserImage: otherUserData?.profileImage
                     }
                   })}
                 >
-                  <View style={[styles.avatarCircle, { backgroundColor: colors.tint }]}>
-                    <Text style={styles.avatarText}>
-                      {(otherUserData?.firstName?.[0] || 'C').toUpperCase()}
-                    </Text>
-                  </View>
+                  {otherUserData?.profileImage ? (
+                    <Image source={{ uri: otherUserData.profileImage }} style={styles.avatarImage} />
+                  ) : (
+                    <View style={[styles.avatarCircle, { backgroundColor: colors.tint }]}>
+                      <Text style={styles.avatarText}>
+                        {(otherUserData?.firstName?.[0] || 'C').toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.conversationDetails}>
                     <View style={styles.conversationHeader}>
                       <Text style={[styles.conversationName, { color: colors.text }]}>
@@ -267,11 +272,15 @@ export default function MessageScreen() {
                   style={styles.memberItem}
                   onPress={() => onSelectMember(member)}
                 >
-                  <View style={[styles.avatarCircle, { backgroundColor: colors.tint, marginRight: SPACING.regular, }]}>
-                    <Text style={styles.avatarText}>
-                      {(member.firstName?.[0] || 'U').toUpperCase()}
-                    </Text>
-                  </View>
+                  {member.profileImage ? (
+                    <Image source={{ uri: member.profileImage }} style={styles.avatarImage} />
+                  ) : (
+                    <View style={[styles.avatarCircle, { backgroundColor: colors.tint, marginRight: SPACING.regular, }]}>
+                      <Text style={styles.avatarText}>
+                        {(member.firstName?.[0] || 'U').toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
                   <Text style={[styles.memberName, { color: colors.text }]}>
                     {member.firstName} {member.lastName || ''}
                   </Text>
@@ -349,6 +358,12 @@ const styles = StyleSheet.create({
     borderRadius: hs(28),
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: SPACING.medium,
+  },
+  avatarImage: {
+    width: hs(56),
+    height: hs(56),
+    borderRadius: hs(28),
     marginRight: SPACING.medium,
   },
   avatarText: {

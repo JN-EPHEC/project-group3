@@ -29,7 +29,7 @@ export default function ConversationScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { conversationId, otherUserId, otherUserName } = useLocalSearchParams();
+  const { conversationId, otherUserId, otherUserName, otherUserImage } = useLocalSearchParams();
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -341,11 +341,15 @@ export default function ConversationScreen() {
               <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
             </TouchableOpacity>
             <View style={styles.headerInfo}>
-              <View style={[styles.headerAvatar, { backgroundColor: colors.tint }]}>
-                <Text style={styles.headerAvatarText}>
-                  {otherUserName?.toString()[0]?.toUpperCase() || 'C'}
-                </Text>
-              </View>
+              {typeof otherUserImage === 'string' ? (
+                <Image source={{ uri: otherUserImage }} style={styles.headerAvatar} />
+              ) : (
+                <View style={[styles.headerAvatar, { backgroundColor: colors.tint }]}>
+                  <Text style={styles.headerAvatarText}>
+                    {otherUserName?.toString()[0]?.toUpperCase() || 'C'}
+                  </Text>
+                </View>
+              )}
               <Text style={[styles.headerName, { color: colors.text }]}>{otherUserName || 'Co-parent'}</Text>
             </View>
             <View style={styles.headerSpacer} />
