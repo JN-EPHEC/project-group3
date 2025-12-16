@@ -21,6 +21,7 @@ const MAPPING = {
   'chevron.up': 'keyboard-arrow-up',
   'chevron.down': 'keyboard-arrow-down',
   'plus': 'add',
+  'photo': 'image',
 } as IconMapping;
 
 /**

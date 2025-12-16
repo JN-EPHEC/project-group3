@@ -1,11 +1,28 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useColorScheme
+} from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
 export default function ConversationScreen() {
@@ -17,9 +34,11 @@ export default function ConversationScreen() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(
     typeof conversationId === 'string' ? conversationId : null
   );
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const currentUser = auth.currentUser;
   const storage = getStorage();
@@ -136,35 +155,6 @@ export default function ConversationScreen() {
     return () => clearTimeout(timeoutId);
   }, [currentUser, currentConversationId, loading, messages]);
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim() || !currentConversationId || !currentUser) return;
-
-    const messageText = inputText.trim();
-    setInputText('');
-    setSending(true);
-
-    try {
-      await addDoc(collection(db, 'conversations', currentConversationId, 'messages'), {
-        text: messageText,
-        senderId: currentUser.uid,
-        timestamp: serverTimestamp(),
-        type: 'text',
-        status: 'delivered'
-      });
-
-      await updateDoc(doc(db, 'conversations', currentConversationId), {
-        lastMessage: messageText,
-        lastMessageTime: serverTimestamp(),
-        lastMessageType: 'text',
-        [`unreadCount.${otherUserId}`]: 1
-      });
-    } catch (error) {
-      console.error('Error sending message:', error);
-    } finally {
-      setSending(false);
-    }
-  };
-
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -174,42 +164,103 @@ export default function ConversationScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsMultipleSelection: true,
       quality: 0.8,
     });
 
-    if (!result.canceled && currentConversationId && currentUser) {
-      setSending(true);
-      try {
-        const imageUri = result.assets[0].uri;
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        
-        const filename = `conversations/${currentConversationId}/${Date.now()}.jpg`;
-        const storageRef = ref(storage, filename);
-        await uploadBytes(storageRef, blob);
-        const downloadURL = await getDownloadURL(storageRef);
+    if (!result.canceled) {
+      setSelectedImages(prevImages => [...prevImages, ...result.assets.map(a => a.uri)]);
+    }
+  };
 
-        await addDoc(collection(db, 'conversations', currentConversationId, 'messages'), {
-          imageUrl: downloadURL,
-          senderId: currentUser.uid,
-          timestamp: serverTimestamp(),
-          type: 'image',
-          status: 'delivered'
-        });
-
-        await updateDoc(doc(db, 'conversations', currentConversationId), {
-          lastMessage: 'Photo',
-          lastMessageTime: serverTimestamp(),
-          lastMessageType: 'image',
-          [`unreadCount.${otherUserId}`]: 1
-        });
-      } catch (error) {
-        console.error('Error uploading image:', error);
-      } finally {
-        setSending(false);
+  const removeSelectedImage = (uri: string) => {
+    setSelectedImages(prevImages => prevImages.filter(imageUri => imageUri !== uri));
+  };
+  
+  const handleDownloadImage = async (uri: string) => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission refusée', 'Désolé, nous avons besoin des permissions pour enregistrer l\'image !');
+        return;
       }
+
+      const fileUri = FileSystem.documentDirectory + `${Date.now()}.jpg`;
+      const { uri: downloadedUri } = await FileSystem.downloadAsync(uri, fileUri);
+
+      await MediaLibrary.saveToLibraryAsync(downloadedUri);
+      Alert.alert('Image enregistrée', 'L\'image a été enregistrée dans votre galerie.');
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors du téléchargement de l\'image.');
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if ((!inputText.trim() && selectedImages.length === 0) || !currentConversationId || !currentUser) return;
+
+    const messageText = inputText.trim();
+    const imagesToSend = [...selectedImages];
+    
+    setInputText('');
+    setSelectedImages([]);
+    setSending(true);
+
+    try {
+      const imageUrls: string[] = [];
+      if (imagesToSend.length > 0) {
+        for (const imageUri of imagesToSend) {
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          
+          const filename = `conversations/${currentConversationId}/${Date.now()}.jpg`;
+          const storageRef = ref(storage, filename);
+          await uploadBytes(storageRef, blob);
+          const downloadURL = await getDownloadURL(storageRef);
+          imageUrls.push(downloadURL);
+        }
+      }
+
+      const messageData: any = {
+        senderId: currentUser.uid,
+        timestamp: serverTimestamp(),
+        status: 'delivered',
+      };
+
+      let lastMessageText = '';
+      let lastMessageType = '';
+
+      if (imageUrls.length > 0) {
+        messageData.imageUrls = imageUrls;
+        messageData.type = 'image';
+        lastMessageText = `📷 ${imageUrls.length} Photo(s)`;
+        lastMessageType = 'image';
+      }
+      
+      if (messageText) {
+        messageData.text = messageText;
+        // If there's also an image, the type is already 'image', which is fine.
+        // If not, it's 'text'
+        if (!messageData.type) {
+          messageData.type = 'text';
+          lastMessageText = messageText;
+          lastMessageType = 'text';
+        }
+      }
+
+      await addDoc(collection(db, 'conversations', currentConversationId, 'messages'), messageData);
+
+      await updateDoc(doc(db, 'conversations', currentConversationId), {
+        lastMessage: lastMessageText,
+        lastMessageTime: serverTimestamp(),
+        lastMessageType: lastMessageType,
+        [`unreadCount.${otherUserId}`]: 1 
+      });
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -221,9 +272,16 @@ export default function ConversationScreen() {
         styles.messageContainer, 
         isMe ? { backgroundColor: colors.tint, borderBottomRightRadius: 4, alignSelf: 'flex-end' } : { backgroundColor: colors.cardBackground, borderBottomLeftRadius: 4, alignSelf: 'flex-start' }
       ]}>
-        {item.type === 'image' ? (
-          <Image source={{ uri: item.imageUrl }} style={styles.messageImage} />
-        ) : (
+        {item.imageUrls && item.imageUrls.length > 0 && (
+          <View style={styles.messageImagesContainer}>
+            {item.imageUrls.map((url: string, index: number) => (
+              <TouchableOpacity key={index} onPress={() => setFullScreenImage(url)}>
+                <Image source={{ uri: url }} style={styles.messageImage} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        {item.text && (
           <Text style={[styles.messageText, isMe ? { color: '#fff' } : { color: colors.text }]}>
             {item.text}
           </Text>
@@ -304,6 +362,29 @@ export default function ConversationScreen() {
             showsVerticalScrollIndicator={false}
           />
 
+          {/* Image Preview */}
+          {selectedImages.length > 0 && (
+            <View style={[styles.previewContainer, { borderTopColor: colors.border }]}>
+              <FlatList
+                data={selectedImages}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <View style={styles.previewImageContainer}>
+                    <Image source={{ uri: item }} style={styles.previewImage} />
+                    <TouchableOpacity
+                      style={styles.removeImageButton}
+                      onPress={() => removeSelectedImage(item)}
+                    >
+                      <Text style={styles.removeImageButtonText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              />
+            </View>
+          )}
+
           {/* Input */}
           <View style={[styles.inputContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
             <TouchableOpacity style={styles.imageButton} onPress={handlePickImage} disabled={sending}>
@@ -319,15 +400,48 @@ export default function ConversationScreen() {
               placeholderTextColor={colors.textSecondary}
             />
             <TouchableOpacity 
-              style={[styles.sendButton, { backgroundColor: colors.tint }, (!inputText.trim() || sending) && styles.sendButtonDisabled]} 
+              style={[styles.sendButton, { backgroundColor: colors.tint }, (!inputText.trim() && selectedImages.length === 0 || sending) && styles.sendButtonDisabled]} 
               onPress={handleSendMessage}
-              disabled={!inputText.trim() || sending}
+              disabled={(!inputText.trim() && selectedImages.length === 0) || sending}
             >
               <IconSymbol name="paperplane.fill" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      
+      {/* Full Screen Image Modal */}
+      {fullScreenImage && (
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={!!fullScreenImage}
+          onRequestClose={() => setFullScreenImage(null)}
+        >
+          <View style={styles.modalContainer}>
+            <TouchableOpacity 
+              style={styles.modalCloseButton} 
+              onPress={() => setFullScreenImage(null)}
+            >
+              <Text style={styles.modalCloseButtonText}>×</Text>
+            </TouchableOpacity>
+            
+            <Image 
+              source={{ uri: fullScreenImage }} 
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+            />
+            
+            <TouchableOpacity 
+              style={styles.downloadButton} 
+              onPress={() => handleDownloadImage(fullScreenImage)}
+            >
+              <IconSymbol name="arrow.down.to.line" size={24} color="#fff" />
+              <Text style={styles.downloadButtonText}>Télécharger</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      )}
     </>
   );
 }
@@ -419,10 +533,16 @@ const styles = StyleSheet.create({
   otherMessageText: {
     color: '#111',
   },
+  messageImagesContainer: {
+    flexDirection: 'column',
+    gap: 4,
+    marginBottom: 4,
+  },
   messageImage: {
     width: 200,
     height: 200,
     borderRadius: 8,
+    resizeMode: 'cover',
   },
   messageTime: {
     fontSize: 11,
@@ -485,5 +605,74 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.5,
+  },
+  previewContainer: {
+    padding: 8,
+    borderTopWidth: 1,
+  },
+  previewImageContainer: {
+    position: 'relative',
+    marginRight: 8,
+  },
+  previewImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeImageButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  // Styles for Modal
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
+    padding: 10,
+  },
+  modalCloseButtonText: {
+    color: '#fff',
+    fontSize: 35,
+    fontWeight: '300',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '80%',
+  },
+  downloadButton: {
+    position: 'absolute',
+    bottom: 40,
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    alignItems: 'center',
+    gap: 12,
+  },
+  downloadButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
