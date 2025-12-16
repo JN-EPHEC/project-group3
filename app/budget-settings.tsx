@@ -1,4 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
@@ -153,7 +154,7 @@ export default function BudgetSettingsScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollView: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
+  container: { flex: 1, paddingHorizontal: SPACING.large, paddingTop: 18, paddingBottom: 32 },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row',
@@ -168,13 +169,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: { fontSize: 28, fontWeight: '700' },
-  section: { marginBottom: 32 },
-  sectionTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
-  sectionDescription: { fontSize: 14, marginBottom: 16, lineHeight: 20 },
+  section: { marginBottom: V_SPACING.xxlarge },
+  sectionTitle: { fontSize: FONT_SIZES.large, fontWeight: '700', marginBottom: V_SPACING.small },
+  sectionDescription: { fontSize: FONT_SIZES.regular, marginBottom: V_SPACING.regular, lineHeight: vs(20) },
   currencyCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.regular,
+    marginBottom: V_SPACING.medium,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -185,18 +186,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   currencySymbol: {
-    fontSize: 32,
+    fontSize: FONT_SIZES.massive,
     fontWeight: '700',
-    width: 50,
+    width: hs(50),
     textAlign: 'center',
   },
   currencyDetails: {
-    marginLeft: 16,
+    marginLeft: SPACING.regular,
   },
   currencyName: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.medium,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: vs(2),
   },
   currencyCode: {
     fontSize: 14,

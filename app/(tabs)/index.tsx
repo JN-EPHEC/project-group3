@@ -1,8 +1,9 @@
+import { BORDER_RADIUS, FONT_SIZES, hs, rf, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs, wp } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily, signOut } from '../../constants/firebase';
@@ -300,9 +301,9 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   container: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: SPACING.large,
     paddingTop: 18,
-    paddingBottom: 120,
+    paddingBottom: SAFE_BOTTOM_SPACING,
   },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
@@ -316,78 +317,78 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   welcomeSection: {
-    marginBottom: 24,
+    marginBottom: V_SPACING.xlarge,
   },
-  greeting: { fontSize: 14 },
-  name: { fontSize: 24, fontWeight: '600', marginTop: 4 },
-  section: { marginBottom: 28 },
-  sectionTitle: { fontSize: 22, fontWeight: '600', marginBottom: 16 },
-  quickActionsRow: { flexDirection: 'row', gap: 12 },
+  greeting: { fontSize: FONT_SIZES.regular },
+  name: { fontSize: FONT_SIZES.xxlarge, fontWeight: '600', marginTop: V_SPACING.tiny },
+  section: { marginBottom: V_SPACING.xxlarge },
+  sectionTitle: { fontSize: FONT_SIZES.xlarge, fontWeight: '600', marginBottom: V_SPACING.regular },
+  quickActionsRow: { flexDirection: 'row', gap: SPACING.medium },
   quickCard: { 
     flex: 1, 
-    borderRadius: 8, 
-    paddingVertical: 8, 
-    paddingHorizontal: 6, 
+    borderRadius: BORDER_RADIUS.small, 
+    paddingVertical: vs(8), 
+    paddingHorizontal: wp(1.6), 
     alignItems: 'center', 
     shadowColor: '#000', 
     shadowOpacity: 0.05, 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowRadius: 6, 
+    shadowOffset: { width: 0, height: vs(2) }, 
+    shadowRadius: hs(6), 
     elevation: 2 
   },
   plusIcon: {
-    fontSize: 48,
+    fontSize: rf(48),
     fontWeight: '300',
-    lineHeight: 32,
-    marginBottom: 6,
+    lineHeight: vs(32),
+    marginBottom: V_SPACING.tiny,
   },
   iconCircle: { 
-    width: 32, 
-    height: 32, 
-    borderRadius: 8, 
+    width: hs(32), 
+    height: hs(32), 
+    borderRadius: hs(8), 
     justifyContent: 'center', 
     alignItems: 'center', 
-    marginBottom: 6 
+    marginBottom: V_SPACING.tiny 
   },
   quickCardText: { 
     fontWeight: '500', 
-    fontSize: 12 
+    fontSize: FONT_SIZES.small 
   },
-  rowCard: { borderRadius: 20, paddingVertical: 20, paddingHorizontal: 20, justifyContent: 'center', marginBottom: 12, minHeight: 60, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 2 },
-  rowCardText: { fontSize: 15, marginBottom: 8 },
+  rowCard: { borderRadius: BORDER_RADIUS.large, paddingVertical: V_SPACING.large, paddingHorizontal: SPACING.large, justifyContent: 'center', marginBottom: V_SPACING.medium, minHeight: vs(60), shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: vs(2) }, shadowRadius: hs(8), elevation: 2 },
+  rowCardText: { fontSize: FONT_SIZES.regular, marginBottom: V_SPACING.small },
   eventMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: SPACING.medium,
   },
-  rowCardDate: { fontSize: 13, fontWeight: '600' },
+  rowCardDate: { fontSize: FONT_SIZES.small, fontWeight: '600' },
   eventLocation: {
-    fontSize: 12,
+    fontSize: FONT_SIZES.small,
     fontWeight: '600',
   },
   eventTime: {
-    fontSize: 12,
+    fontSize: FONT_SIZES.small,
     fontWeight: '600',
   },
-  emptyText: { textAlign: 'center', fontSize: 15 },
-  tipCard: { borderRadius: 20, padding: 24, shadowColor: '#000', shadowOpacity: 0.06, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 2 },
-  tipText: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  emptyText: { textAlign: 'center', fontSize: FONT_SIZES.regular },
+  tipCard: { borderRadius: BORDER_RADIUS.large, padding: SPACING.xlarge, shadowColor: '#000', shadowOpacity: 0.06, shadowOffset: { width: 0, height: vs(4) }, shadowRadius: hs(10), elevation: 2 },
+  tipText: { fontSize: FONT_SIZES.regular, textAlign: 'center', lineHeight: vs(22) },
   seeMoreButton: {
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    borderRadius: BORDER_RADIUS.medium,
+    paddingVertical: V_SPACING.medium,
+    paddingHorizontal: SPACING.regular,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: V_SPACING.small,
   },
   seeMoreText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.regular,
     fontWeight: '600',
   },
   eventContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: V_SPACING.tiny,
   },
   messageContent: {
     flexDirection: 'row',
@@ -395,20 +396,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   messageSender: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.medium,
     fontWeight: '600',
   },
   unreadBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: hs(24),
+    height: hs(24),
+    borderRadius: hs(12),
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
+    marginLeft: SPACING.medium,
   },
   unreadText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: FONT_SIZES.small,
     fontWeight: '600',
   },
 });

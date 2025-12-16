@@ -1,4 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -234,7 +235,7 @@ export default function AddExpenseScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollView: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
+  container: { flex: 1, paddingHorizontal: SPACING.large, paddingTop: 18, paddingBottom: 32 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -252,70 +253,70 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 24,
-    gap: 12,
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    marginBottom: V_SPACING.xlarge,
+    gap: SPACING.medium,
   },
   scanButtonText: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.medium,
     fontWeight: '600',
   },
   imageContainer: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.regular,
+    marginBottom: V_SPACING.xlarge,
     alignItems: 'center',
   },
   productImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 12,
+    width: hs(200),
+    height: hs(200),
+    borderRadius: BORDER_RADIUS.medium,
     resizeMode: 'contain',
   },
-  form: { marginBottom: 24 },
-  inputGroup: { marginBottom: 20 },
+  form: { marginBottom: V_SPACING.xlarge },
+  inputGroup: { marginBottom: V_SPACING.large },
   label: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.medium,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: V_SPACING.small,
   },
   input: {
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.regular,
+    fontSize: FONT_SIZES.medium,
   },
   categoriesScroll: {
-    marginTop: 8,
+    marginTop: V_SPACING.small,
   },
   categoryChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 8,
+    paddingHorizontal: SPACING.regular,
+    paddingVertical: vs(10),
+    borderRadius: BORDER_RADIUS.large,
+    marginRight: SPACING.small,
   },
   categoryChipText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.regular,
     fontWeight: '600',
   },
   barcodeInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    gap: 8,
+    padding: SPACING.medium,
+    borderRadius: BORDER_RADIUS.medium,
+    gap: SPACING.small,
   },
   barcodeText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.regular,
   },
   submitButton: {
-    borderRadius: 20,
-    paddingVertical: 16,
+    borderRadius: BORDER_RADIUS.large,
+    paddingVertical: V_SPACING.regular,
     alignItems: 'center',
   },
   submitButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: FONT_SIZES.medium,
     fontWeight: '700',
   },
 });
