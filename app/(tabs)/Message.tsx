@@ -197,12 +197,12 @@ export default function MessageScreen() {
                       conversationId: conv.id,
                       otherUserId: otherParticipant,
                       otherUserName: `${otherUserData?.firstName || 'Co-parent'} ${otherUserData?.lastName || ''}`,
-                      otherUserImage: otherUserData?.profileImage
+                      otherUserPhotoURL: otherUserData?.photoURL || otherUserData?.profileImage
                     }
                   })}
                 >
-                  {otherUserData?.profileImage ? (
-                    <Image source={{ uri: otherUserData.profileImage }} style={styles.avatarImage} />
+                  {(otherUserData?.photoURL || otherUserData?.profileImage) ? (
+                    <Image source={{ uri: otherUserData.photoURL || otherUserData.profileImage }} style={styles.avatarImage} />
                   ) : (
                     <View style={[styles.avatarCircle, { backgroundColor: colors.tint }]}>
                       <Text style={styles.avatarText}>
@@ -272,8 +272,8 @@ export default function MessageScreen() {
                   style={styles.memberItem}
                   onPress={() => onSelectMember(member)}
                 >
-                  {member.profileImage ? (
-                    <Image source={{ uri: member.profileImage }} style={styles.avatarImage} />
+                  {member.photoURL || member.profileImage ? (
+                    <Image source={{ uri: member.photoURL || member.profileImage }} style={styles.avatarImage} />
                   ) : (
                     <View style={[styles.avatarCircle, { backgroundColor: colors.tint, marginRight: SPACING.regular, }]}>
                       <Text style={styles.avatarText}>

@@ -4,7 +4,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -29,7 +29,8 @@ export default function ConversationScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { conversationId, otherUserId, otherUserName, otherUserImage } = useLocalSearchParams();
+  const { conversationId, otherUserId, otherUserName, otherUserPhotoURL } = useLocalSearchParams();
+  const [otherUser, setOtherUser] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -42,6 +43,23 @@ export default function ConversationScreen() {
   const flatListRef = useRef<FlatList>(null);
   const currentUser = auth.currentUser;
   const storage = getStorage();
+
+  useEffect(() => {
+    const fetchOtherUserData = async () => {
+      if (otherUserId) {
+        try {
+          const userDocRef = doc(db, 'users', String(otherUserId));
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            setOtherUser(userDocSnap.data());
+          }
+        } catch (error) {
+            console.error("Failed to fetch other user data:", error)
+        }
+      }
+    };
+    fetchOtherUserData();
+  }, [otherUserId]);
 
   useEffect(() => {
     if (!currentUser || !otherUserId) return;
@@ -341,16 +359,18 @@ export default function ConversationScreen() {
               <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
             </TouchableOpacity>
             <View style={styles.headerInfo}>
-              {typeof otherUserImage === 'string' ? (
-                <Image source={{ uri: otherUserImage }} style={styles.headerAvatar} />
+              {(otherUser?.photoURL || otherUser?.profileImage) ? (
+                <Image source={{ uri: otherUser.photoURL || otherUser.profileImage }} style={styles.headerAvatar} />
               ) : (
                 <View style={[styles.headerAvatar, { backgroundColor: colors.tint }]}>
                   <Text style={styles.headerAvatarText}>
-                    {otherUserName?.toString()[0]?.toUpperCase() || 'C'}
+                    {((otherUser?.firstName?.[0] || otherUserName?.toString()[0]) || 'C').toUpperCase()}
                   </Text>
                 </View>
               )}
-              <Text style={[styles.headerName, { color: colors.text }]}>{otherUserName || 'Co-parent'}</Text>
+              <Text style={[styles.headerName, { color: colors.text }]}>
+                {otherUser ? `${otherUser.firstName} ${otherUser.lastName}` : (otherUserName || 'Co-parent')}
+              </Text>
             </View>
             <View style={styles.headerSpacer} />
           </View>
