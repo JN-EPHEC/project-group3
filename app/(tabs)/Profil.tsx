@@ -16,6 +16,8 @@ export default function ProfilScreen() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [familyCode, setFamilyCode] = useState<string | null>(null);
+  const [familyMembers, setFamilyMembers] = useState<{ id: string; firstName: string; lastName: string }[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editFirstName, setEditFirstName] = useState('');
@@ -47,6 +49,24 @@ export default function ProfilScreen() {
           const family = await getUserFamily(uid);
           if (family) {
             setFamilyCode(family.code);
+            if (family.members && family.members.length > 0) {
+              const membersDetails = await Promise.all(
+                family.members.map(async (memberId: string) => {
+                  const memberDocRef = doc(db, 'users', memberId);
+                  const memberDocSnap = await getDoc(memberDocRef);
+                  if (memberDocSnap.exists()) {
+                    const memberData = memberDocSnap.data();
+                    return {
+                      id: memberId,
+                      firstName: memberData.firstName || 'Membre',
+                      lastName: memberData.lastName || '',
+                    };
+                  }
+                  return null;
+                })
+              );
+              setFamilyMembers(membersDetails.filter(Boolean) as { id: string; firstName: string; lastName: string }[]);
+            }
           }
         } catch (error) {
           console.error("Error fetching data:", error);
@@ -255,6 +275,35 @@ export default function ProfilScreen() {
                 </View>
               </TouchableOpacity>
             )}
+
+            {familyMembers.length > 0 && (
+              <View>
+                <TouchableOpacity 
+                  style={[styles.infoCard, { backgroundColor: colors.cardBackground }]} 
+                  onPress={() => setIsDropdownOpen(!isDropdownOpen)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.infoRow}>
+                    <IconSymbol name="person.2" size={20} color={colors.textSecondary} />
+                    <View style={styles.infoText}>
+                      <Text style={[styles.infoValue, { color: colors.text }]}>Membres de la famille</Text>
+                    </View>
+                    <IconSymbol name={isDropdownOpen ? "chevron.up" : "chevron.down"} size={20} color={colors.tint} />
+                  </View>
+                </TouchableOpacity>
+
+                {isDropdownOpen && (
+                  <View style={styles.dropdownListContainer}>
+                    {familyMembers.map((member) => (
+                      <View key={member.id} style={[styles.memberCard, { backgroundColor: colors.secondaryCardBackground }]}>
+                        <IconSymbol name="person.circle" size={30} color={colors.tint} />
+                        <Text style={[styles.memberName, { color: colors.text }]}>{member.firstName} {member.lastName}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           {/* Settings */}
@@ -326,9 +375,6 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: '600',
-  },
-  greeting: {
-    fontSize: 14,
   },
   avatarSection: {
     alignItems: 'center',
@@ -474,10 +520,27 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   logoutText: {
-    marginLeft: 8,
     marginLeft: 10,
     fontWeight: '700',
     fontSize: 16,
     color: '#fff',
+  },
+  dropdownListContainer: {
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    marginTop: -8,
+  },
+  memberCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 6,
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 16,
   },
 });
