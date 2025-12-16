@@ -71,7 +71,6 @@ export default function ProTabLayout() {
               style={{
                 width: 28,
                 height: 28,
-                tintColor: '#FFCEB0',
               }}
               resizeMode="contain"
             />
@@ -89,7 +88,6 @@ export default function ProTabLayout() {
               style={{
                 width: 28,
                 height: 28,
-                tintColor: '#FFCEB0',
               }}
               resizeMode="contain"
             />
@@ -107,7 +105,6 @@ export default function ProTabLayout() {
               style={{
                 width: 28,
                 height: 28,
-                tintColor: '#FFCEB0',
               }}
               resizeMode="contain"
             />
@@ -125,7 +122,6 @@ export default function ProTabLayout() {
               style={{
                 width: 28,
                 height: 28,
-                tintColor: '#FFCEB0',
               }}
               resizeMode="contain"
             />
@@ -143,7 +139,6 @@ export default function ProTabLayout() {
               style={{
                 width: 28,
                 height: 28,
-                tintColor: '#FFCEB0',
               }}
               resizeMode="contain"
             />
