@@ -71,6 +71,7 @@ export default function ProTabLayout() {
               style={{
                 width: 28,
                 height: 28,
+                tintColor: null,
               }}
               resizeMode="contain"
             />
@@ -82,12 +83,13 @@ export default function ProTabLayout() {
         options={{
           title: 'Agenda',
           headerShown: false,
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: ({ focused, color }) => (
             <Image
               source={require('../../ImageAndLogo/Logoagenda.png')}
               style={{
                 width: 28,
                 height: 28,
+                tintColor: color,
               }}
               resizeMode="contain"
             />
@@ -99,12 +101,13 @@ export default function ProTabLayout() {
         options={{
           title: 'Messages',
           headerShown: false,
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: ({ focused, color }) => (
             <Image
               source={require('../../ImageAndLogo/logomessage.png')}
               style={{
                 width: 28,
                 height: 28,
+                tintColor: color,
               }}
               resizeMode="contain"
             />
@@ -122,6 +125,7 @@ export default function ProTabLayout() {
               style={{
                 width: 28,
                 height: 28,
+                tintColor: null,
               }}
               resizeMode="contain"
             />
@@ -133,12 +137,13 @@ export default function ProTabLayout() {
         options={{
           title: 'Profil',
           headerShown: false,
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: ({ focused, color }) => (
             <Image
               source={require('../../ImageAndLogo/logoprofil.png')}
               style={{
                 width: 28,
                 height: 28,
+                tintColor: color,
               }}
               resizeMode="contain"
             />
