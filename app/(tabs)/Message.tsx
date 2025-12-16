@@ -6,7 +6,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../../constants/firebase';
 
 export default function MessageScreen() {
@@ -16,6 +16,8 @@ export default function MessageScreen() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
+  const [membersWithoutConversation, setMembersWithoutConversation] = useState<any[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -26,11 +28,9 @@ export default function MessageScreen() {
 
     const uid = currentUser.uid;
     try {
-      // Récupérer la famille de l'utilisateur
       const userFamily = await getUserFamily(uid);
       
       if (userFamily?.id) {
-        // Récupérer tous les membres de la famille
         const membersQuery = query(
           collection(db, 'users'),
           where('familyId', '==', userFamily.id)
@@ -42,7 +42,6 @@ export default function MessageScreen() {
         
         setFamilyMembers(members);
 
-        // Écouter les conversations en temps réel
         const messagesQuery = query(
           collection(db, 'conversations'),
           where('familyId', '==', userFamily.id),
@@ -76,7 +75,6 @@ export default function MessageScreen() {
     }, [fetchConversations])
   );
 
-  // Calculer le nombre total de messages non lus
   useEffect(() => {
     if (user?.uid) {
       const total = conversations.reduce((sum, conv) => {
@@ -85,6 +83,16 @@ export default function MessageScreen() {
       setTotalUnreadCount(total);
     }
   }, [conversations, user]);
+
+  useEffect(() => {
+    if (user?.uid) {
+      const membersWithConversation = new Set(
+        conversations.map(conv => conv.participants.find((p: string) => p !== user.uid)).filter(Boolean)
+      );
+      const membersWithout = familyMembers.filter(member => !membersWithConversation.has(member.uid));
+      setMembersWithoutConversation(membersWithout);
+    }
+  }, [conversations, familyMembers, user]);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -115,16 +123,16 @@ export default function MessageScreen() {
   }, [router, fetchConversations]);
 
   const handleNewMessage = () => {
-    if (familyMembers.length === 0) {
-      return;
-    }
-    // S'il n'y a qu'un seul membre, ouvrir directement la conversation
-    const otherMember = familyMembers[0];
+    setIsModalVisible(true);
+  };
+
+  const onSelectMember = (member: any) => {
+    setIsModalVisible(false);
     router.push({
       pathname: '/conversation',
       params: {
-        otherUserId: otherMember.uid,
-        otherUserName: `${otherMember.firstName} ${otherMember.lastName || ''}`
+        otherUserId: member.uid,
+        otherUserName: `${member.firstName} ${member.lastName || ''}`
       }
     });
   };
@@ -156,22 +164,19 @@ export default function MessageScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.tint }]}>Messages</Text>
           <View style={styles.headerButtons}>
-            {familyMembers.length > 0 && (
-              <TouchableOpacity 
-                style={[styles.addButton, { backgroundColor: colors.primaryButton }]}
-                onPress={handleNewMessage}
-              >
-                <Text style={styles.addButtonText}>+</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+                      {membersWithoutConversation.length > 0 && (
+                        <TouchableOpacity 
+                          style={[styles.addButton, { backgroundColor: colors.primaryButton }]}
+                          onPress={handleNewMessage}
+                        >
+                          <Text style={styles.addButtonText}>+</Text>
+                        </TouchableOpacity>
+                      )}          </View>
         </View>
 
-        {/* Conversations List */}
         <ScrollView 
           style={styles.scrollView} 
           contentContainerStyle={styles.scrollViewContent}
@@ -245,6 +250,40 @@ export default function MessageScreen() {
           )}
         </ScrollView>
       </View>
+      
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Démarrer une conversation</Text>
+            <ScrollView>
+              {membersWithoutConversation.map((member) => (
+                <TouchableOpacity
+                  key={member.uid}
+                  style={styles.memberItem}
+                  onPress={() => onSelectMember(member)}
+                >
+                  <View style={[styles.avatarCircle, { backgroundColor: colors.tint, marginRight: SPACING.regular, }]}>
+                    <Text style={styles.avatarText}>
+                      {(member.firstName?.[0] || 'U').toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={[styles.memberName, { color: colors.text }]}>
+                    {member.firstName} {member.lastName || ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setIsModalVisible(false)} style={styles.closeButton}>
+              <Text style={{ color: colors.tint }}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -378,20 +417,34 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: wp(10.7),
   },
-  fab: {
-    position: 'absolute',
-    right: SPACING.large,
-    bottom: SPACING.large,
-    width: hs(60),
-    height: hs(60),
-    borderRadius: hs(30),
-    backgroundColor: '#87CEEB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: vs(4) },
-    shadowRadius: hs(8),
-    elevation: 8,
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
+  modalContent: {
+    borderTopLeftRadius: BORDER_RADIUS.large,
+    borderTopRightRadius: BORDER_RADIUS.large,
+    padding: SPACING.large,
+    maxHeight: '50%',
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.xlarge,
+    fontWeight: '700',
+    marginBottom: V_SPACING.large,
+    textAlign: 'center',
+  },
+  memberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: V_SPACING.medium,
+  },
+  memberName: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+  },
+  closeButton: {
+    marginTop: V_SPACING.large,
+    alignItems: 'center',
+  }
 });
