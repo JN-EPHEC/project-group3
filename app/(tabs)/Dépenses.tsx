@@ -249,10 +249,10 @@ export default function DepensesScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollView: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: SPACING.large, paddingTop: 18, paddingBottom: SAFE_BOTTOM_SPACING },
+  container: { flex: 1, paddingHorizontal: SPACING.large, paddingTop: V_SPACING.large, paddingBottom: SAFE_BOTTOM_SPACING },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  title: { fontSize: 28, fontWeight: '700' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: V_SPACING.xlarge },
+  title: { fontSize: FONT_SIZES.huge, fontWeight: '700' },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',

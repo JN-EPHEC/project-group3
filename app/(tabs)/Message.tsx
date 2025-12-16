@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: SPACING.large,
-    paddingTop: 18,
+    paddingTop: V_SPACING.large,
   },
   containerCentered: {
     flex: 1,
@@ -267,10 +267,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: V_SPACING.large,
   },
   title: {
-    fontSize: 28,
+    fontSize: FONT_SIZES.huge,
     fontWeight: '700',
   },
   headerButtons: {

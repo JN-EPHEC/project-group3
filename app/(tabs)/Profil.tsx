@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: SPACING.large,
-    paddingTop: 18,
+    paddingTop: V_SPACING.large,
     paddingBottom: SAFE_BOTTOM_SPACING,
   },
   containerCentered: {
@@ -364,10 +364,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    marginBottom: 16,
+    marginBottom: V_SPACING.regular,
   },
   title: {
-    fontSize: 28,
+    fontSize: FONT_SIZES.huge,
     fontWeight: '700',
   },
   userInfoSection: {
