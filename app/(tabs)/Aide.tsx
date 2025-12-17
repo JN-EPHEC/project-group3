@@ -3,13 +3,34 @@ import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING,
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { useState } from 'react';
+import { addDoc, collection, getDocs, serverTimestamp } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
 
 // Type definitions
 type ProfessionalType = 'avocat' | 'psychologue';
+
+interface TimeSlot {
+  start: string;
+  end: string;
+  available: boolean;
+}
+
+interface DayAvailability {
+  isOpen: boolean;
+  slots: TimeSlot[];
+}
+
+interface AvailabilitySchedule {
+  lundi: DayAvailability | string;
+  mardi: DayAvailability | string;
+  mercredi: DayAvailability | string;
+  jeudi: DayAvailability | string;
+  vendredi: DayAvailability | string;
+  samedi: DayAvailability | string;
+  dimanche: DayAvailability | string;
+}
 
 interface Professional {
   id: string;
@@ -20,19 +41,50 @@ interface Professional {
   phone: string;
   email: string;
   description: string;
-  availability: {
-    lundi: string;
-    mardi: string;
-    mercredi: string;
-    jeudi: string;
-    vendredi: string;
-    samedi: string;
-    dimanche: string;
-  };
+  availability: AvailabilitySchedule;
 }
 
-// Mock data for professionals
-const PROFESSIONALS: Professional[] = [
+// Helper function to load professionals from Firebase
+async function loadProfessionalsFromFirebase(): Promise<Professional[]> {
+  try {
+    const professionalsSnapshot = await getDocs(collection(db, 'professionals'));
+    const professionals: Professional[] = [];
+    
+    professionalsSnapshot.forEach((doc) => {
+      const data = doc.data();
+      // Only include professionals with a defined type
+      if (data.type && (data.type === 'avocat' || data.type === 'psychologue')) {
+        professionals.push({
+          id: doc.id,
+          name: `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Professionnel',
+          type: data.type,
+          location: data.address || 'Non renseignée',
+          specialty: data.specialty || 'Non spécifiée',
+          phone: data.phone || 'Non renseigné',
+          email: data.email || '',
+          description: data.description || 'Aucune description disponible',
+          availability: data.availability || {
+            lundi: '9h - 18h',
+            mardi: '9h - 18h',
+            mercredi: '9h - 18h',
+            jeudi: '9h - 18h',
+            vendredi: '9h - 18h',
+            samedi: 'Fermé',
+            dimanche: 'Fermé'
+          }
+        });
+      }
+    });
+    
+    return professionals;
+  } catch (error) {
+    console.error('Error loading professionals:', error);
+    return [];
+  }
+}
+
+// Mock data for professionals (fallback if Firebase is empty)
+const MOCK_PROFESSIONALS: Professional[] = [
   {
     id: '1',
     name: 'Me. Marie Dubois',
@@ -267,19 +319,68 @@ function ProfessionalCard({
           {/* Availability */}
           <View>
             <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '600', marginBottom: vs(8) }}>
-              Disponibilités
+              Créneaux disponibles
             </Text>
-            <View style={{ backgroundColor: colors.border, borderRadius: BORDER_RADIUS.medium, padding: SPACING.large, gap: V_SPACING.small }}>
-              {Object.entries(professional.availability).map(([day, hours]) => (
-                <View key={day} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.medium, fontWeight: '500' }}>
-                    {day.charAt(0).toUpperCase() + day.slice(1)}
-                  </Text>
-                  <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '400' }}>
-                    {hours}
-                  </Text>
-                </View>
-              ))}
+            <View style={{ backgroundColor: colors.border, borderRadius: BORDER_RADIUS.medium, padding: SPACING.large }}>
+              {Object.entries(professional.availability).map(([day, dayData]) => {
+                const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                
+                // Handle both old format (string) and new format (object)
+                if (typeof dayData === 'string') {
+                  return (
+                    <View key={day} style={{ marginBottom: vs(12) }}>
+                      <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600', marginBottom: vs(4) }}>
+                        {dayName}
+                      </Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small }}>
+                        {dayData}
+                      </Text>
+                    </View>
+                  );
+                }
+                
+                // New format with time slots
+                const availableSlots = dayData.isOpen 
+                  ? dayData.slots.filter((slot: TimeSlot) => slot.available)
+                  : [];
+                
+                return (
+                  <View key={day} style={{ marginBottom: vs(12) }}>
+                    <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600', marginBottom: vs(4) }}>
+                      {dayName}
+                    </Text>
+                    {!dayData.isOpen ? (
+                      <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small, fontStyle: 'italic' }}>
+                        Fermé
+                      </Text>
+                    ) : availableSlots.length === 0 ? (
+                      <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small, fontStyle: 'italic' }}>
+                        Aucun créneau disponible
+                      </Text>
+                    ) : (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: hs(6) }}>
+                        {availableSlots.map((slot: TimeSlot, idx: number) => (
+                          <View 
+                            key={idx} 
+                            style={{ 
+                              backgroundColor: colors.tint + '30', 
+                              paddingHorizontal: hs(10), 
+                              paddingVertical: vs(4), 
+                              borderRadius: BORDER_RADIUS.small,
+                              borderWidth: 1,
+                              borderColor: colors.tint
+                            }}
+                          >
+                            <Text style={{ color: colors.tint, fontSize: FONT_SIZES.tiny, fontWeight: '600' }}>
+                              {slot.start} - {slot.end}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           </View>
 
@@ -384,9 +485,23 @@ export default function AideScreen() {
   const [selectedCategory, setSelectedCategory] = useState<'avocat' | 'psychologue' | null>(null);
   const [expandedProfessionalId, setExpandedProfessionalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [loadingProfessionals, setLoadingProfessionals] = useState(true);
+
+  // Load professionals from Firebase on mount
+  useEffect(() => {
+    const loadProfessionals = async () => {
+      setLoadingProfessionals(true);
+      const profs = await loadProfessionalsFromFirebase();
+      // If no professionals in Firebase, use mock data
+      setProfessionals(profs.length > 0 ? profs : MOCK_PROFESSIONALS);
+      setLoadingProfessionals(false);
+    };
+    loadProfessionals();
+  }, []);
 
   const filteredProfessionals = selectedCategory
-    ? PROFESSIONALS.filter(p => p.type === selectedCategory)
+    ? professionals.filter(p => p.type === selectedCategory)
     : [];
 
   const handleSelectCategory = (category: 'avocat' | 'psychologue') => {
@@ -463,6 +578,20 @@ export default function AideScreen() {
       setLoading(false);
     }
   };
+
+  // Show loading screen while professionals are being loaded
+  if (loadingProfessionals) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, marginTop: SPACING.large }}>
+            Chargement des professionnels...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
