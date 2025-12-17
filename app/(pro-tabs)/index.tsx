@@ -186,55 +186,56 @@ export default function ProHomeScreen() {
     };
   }, [families]);
 
-  // Fetch client families grouped by family
+  // Fetch client families and conversations (works even if pro n'a pas de familles associées)
   useEffect(() => {
     const currentUser = auth.currentUser;
-    if (!currentUser || families.length === 0) {
-        setFamilyMembers([]);
-        setMessages([]);
-        setClientFamilies([]);
-        setClientContacts([]);
-        return;
-    };
-    const uid = currentUser.uid;
-    
-    const allMemberIds = families.flatMap(f => f.members || []);
-    const uniqueMemberIds = [...new Set(allMemberIds)].filter(id => id !== uid);
-    
-    let unsubMembers = () => {};
-    if (uniqueMemberIds.length > 0) {
-        const membersQuery = query(collection(db, 'users'), where('__name__', 'in', uniqueMemberIds));
-        unsubMembers = onSnapshot(membersQuery, async (snapshot) => {
-            const members: FamilyMember[] = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-            setFamilyMembers(members);
-
-            // Group members by family for client management view
-            const familiesGrouped: ClientFamily[] = families.map(family => {
-              const familyParents = members.filter((m: FamilyMember) => 
-                family.members?.includes(m.uid) && 
-                m.roles?.includes('parent')
-              );
-              
-              return {
-                familyId: family.id,
-                familyName: family.name || `Famille ${family.id.substring(0, 8)}`,
-                parents: familyParents.map((p: FamilyMember) => ({
-                  uid: p.uid,
-                  firstName: p.firstName || 'Prénom',
-                  lastName: p.lastName || '',
-                  email: p.email || ''
-                }))
-              };
-            }).filter(f => f.parents.length > 0);
-
-            setClientFamilies(familiesGrouped);
-        });
-    } else {
-        setFamilyMembers([]);
-        setClientFamilies([]);
+    if (!currentUser) {
+      setFamilyMembers([]);
+      setClientFamilies([]);
+      setClientContacts([]);
+      setMessages([]);
+      return;
     }
 
-    // Conversations pro : deux sources (familyId ou professionalId)
+    const uid = currentUser.uid;
+
+    // --- Membres des familles (si le pro en a)
+    let unsubMembers = () => {};
+    const allMemberIds = families.flatMap(f => f.members || []);
+    const uniqueMemberIds = [...new Set(allMemberIds)].filter(id => id !== uid);
+
+    if (uniqueMemberIds.length > 0) {
+      const membersQuery = query(collection(db, 'users'), where('__name__', 'in', uniqueMemberIds));
+      unsubMembers = onSnapshot(membersQuery, async (snapshot) => {
+        const members: FamilyMember[] = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+        setFamilyMembers(members);
+
+        const familiesGrouped: ClientFamily[] = families.map(family => {
+          const familyParents = members.filter((m: FamilyMember) => 
+            family.members?.includes(m.uid) && 
+            m.roles?.includes('parent')
+          );
+          
+          return {
+            familyId: family.id,
+            familyName: family.name || `Famille ${family.id.substring(0, 8)}`,
+            parents: familyParents.map((p: FamilyMember) => ({
+              uid: p.uid,
+              firstName: p.firstName || 'Prénom',
+              lastName: p.lastName || '',
+              email: p.email || ''
+            }))
+          };
+        }).filter(f => f.parents.length > 0);
+
+        setClientFamilies(familiesGrouped);
+      });
+    } else {
+      setFamilyMembers([]);
+      setClientFamilies([]);
+    }
+
+    // --- Conversations (parents -> pro ou familiales) : fonctionne même sans familles
     const conversationsQuery = query(
       collection(db, 'conversations'),
       where('participants', 'array-contains', uid),
@@ -242,58 +243,54 @@ export default function ProHomeScreen() {
     );
     
     const unsubConversations = onSnapshot(conversationsQuery, async (snapshot) => {
-        const conversations: ConversationData[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        let totalUnread = 0;
-        let contactsFromConversations: ClientContact[] = [];
-        const participantIds = new Set<string>();
-        const unreadMessages: MessageData[] = [];
+      const conversations: ConversationData[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      let totalUnread = 0;
+      let contactsFromConversations: ClientContact[] = [];
+      const participantIds = new Set<string>();
+      const unreadMessages: MessageData[] = [];
 
-        // Collect participant ids (parents) pour un fetch en batch
-        conversations.forEach(conv => {
-          conv.participants?.forEach((p: string) => {
-            if (p !== uid) participantIds.add(p);
-          });
+      conversations.forEach(conv => {
+        conv.participants?.forEach((p: string) => {
+          if (p !== uid) participantIds.add(p);
         });
+      });
 
-        let participantsData: Record<string, any> = {};
-        if (participantIds.size > 0) {
-          const ids = Array.from(participantIds);
-          const usersQuery = query(collection(db, 'users'), where('__name__', 'in', ids));
-          const usersSnap = await getDocs(usersQuery);
-          usersSnap.docs.forEach((d: any) => {
-            participantsData[d.id] = d.data();
+      let participantsData: Record<string, any> = {};
+      if (participantIds.size > 0) {
+        const ids = Array.from(participantIds);
+        const usersQuery = query(collection(db, 'users'), where('__name__', 'in', ids));
+        const usersSnap = await getDocs(usersQuery);
+        usersSnap.docs.forEach((d: any) => {
+          participantsData[d.id] = d.data();
+        });
+      }
+
+      conversations.forEach((conv) => {
+        const otherUserId = conv.participants?.find((p: string) => p !== uid);
+        if (!otherUserId) return;
+
+        const userData = participantsData[otherUserId];
+        const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
+        totalUnread += unreadCount;
+
+        const firstName = userData?.firstName || conv.parentFirstName || 'Parent';
+        const lastName = userData?.lastName || conv.parentLastName || '';
+        const email = userData?.email || '';
+        const displayName = `${firstName} ${lastName}`.trim();
+
+        if ((userData?.roles && userData.roles.includes('parent')) || conv.parentId) {
+          contactsFromConversations.push({
+            uid: otherUserId,
+            firstName,
+            lastName,
+            email,
+            familyId: conv.familyId,
+            lastContact: conv.lastMessageTime?.toDate()
           });
         }
 
-        conversations.forEach((conv) => {
-          const otherUserId = conv.participants?.find((p: string) => p !== uid);
-          if (!otherUserId) return;
-
-          const userData = participantsData[otherUserId];
-          const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
-          totalUnread += unreadCount;
-
-          // Infos parent depuis userData ou fallback conv
-          const firstName = userData?.firstName || conv.parentFirstName || 'Parent';
-          const lastName = userData?.lastName || conv.parentLastName || '';
-          const email = userData?.email || '';
-          const displayName = `${firstName} ${lastName}`.trim();
-
-          // Ajouter le contact s'il s'agit d'un parent
-          if ((userData?.roles && userData.roles.includes('parent')) || conv.parentId) {
-            contactsFromConversations.push({
-              uid: otherUserId,
-              firstName,
-              lastName,
-              email,
-              familyId: conv.familyId,
-              lastContact: conv.lastMessageTime?.toDate()
-            });
-          }
-
-          // Construire la liste des messages non lus pour l'encart messagerie
-          if (unreadCount > 0) {
+        if (unreadCount > 0) {
             unreadMessages.push({
               id: conv.id,
               otherUserId,
@@ -301,19 +298,20 @@ export default function ProHomeScreen() {
               unreadCount,
               lastMessage: conv.lastMessage || 'Nouveau message'
             });
-          }
-        });
+        }
+      });
 
-        const uniqueContacts = Array.from(new Map(contactsFromConversations.map(c => [c.uid, c])).values());
-        setClientContacts(uniqueContacts);
-        setUnreadCount(totalUnread);
-        setMessages(unreadMessages);
+      const uniqueContacts = Array.from(new Map(contactsFromConversations.map(c => [c.uid, c])).values());
+      setClientContacts(uniqueContacts);
+      setUnreadCount(totalUnread);
+      // Garder les non-lus par ordre chronologique décroissant (lastMessageTime déjà trié par la requête)
+      setMessages(unreadMessages);
     });
 
     return () => {
-        unsubMembers();
-        unsubConversations();
-    }
+      unsubMembers();
+      unsubConversations();
+    };
   }, [families]);
 
   const handleNewMessage = () => {
