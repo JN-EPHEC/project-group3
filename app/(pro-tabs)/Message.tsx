@@ -9,13 +9,24 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
 
-const PRO_COLOR = 'rgb(255, 206, 176)'; // Couleur principale pour les professionnels
+const PRO_COLOR = '#FFCEB0'; // Professional accent color (salmon/peach)
+
+interface ConversationData {
+  id: string;
+  participants?: string[];
+  lastMessage?: string;
+  lastMessageTime?: any;
+  lastMessageType?: string;
+  unreadCount?: { [key: string]: number };
+  familyId?: string;
+  [key: string]: any;
+}
 
 export default function ProMessageScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [firstName, setFirstName] = useState('');
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
   const [membersWithoutConversation, setMembersWithoutConversation] = useState<any[]>([]);
@@ -46,41 +57,42 @@ export default function ProMessageScreen() {
         setLoading(true);
         try {
             const userFamilies = await getUserFamilies(uid);
-            if (userFamilies && userFamilies.length > 0) {
-                const allMemberIds = userFamilies.flatMap(f => f.members || []);
-                const uniqueMemberIds = [...new Set(allMemberIds)].filter(id => id !== uid);
-
-                if (uniqueMemberIds.length > 0) {
-                    const membersQuery = query(collection(db, 'users'), where('__name__', 'in', uniqueMemberIds));
+            
+            // Fetch ALL conversations with this professional (to get all contacts)
+            const conversationsQuery = query(
+                collection(db, 'conversations'),
+                where('participants', 'array-contains', uid),
+                orderBy('lastMessageTime', 'desc')
+            );
+            
+            unsubConversations = onSnapshot(conversationsQuery, async (snapshot) => {
+                const convs: ConversationData[] = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as ConversationData));
+                
+                // Fetch user data for all other participants
+                const uniqueParticipantIds = new Set<string>();
+                convs.forEach((conv: ConversationData) => {
+                    conv.participants?.forEach((p: string) => {
+                        if (p !== uid) {
+                            uniqueParticipantIds.add(p);
+                        }
+                    });
+                });
+                
+                if (uniqueParticipantIds.size > 0) {
+                    const participantIds = Array.from(uniqueParticipantIds);
+                    const membersQuery = query(collection(db, 'users'), where('__name__', 'in', participantIds));
                     unsubMembers = onSnapshot(membersQuery, (snapshot) => {
                         const members = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
                         setFamilyMembers(members);
                     });
-                } else {
-                    setFamilyMembers([]);
                 }
                 
-                const familyIds = userFamilies.map(f => f.id);
-                // Listen to conversations from all families
-                const conversationsQuery = query(
-                    collection(db, 'conversations'),
-                    where('familyId', 'in', familyIds),
-                    where('participants', 'array-contains', uid),
-                    orderBy('lastMessageTime', 'desc')
-                );
-                unsubConversations = onSnapshot(conversationsQuery, (snapshot) => {
-                    const convs = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                    setConversations(convs);
-                    setLoading(false);
-                });
-            } else {
+                setConversations(convs);
                 setLoading(false);
-                setFamilyMembers([]);
-                setConversations([]);
-            }
+            });
         } catch (error) {
             console.error("Error setting up listeners:", error);
             setLoading(false);
@@ -156,7 +168,7 @@ export default function ProMessageScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: PRO_COLOR }]}>Messages</Text>
+          <Text style={[styles.title, { color: PRO_COLOR }]}>Tous mes Clients</Text>
           <View style={styles.headerButtons}>
                       {familyMembers.length > 0 && (
                         <TouchableOpacity 

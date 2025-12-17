@@ -11,7 +11,7 @@ export default function ProTabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#2E5C6E', // Teal accent matching professional theme
+        tabBarActiveTintColor: '#FFCEB0', // Professional accent color
         tabBarInactiveTintColor: isDark ? '#666' : '#999',
         headerShown: false,
         tabBarButton: HapticTab,
