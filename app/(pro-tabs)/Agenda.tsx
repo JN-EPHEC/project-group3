@@ -1,13 +1,17 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs, wp } from '@/constants/responsive';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { collection, doc, getDoc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
-import { Colors } from '../../constants/theme';
 
-export default function AgendaScreen() {
+const PRO_COLOR = 'rgb(255, 206, 176)'; // Couleur principale pour les professionnels
+
+export default function ProAgendaScreen() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [firstName, setFirstName] = useState('');
@@ -15,77 +19,99 @@ export default function AgendaScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [viewMode, setViewMode] = useState('mois');
+  const [showViewOptions, setShowViewOptions] = useState(false);
+  const [families, setFamilies] = useState<any[]>([]);
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('all');
+  const flatListRef = React.useRef<FlatList>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
-  const fetchEvents = useCallback(async () => {
+  useEffect(() => {
     const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
-    const uid = currentUser.uid;
-    try {
-      const userFamilies = await getUserFamilies(uid);
-      if (userFamilies && userFamilies.length > 0) {
-        const familyIds = userFamilies.map(f => f.id);
-        const eventsQuery = query(
-          collection(db, 'events'),
-          where('familyId', 'in', familyIds),
-          orderBy('date', 'asc')
-        );
-        const eventsSnapshot = await getDocs(eventsQuery);
-        const fetchedEvents = eventsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setEvents(fetchedEvents);
-      } else {
-        // Fallback for users who might not be in any family but have events
-        const eventsQuery = query(
-          collection(db, 'events'),
-          where('userID', '==', uid),
-          orderBy('date', 'asc')
-        );
-        const eventsSnapshot = await getDocs(eventsQuery);
-        setEvents(eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }
-    } catch (error) {
-      console.error("Error fetching events:", error);
+    if (!currentUser) {
+      router.replace('/(auth)/WelcomeScreen');
+      return;
     }
-  }, []);
+    setUser(currentUser);
+    const uid = currentUser.uid;
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchEvents();
-    }, [fetchEvents])
-  );
+    const userDocRef = doc(db, 'users', uid);
+    const unsubUser = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          setFirstName(doc.data().firstName || 'Utilisateur');
+        }
+    });
+
+    const fetchFamilies = async () => {
+        try {
+            const userFamilies = await getUserFamilies(uid);
+            const familiesWithData = await Promise.all(userFamilies.map(async (family) => {
+                const familyDoc = await getDoc(doc(db, 'families', family.id));
+                return familyDoc.exists() ? { ...family, ...familyDoc.data() } : family;
+            }));
+            setFamilies(familiesWithData);
+        } catch (error) {
+            console.error("Error fetching families:", error);
+        }
+    }
+    fetchFamilies();
+
+    return () => unsubUser();
+  }, [router]);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
-    if (currentUser) {
-      setUser(currentUser);
-      const uid = currentUser.uid;
-
-      const fetchData = async () => {
-        try {
-          const userDocRef = doc(db, 'users', uid);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            setFirstName(userDocSnap.data().firstName || 'Utilisateur');
-          }
-
-          await fetchEvents();
-        } catch (error) {
-          console.error("Error fetching data:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchData();
-    } else {
-      router.replace('/(auth)/WelcomeScreen');
+    if (!currentUser) return;
+    const uid = currentUser.uid;
+    
+    if (families.length === 0) {
+        setEvents([]);
+        setLoading(false);
+        return;
     }
-  }, [router, fetchEvents]);
+
+    setLoading(true);
+    let eventsQuery;
+
+    if (selectedFamilyId === 'all') {
+        const familyIds = families.map(f => f.id);
+        if (familyIds.length > 0) {
+            eventsQuery = query(
+                collection(db, 'events'),
+                where('familyId', 'in', familyIds),
+                orderBy('date', 'asc')
+            );
+        }
+    } else {
+        eventsQuery = query(
+            collection(db, 'events'),
+            where('familyId', '==', selectedFamilyId),
+            orderBy('date', 'asc')
+        );
+    }
+    
+    if (!eventsQuery) {
+        setEvents([]);
+        setLoading(false);
+        return;
+    }
+
+    const unsubEvents = onSnapshot(eventsQuery, (querySnapshot) => {
+        const fetchedEvents = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        setEvents(fetchedEvents);
+        setLoading(false);
+    }, (error) => {
+        console.error("Error fetching events:", error);
+        setLoading(false);
+    });
+
+    return () => unsubEvents();
+  }, [families, selectedFamilyId]);
 
   const getDaysInMonth = () => {
     const year = currentMonth.getFullYear();
@@ -94,24 +120,20 @@ export default function AgendaScreen() {
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     
-    // Ajuster le jour de début pour commencer par lundi (1) au lieu de dimanche (0)
     let startingDayOfWeek = firstDay.getDay();
     startingDayOfWeek = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
 
     const days = [];
     
-    // Previous month days
     for (let i = 0; i < startingDayOfWeek; i++) {
       const prevMonthDay = new Date(year, month, -startingDayOfWeek + i + 1);
       days.push({ date: prevMonthDay, isCurrentMonth: false });
     }
     
-    // Current month days
     for (let i = 1; i <= daysInMonth; i++) {
       days.push({ date: new Date(year, month, i), isCurrentMonth: true });
     }
     
-    // Next month days to fill the grid
     const remainingDays = 42 - days.length;
     for (let i = 1; i <= remainingDays; i++) {
       days.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
@@ -120,13 +142,35 @@ export default function AgendaScreen() {
     return days;
   };
 
+  const getDaysInWeek = () => {
+    const startOfWeek = new Date(currentWeek);
+    const day = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+    startOfWeek.setDate(diff);
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const weekDay = new Date(startOfWeek);
+      weekDay.setDate(startOfWeek.getDate() + i);
+      days.push({ date: weekDay, isCurrentMonth: weekDay.getMonth() === currentMonth.getMonth() });
+    }
+    return days;
+  };
+
   const changeMonth = (offset: number) => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+  };
+
+  const changeWeek = (offset: number) => {
+    const newWeek = new Date(currentWeek);
+    newWeek.setDate(currentWeek.getDate() + offset * 7);
+    setCurrentWeek(newWeek);
   };
 
   const goToToday = () => {
     const today = new Date();
     setCurrentMonth(today);
+    setCurrentWeek(today);
     setSelectedDate(today);
   };
 
@@ -143,7 +187,7 @@ export default function AgendaScreen() {
   };
 
   const getEventCountForDate = (date: Date) => {
-    const count = events.filter((event: any) => {
+    return events.filter((event: any) => {
       if (!event.date?.toDate) return false;
       const eventDate = event.date.toDate();
       return (
@@ -151,20 +195,7 @@ export default function AgendaScreen() {
         eventDate.getMonth() === date.getMonth() &&
         eventDate.getFullYear() === date.getFullYear()
       );
-    }).length;
-    return Math.min(count, 3); // Maximum 3 pastilles visibles
-  };
-
-  const hasEventsOnDate = (date: Date) => {
-    return events.some((event: any) => {
-      if (!event.date?.toDate) return false;
-      const eventDate = event.date.toDate();
-      return (
-        eventDate.getDate() === date.getDate() &&
-        eventDate.getMonth() === date.getMonth() &&
-        eventDate.getFullYear() === date.getFullYear()
-      );
-    });
+    }).slice(0, 3);
   };
 
   const isToday = (date: Date) => {
@@ -179,12 +210,142 @@ export default function AgendaScreen() {
            date.getMonth() === selectedDate.getMonth() &&
            date.getFullYear() === selectedDate.getFullYear();
   };
+  
+  const groupEventsByDay = () => {
+    const groupedEvents: { [key: string]: any[] } = {};
+    events.forEach(event => {
+      if (!event.date?.toDate) return;
+      const eventDate = event.date.toDate().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      if (!groupedEvents[eventDate]) {
+        groupedEvents[eventDate] = [];
+      }
+      groupedEvents[eventDate].push(event);
+    });
+    return groupedEvents;
+  };
+
+  useEffect(() => {
+    if (viewMode === 'liste') {
+      const groupedEvents = groupEventsByDay();
+      const eventDates = Object.keys(groupedEvents);
+      const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const index = eventDates.findIndex(date => date === today);
+      if (index !== -1) {
+        flatListRef.current?.scrollToIndex({ index, animated: true });
+      }
+    }
+  }, [viewMode]);
+
+  const renderListView = () => {
+    const groupedEvents = groupEventsByDay();
+    const eventDates = Object.keys(groupedEvents);
+
+    if (eventDates.length === 0) {
+      return <Text style={[styles.noEventsText, { color: colors.textTertiary }]}>Aucun évènement à venir</Text>;
+    }
+
+    return (
+      <FlatList
+        ref={flatListRef}
+        data={eventDates}
+        keyExtractor={item => item}
+        renderItem={({ item: date }) => (
+          <View style={styles.dayGroup}>
+            <Text style={[styles.dayGroupTitle, { color: colors.textSecondary }]}>{date}</Text>
+            {groupedEvents[date].map(event => (
+              <TouchableOpacity
+                key={event.id}
+                style={[styles.eventCard, { backgroundColor: colors.cardBackground }]}
+                onPress={() => router.push(`/event-details?eventId=${event.id}`)}
+              >
+                <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                {event.location && <Text style={[styles.eventLocation, { color: colors.textSecondary }]}>{event.location}</Text>}
+                <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
+                  {event.isAllDay
+                    ? 'Toute la journée'
+                    : event.startTime && event.endTime
+                      ? `${event.startTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${event.endTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                      : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        onScrollToIndexFailed={info => {
+          const wait = new Promise(resolve => setTimeout(resolve, 500));
+          wait.then(() => {
+            flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
+          });
+        }}
+      />
+    );
+  };
+
+  const renderWeeklyView = () => {
+    const weekDays = getDaysInWeek();
+    return (
+      <>
+        <View style={[styles.calendarContainer, { backgroundColor: colors.cardBackground }]}>
+          <View style={styles.monthHeader}>
+            <TouchableOpacity onPress={() => changeWeek(-1)}>
+              <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'<'}</Text>
+            </TouchableOpacity>
+            <Text style={[styles.monthText, { color: colors.text }]}>
+              {currentWeek.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+            </Text>
+            <TouchableOpacity onPress={() => changeWeek(1)}>
+              <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'>'}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.weekDaysRow}>
+            {weekDays.map(({ date }) => (
+              <TouchableOpacity key={date.toString()} onPress={() => setSelectedDate(date)}>
+                <View style={[styles.dayCircle, isSelected(date) && { backgroundColor: colors.secondaryCardBackground }]}>
+                  <Text style={[styles.weekDayText, { color: colors.textTertiary }]}>{date.toLocaleDateString('fr-FR', { weekday: 'short' })}</Text>
+                  <Text style={[styles.dayText, { color: colors.text }, isToday(date) && { color: '#dd2e2eff', fontWeight: '700' }, isSelected(date) && { color: PRO_COLOR, fontWeight: '700' }]}>
+                    {date.getDate()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+        <View style={styles.eventsSection}>
+          <Text style={[styles.eventsSectionTitle, { color: colors.textSecondary }]}>
+            {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </Text>
+          {getEventsForSelectedDate().length > 0 ? (
+            getEventsForSelectedDate().map((event: any) => (
+              <TouchableOpacity
+                key={event.id}
+                style={[styles.eventCard, { backgroundColor: colors.cardBackground }]}
+                onPress={() => router.push(`/event-details?eventId=${event.id}`)}
+              >
+                <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                {event.location && <Text style={[styles.eventLocation, { color: colors.textSecondary }]}>{event.location}</Text>}
+                <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
+                  {event.isAllDay
+                    ? 'Toute la journée'
+                    : event.startTime && event.endTime
+                      ? `${event.startTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${event.endTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                      : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                  }
+                </Text>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={[styles.noEventsText, { color: colors.textTertiary }]}>Aucun évènement à ce jour</Text>
+          )}
+        </View>
+      </>
+    );
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" color={colors.tint} />
+          <ActivityIndicator size="large" color={PRO_COLOR} />
         </View>
       </SafeAreaView>
     );
@@ -200,111 +361,174 @@ export default function AgendaScreen() {
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>Agenda partagé</Text>
+            <Text style={[styles.title, { color: PRO_COLOR }]}>Agenda</Text>
             <View style={styles.headerButtons}>
-              <View style={[styles.todayButton, { backgroundColor: colors.secondaryCardBackground }]}>
-                <TouchableOpacity onPress={goToToday}>
-                  <Text style={[styles.todayButtonText, { color: colors.text }]}>Aujourd'hui</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={() => {
-                    router.push('/create-event');
-                  }}
-                >
-                  <Text style={[styles.addButtonText, { color: colors.tint }]}>+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* Calendar */}
-          <View style={[styles.calendarContainer, { backgroundColor: colors.cardBackground }]}>
-            {/* Month Navigation */}
-            <View style={styles.monthHeader}>
-              <TouchableOpacity onPress={() => changeMonth(-1)}>
-                <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'<'}</Text>
+              <TouchableOpacity style={[styles.todayButton, { backgroundColor: colors.secondaryCardBackground }]} onPress={goToToday}>
+                <Text style={[styles.todayButtonText, { color: PRO_COLOR }]}>Aujourd'hui</Text>
               </TouchableOpacity>
-              <Text style={[styles.monthText, { color: colors.text }]}>
-                {currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-              </Text>
-              <TouchableOpacity onPress={() => changeMonth(1)}>
-                <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'>'}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Week Days */}
-            <View style={styles.weekDaysRow}>
-              {weekDays.map((day) => (
-                <Text key={day} style={[styles.weekDayText, { color: colors.textTertiary }]}>{day}</Text>
-              ))}
-            </View>
-
-            {/* Calendar Grid */}
-            <View style={styles.calendarGrid}>
-              {days.map((day, index) => (
+              <View>
                 <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.dayCell,
-                    !day.isCurrentMonth && styles.otherMonthDay,
-                  ]}
-                  onPress={() => setSelectedDate(day.date)}
+                  style={styles.viewModeButton}
+                  onPress={() => setShowViewOptions(true)}
                 >
-                  <View style={[
-                    styles.dayCircle,
-                    isSelected(day.date) && { backgroundColor: colors.secondaryCardBackground },
-                  ]}>
-                    <Text style={[
-                      styles.dayText,
-                      { color: colors.text },
-                      !day.isCurrentMonth && { color: colors.textTertiary, opacity: 0.3 },
-                      isToday(day.date) && !isSelected(day.date) && { color: '#dd2e2eff', fontWeight: '700' },
-                      isSelected(day.date) && { color: colors.tint, fontWeight: '700' },
-                    ]}>
-                      {day.date.getDate()}
-                    </Text>
-                    {getEventCountForDate(day.date) > 0 && (
-                      <View style={styles.eventDotsContainer}>
-                        {Array.from({ length: getEventCountForDate(day.date) }).map((_, i) => (
-                          <View 
-                            key={i} 
-                            style={[
-                              styles.eventDot,
-                              { backgroundColor: ['#87CEEB', '#FF6B6B', '#4ECDC4'][i] }
-                            ]} 
-                          />
-                        ))}
-                      </View>
-                    )}
-                  </View>
+                  <Text style={[styles.viewModeButtonText, { color: PRO_COLOR }]}>{viewMode.charAt(0).toUpperCase() + viewMode.slice(1)}</Text>
+                  <Text style={{ color: PRO_COLOR }}>▼</Text>
                 </TouchableOpacity>
-              ))}
+                <Modal
+                  transparent={true}
+                  visible={showViewOptions}
+                  onRequestClose={() => setShowViewOptions(false)}
+                >
+                  <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowViewOptions(false)}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+                      {['Mois', 'Semaine', 'Liste'].map(view => (
+                        <TouchableOpacity
+                          key={view}
+                          style={styles.modalOption}
+                          onPress={() => {
+                            setViewMode(view.toLowerCase());
+                            setShowViewOptions(false);
+                          }}
+                        >
+                          <Text style={{ color: colors.text }}>{view}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
+              </View>
+              <TouchableOpacity
+                style={[styles.addButton, { backgroundColor: PRO_COLOR }]}
+                onPress={() => {
+                  router.push('/create-event');
+                }}
+              >
+                <IconSymbol name="plus" size={hs(20)} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Selected Date Events */}
-          <View style={styles.eventsSection}>
-            <Text style={[styles.eventsSectionTitle, { color: colors.textSecondary }]}>
-              {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            </Text>
-            
-            {selectedDateEvents.length > 0 ? (
-              selectedDateEvents.map((event: any) => (
-                <TouchableOpacity 
-                  key={event.id} 
-                  style={[styles.eventCard, { backgroundColor: colors.cardBackground }]}
-                  onPress={() => router.push(`/event-details?eventId=${event.id}`)}
+          <View style={styles.familySelectorContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <TouchableOpacity
+                    style={[styles.familyChip, {backgroundColor: selectedFamilyId === 'all' ? PRO_COLOR : colors.secondaryCardBackground}]}
+                    onPress={() => setSelectedFamilyId('all')}
                 >
-                  <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
-                  <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
-                    {event.isAllDay ? 'Toute la journée' : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
+                    <Text style={[styles.familyChipText, {color: selectedFamilyId === 'all' ? '#fff' : colors.text}]}>Toutes</Text>
                 </TouchableOpacity>
-              ))
-            ) : (
-              <Text style={[styles.noEventsText, { color: colors.textTertiary }]}>Aucun évènement à ce jour</Text>
-            )}
+                {families.map((family) => (
+                    <TouchableOpacity
+                        key={family.id}
+                        style={[styles.familyChip, {backgroundColor: selectedFamilyId === family.id ? PRO_COLOR : colors.secondaryCardBackground}]}
+                        onPress={() => setSelectedFamilyId(family.id)}
+                    >
+                        <Text style={[styles.familyChipText, {color: selectedFamilyId === family.id ? '#fff' : colors.text}]}>{family.name || `Famille`}</Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
           </View>
+
+          {viewMode === 'mois' && (
+            <>
+              {/* Calendar */}
+              <View style={[styles.calendarContainer, { backgroundColor: colors.cardBackground }]}>
+                {/* Month Navigation */}
+                <View style={styles.monthHeader}>
+                  <TouchableOpacity onPress={() => changeMonth(-1)}>
+                    <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'<'}</Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.monthText, { color: colors.text }]}>
+                    {currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                  </Text>
+                  <TouchableOpacity onPress={() => changeMonth(1)}>
+                    <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'>'}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Week Days */}
+                <View style={styles.weekDaysRow}>
+                  {weekDays.map((day) => (
+                    <Text key={day} style={[styles.weekDayText, { color: colors.textTertiary }]}>{day}</Text>
+                  ))}
+                </View>
+
+                {/* Calendar Grid */}
+                <View style={styles.calendarGrid}>
+                  {days.map((day, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.dayCell,
+                        !day.isCurrentMonth && styles.otherMonthDay,
+                      ]}
+                      onPress={() => setSelectedDate(day.date)}
+                    >
+                      <View style={[
+                        styles.dayCircle,
+                        isSelected(day.date) && { backgroundColor: colors.secondaryCardBackground },
+                      ]}>
+                        <Text style={[
+                          styles.dayText,
+                          { color: colors.text },
+                          !day.isCurrentMonth && { color: colors.textTertiary, opacity: 0.3 },
+                          isToday(day.date) && !isSelected(day.date) && { color: '#dd2e2eff', fontWeight: '700' },
+                          isSelected(day.date) && { color: PRO_COLOR, fontWeight: '700' },
+                        ]}>
+                          {day.date.getDate()}
+                        </Text>
+                        {getEventCountForDate(day.date).length > 0 && (
+                          <View style={styles.eventDotsContainer}>
+                            {getEventCountForDate(day.date).map((event: any, i: number) => (
+                              <View
+                                key={i}
+                                style={[
+                                  styles.eventDot,
+                                  { backgroundColor: event.category?.color || PRO_COLOR }
+                                ]}
+                              />
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Selected Date Events */}
+              <View style={styles.eventsSection}>
+                <Text style={[styles.eventsSectionTitle, { color: colors.textSecondary }]}>
+                  {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </Text>
+
+                {selectedDateEvents.length > 0 ? (
+                  selectedDateEvents.map((event: any) => (
+                    <TouchableOpacity
+                      key={event.id}
+                      style={[styles.eventCard, { backgroundColor: colors.cardBackground }]}
+                      onPress={() => router.push(`/event-details?eventId=${event.id}`)}
+                    >
+                      <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                      {event.location && <Text style={[styles.eventLocation, { color: colors.textSecondary }]}>{event.location}</Text>}
+                      <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
+                        {event.isAllDay
+                          ? 'Toute la journée'
+                          : event.startTime && event.endTime
+                            ? `${event.startTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${event.endTime.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                            : event.date?.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                        }
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <Text style={[styles.noEventsText, { color: colors.textTertiary }]}>Aucun évènement à ce jour</Text>
+                )}
+              </View>
+            </>
+          )}
+
+          {viewMode === 'liste' && renderListView()}
+          {viewMode === 'semaine' && renderWeeklyView()}
 
         </View>
       </ScrollView>
@@ -315,16 +539,15 @@ export default function AgendaScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   scrollView: {
     flex: 1,
   },
   container: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 32,
+    paddingHorizontal: SPACING.large,
+    paddingTop: V_SPACING.large,
+    paddingBottom: SAFE_BOTTOM_SPACING,
   },
   containerCentered: {
     flex: 1,
@@ -335,69 +558,80 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: V_SPACING.xlarge,
+    gap: SPACING.small,
   },
   title: {
-    fontSize: 28,
+    fontSize: FONT_SIZES.large,
     fontWeight: '700',
-    color: '#87CEEB',
+    flex: 0,
+    flexShrink: 1,
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: hs(6),
+    flexShrink: 0,
   },
-  todayButton: {
-    backgroundColor: '#E7F7FF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  familySelectorContainer: {
+    marginBottom: V_SPACING.large,
   },
-  todayButtonText: {
-    color: '#87CEEB',
-    fontSize: 14,
+  familyChip: {
+    paddingHorizontal: SPACING.large,
+    paddingVertical: vs(8),
+    borderRadius: BORDER_RADIUS.large,
+    marginRight: SPACING.small,
+  },
+  familyChipText: {
+    fontSize: FONT_SIZES.regular,
     fontWeight: '600',
   },
-  addButtonText: {
-    fontSize: 24,
-    color: '#87CEEB',
-    fontWeight: '300',
-    lineHeight: 24,
+  todayButton: {
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderRadius: BORDER_RADIUS.medium,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  todayButtonText: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+  },
+  addButton: {
+    width: hs(34),
+    height: hs(34),
+    borderRadius: hs(17),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   calendarContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 24,
+    borderRadius: BORDER_RADIUS.large,
+    padding: SPACING.regular,
+    marginBottom: V_SPACING.xlarge,
   },
   monthHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: V_SPACING.large,
   },
   navButton: {
-    fontSize: 24,
-    color: '#666',
-    paddingHorizontal: 16,
+    fontSize: FONT_SIZES.xxlarge,
+    paddingHorizontal: SPACING.regular,
   },
   monthText: {
-    fontSize: 18,
+    fontSize: FONT_SIZES.large,
     fontWeight: '600',
-    color: '#111',
   },
   weekDaysRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 12,
+    marginBottom: V_SPACING.medium,
   },
   weekDayText: {
-    width: 40,
+    width: hs(40),
     textAlign: 'center',
-    fontSize: 12,
-    color: '#999',
+    fontSize: FONT_SIZES.small,
     fontWeight: '500',
   },
   calendarGrid: {
@@ -409,25 +643,24 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 4,
+    padding: vs(4),
   },
   dayCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: hs(36),
+    height: hs(36),
+    borderRadius: hs(18),
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
   todayCircle: {
-    backgroundColor: '#E7F7FF',
+    backgroundColor: '#FFF5EE',
   },
   selectedCircle: {
-    backgroundColor: '#87CEEB',
+    backgroundColor: PRO_COLOR,
   },
   dayText: {
-    fontSize: 14,
-    color: '#111',
+    fontSize: FONT_SIZES.regular,
     fontWeight: '500',
   },
   otherMonthDay: {
@@ -437,7 +670,7 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   todayText: {
-    color: '#87CEEB',
+    color: PRO_COLOR,
     fontWeight: '700',
   },
   selectedText: {
@@ -445,46 +678,84 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   eventsSection: {
-    marginTop: 8,
+    marginTop: V_SPACING.small,
   },
   eventsSectionTitle: {
-    fontSize: 20,
+    fontSize: FONT_SIZES.large,
     fontWeight: '700',
-    color: '#666',
-    marginBottom: 16,
+    marginBottom: V_SPACING.regular,
     textTransform: 'capitalize',
   },
   eventCard: {
-    backgroundColor: '#E8E8E8',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.regular,
+    marginBottom: V_SPACING.medium,
   },
   eventTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.medium,
     fontWeight: '600',
-    color: '#111',
-    marginBottom: 4,
+    marginBottom: V_SPACING.tiny,
+  },
+  eventLocation: {
+    fontSize: FONT_SIZES.regular,
+    marginBottom: vs(2),
   },
   eventTime: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: FONT_SIZES.regular,
   },
   noEventsText: {
     textAlign: 'center',
-    color: '#999',
-    fontSize: 15,
-    marginTop: 24,
+    fontSize: FONT_SIZES.regular,
+    marginTop: V_SPACING.xlarge,
   },
   eventDotsContainer: {
     position: 'absolute',
-    bottom: 2,
+    bottom: vs(2),
     flexDirection: 'row',
-    gap: 3,
+    gap: hs(3),
   },
   eventDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: hs(4),
+    height: hs(4),
+    borderRadius: hs(2),
+  },
+  viewModeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(8),
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  viewModeButtonText: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+    marginRight: hs(3),
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: vs(120),
+    paddingRight: wp(5.3),
+  },
+  modalContent: {
+    borderRadius: BORDER_RADIUS.small,
+    padding: SPACING.small,
+    width: hs(150),
+  },
+  modalOption: {
+    paddingVertical: vs(10),
+  },
+  listViewContainer: {
+    paddingBottom: vs(50),
+  },
+  dayGroup: {
+    marginBottom: V_SPACING.large,
+  },
+  dayGroupTitle: {
+    fontSize: FONT_SIZES.large,
+    fontWeight: '600',
+    marginBottom: V_SPACING.small,
+    textTransform: 'capitalize',
   },
 });
