@@ -255,23 +255,20 @@ export default function ProAgendaScreen() {
           });
         }
 
-        // Récupérer les familles du parent pour créer l'événement dans son calendrier
-        const parentFamilies = await getUserFamilies(appointment.userId);
-        for (const family of parentFamilies) {
-          await addDoc(collection(db, 'events'), {
-            title: `Rendez-vous - ${appointment.professionalName}`,
-            date: appointmentDate,
-            startTime: startTime,
-            endTime: endTime,
-            location: 'Cabinet',
-            isAllDay: false,
-            familyId: family.id,
-            createdBy: currentUser.uid,
-            appointmentId: appointment.id,
-            description: `Rendez-vous avec ${appointment.professionalName}\nType: ${appointment.professionalType === 'avocat' ? 'Avocat' : 'Psychologue'}`,
-            createdAt: serverTimestamp()
-          });
-        }
+        // Créer l'événement uniquement pour le parent (pas visible par les autres membres de la famille)
+        await addDoc(collection(db, 'events'), {
+          title: `Rendez-vous - ${appointment.professionalName}`,
+          date: appointmentDate,
+          startTime: startTime,
+          endTime: endTime,
+          location: 'Cabinet',
+          isAllDay: false,
+          userId: appointment.userId,
+          createdBy: currentUser.uid,
+          appointmentId: appointment.id,
+          description: `Rendez-vous avec ${appointment.professionalName}\nType: ${appointment.professionalType === 'avocat' ? 'Avocat' : 'Psychologue'}`,
+          createdAt: serverTimestamp()
+        });
 
         // Créer un document pour suivre ce créneau réservé à cette date spécifique
         await addDoc(collection(db, 'bookedSlots'), {
