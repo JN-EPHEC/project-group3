@@ -4,12 +4,31 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
 
 const PRO_COLOR = '#FFCEB0'; // Professional accent color (salmon/peach)
+
+interface TimeSlot {
+  start: string;
+  end: string;
+  available: boolean;
+}
+
+interface Appointment {
+  id: string;
+  userId: string;
+  professionalId: string;
+  professionalName: string;
+  selectedDay: string;
+  selectedTimeSlot: TimeSlot;
+  status: 'pending' | 'confirmed' | 'rejected';
+  createdAt: any;
+  parentName?: string;
+  parentEmail?: string;
+}
 
 export default function ProAgendaScreen() {
   const router = useRouter();
@@ -27,6 +46,12 @@ export default function ProAgendaScreen() {
   const flatListRef = React.useRef<FlatList>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  
+  // Appointment states
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [showAppointments, setShowAppointments] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [appointmentModalVisible, setAppointmentModalVisible] = useState(false);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -112,6 +137,56 @@ export default function ProAgendaScreen() {
 
     return () => unsubEvents();
   }, [families, selectedFamilyId]);
+
+  // Load appointments for professional
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const appointmentsQuery = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubAppointments = onSnapshot(appointmentsQuery, (querySnapshot) => {
+      const fetchedAppointments = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Appointment));
+      setAppointments(fetchedAppointments);
+    }, (error) => {
+      console.error('Error fetching appointments:', error);
+    });
+
+    return () => unsubAppointments();
+  }, []);
+
+  const handleAcceptAppointment = async (appointment: Appointment) => {
+    try {
+      await updateDoc(doc(db, 'appointments', appointment.id), {
+        status: 'confirmed',
+        confirmedAt: serverTimestamp()
+      });
+      Alert.alert('Succès', 'Rendez-vous confirmé');
+    } catch (error) {
+      console.error('Error confirming appointment:', error);
+      Alert.alert('Erreur', 'Erreur lors de la confirmation');
+    }
+  };
+
+  const handleRejectAppointment = async (appointment: Appointment) => {
+    try {
+      await updateDoc(doc(db, 'appointments', appointment.id), {
+        status: 'rejected',
+        rejectedAt: serverTimestamp()
+      });
+      Alert.alert('Succès', 'Rendez-vous refusé');
+    } catch (error) {
+      console.error('Error rejecting appointment:', error);
+      Alert.alert('Erreur', 'Erreur lors du refus');
+    }
+  };
 
   const getDaysInMonth = () => {
     const year = currentMonth.getFullYear();
@@ -355,10 +430,48 @@ export default function ProAgendaScreen() {
   const weekDays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
   const selectedDateEvents = getEventsForSelectedDate();
 
+  const pendingAppointments = appointments.filter(a => a.status === 'pending');
+  const confirmedAppointments = appointments.filter(a => a.status === 'confirmed');
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      {/* Tab Navigation */}
+      <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        <TouchableOpacity
+          onPress={() => setShowAppointments(false)}
+          style={{
+            flex: 1,
+            paddingVertical: vs(12),
+            borderBottomWidth: !showAppointments ? 3 : 0,
+            borderBottomColor: PRO_COLOR,
+            alignItems: 'center'
+          }}
+        >
+          <Text style={{ color: !showAppointments ? PRO_COLOR : colors.textSecondary, fontWeight: '600' }}>
+            Agenda
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setShowAppointments(true)}
+          style={{
+            flex: 1,
+            paddingVertical: vs(12),
+            borderBottomWidth: showAppointments ? 3 : 0,
+            borderBottomColor: PRO_COLOR,
+            alignItems: 'center'
+          }}
+        >
+          <Text style={{ color: showAppointments ? PRO_COLOR : colors.textSecondary, fontWeight: '600' }}>
+            Rendez-vous
+            {pendingAppointments.length > 0 && <Text style={{ color: '#FF6B6B', marginLeft: hs(4) }}>({pendingAppointments.length})</Text>}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.scrollView}>
-        <View style={styles.container}>
+        {!showAppointments ? (
+          // Agenda View
+          <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: PRO_COLOR }]}>Agenda</Text>
@@ -531,7 +644,187 @@ export default function ProAgendaScreen() {
           {viewMode === 'semaine' && renderWeeklyView()}
 
         </View>
+        ) : (
+          // Appointments View
+          <View style={styles.container}>
+            {/* Pending Appointments */}
+            <View style={{ marginBottom: V_SPACING.xlarge }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: V_SPACING.large }}>
+                <Text style={[styles.title, { color: PRO_COLOR, flex: 1 }]}>Demandes en attente</Text>
+                {pendingAppointments.length > 0 && (
+                  <View style={{
+                    backgroundColor: '#FF6B6B',
+                    borderRadius: BORDER_RADIUS.round,
+                    width: hs(24),
+                    height: hs(24),
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}>
+                    <Text style={{ color: '#fff', fontWeight: '600', fontSize: FONT_SIZES.small }}>
+                      {pendingAppointments.length}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {pendingAppointments.length > 0 ? (
+                pendingAppointments.map((appointment) => (
+                  <TouchableOpacity
+                    key={appointment.id}
+                    onPress={() => {
+                      setSelectedAppointment(appointment);
+                      setAppointmentModalVisible(true);
+                    }}
+                    style={[styles.appointmentCard, { backgroundColor: colors.cardBackground }]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.eventTitle, { color: colors.text, fontWeight: '600' }]}>
+                        {appointment.parentName || 'Parent'}
+                      </Text>
+                      <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(4) }]}>
+                        📅 {appointment.selectedDay}
+                      </Text>
+                      <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(2) }]}>
+                        🕐 {appointment.selectedTimeSlot?.start} - {appointment.selectedTimeSlot?.end}
+                      </Text>
+                      <Text style={[styles.eventTime, { color: colors.textTertiary, marginTop: vs(4), fontSize: FONT_SIZES.tiny }]}>
+                        Reçu le {new Date(appointment.createdAt?.toDate?.() || appointment.createdAt).toLocaleDateString('fr-FR')}
+                      </Text>
+                    </View>
+                    <IconSymbol name="chevron.right" size={hs(20)} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={[styles.noEventsText, { color: colors.textTertiary }]}>
+                  Aucune demande en attente
+                </Text>
+              )}
+            </View>
+
+            {/* Confirmed Appointments */}
+            {confirmedAppointments.length > 0 && (
+              <View>
+                <Text style={[styles.title, { color: PRO_COLOR, marginBottom: V_SPACING.large }]}>
+                  Rendez-vous confirmés
+                </Text>
+                {confirmedAppointments.map((appointment) => (
+                  <TouchableOpacity
+                    key={appointment.id}
+                    style={[styles.appointmentCard, { backgroundColor: colors.secondaryCardBackground }]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.eventTitle, { color: colors.text, fontWeight: '600' }]}>
+                        {appointment.parentName || 'Parent'}
+                      </Text>
+                      <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(4) }]}>
+                        📅 {appointment.selectedDay}
+                      </Text>
+                      <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(2) }]}>
+                        🕐 {appointment.selectedTimeSlot?.start} - {appointment.selectedTimeSlot?.end}
+                      </Text>
+                      <Text style={[styles.eventTime, { color: colors.textTertiary, marginTop: vs(4), fontSize: FONT_SIZES.tiny }]}>
+                        ✅ Confirmé
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
+
+      {/* Appointment Detail Modal */}
+      <Modal
+        visible={appointmentModalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setAppointmentModalVisible(false)}
+      >
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+          <View style={styles.container}>
+            {selectedAppointment && (
+              <>
+                {/* Header */}
+                <TouchableOpacity
+                  onPress={() => setAppointmentModalVisible(false)}
+                  style={{ marginBottom: V_SPACING.large }}
+                >
+                  <IconSymbol name="chevron.left" size={hs(24)} color={colors.text} />
+                </TouchableOpacity>
+
+                {/* Details */}
+                <View style={[styles.detailCard, { backgroundColor: colors.cardBackground }]}>
+                  <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Parent</Text>
+                  <Text style={[styles.eventTitle, { color: colors.text, marginBottom: V_SPACING.medium }]}>
+                    {selectedAppointment.parentName || 'Parent'}
+                  </Text>
+
+                  {selectedAppointment.parentEmail && (
+                    <>
+                      <Text style={[styles.detailLabel, { color: colors.textSecondary, marginTop: V_SPACING.medium }]}>
+                        Email
+                      </Text>
+                      <Text style={[styles.eventLocation, { color: colors.text }]}>
+                        {selectedAppointment.parentEmail}
+                      </Text>
+                    </>
+                  )}
+
+                  <Text style={[styles.detailLabel, { color: colors.textSecondary, marginTop: V_SPACING.medium }]}>
+                    Date et heure
+                  </Text>
+                  <View>
+                    <Text style={[styles.eventLocation, { color: colors.text }]}>
+                      📅 {selectedAppointment.selectedDay}
+                    </Text>
+                    <Text style={[styles.eventLocation, { color: colors.text, marginTop: vs(4) }]}>
+                      🕐 {selectedAppointment.selectedTimeSlot?.start} - {selectedAppointment.selectedTimeSlot?.end}
+                    </Text>
+                  </View>
+
+                  {selectedAppointment.status === 'pending' && (
+                    <>
+                      <View style={{ flexDirection: 'row', gap: SPACING.medium, marginTop: V_SPACING.large }}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            handleRejectAppointment(selectedAppointment);
+                            setAppointmentModalVisible(false);
+                          }}
+                          style={{
+                            flex: 1,
+                            paddingVertical: vs(12),
+                            borderRadius: BORDER_RADIUS.medium,
+                            backgroundColor: colors.dangerButton,
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '600' }}>Refuser</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            handleAcceptAppointment(selectedAppointment);
+                            setAppointmentModalVisible(false);
+                          }}
+                          style={{
+                            flex: 1,
+                            paddingVertical: vs(12),
+                            borderRadius: BORDER_RADIUS.medium,
+                            backgroundColor: PRO_COLOR,
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '600' }}>Confirmer</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </>
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -548,6 +841,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.large,
     paddingTop: V_SPACING.large,
     paddingBottom: SAFE_BOTTOM_SPACING,
+  },
+  appointmentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.large,
+    marginBottom: V_SPACING.medium,
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  detailCard: {
+    padding: SPACING.large,
+    borderRadius: BORDER_RADIUS.medium,
+    marginBottom: V_SPACING.large,
+  },
+  detailLabel: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
   },
   containerCentered: {
     flex: 1,
