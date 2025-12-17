@@ -5,7 +5,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { addDoc, collection, getDocs, serverTimestamp } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
 
 // Type definitions
@@ -487,6 +487,13 @@ export default function AideScreen() {
   const [loading, setLoading] = useState(false);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loadingProfessionals, setLoadingProfessionals] = useState(true);
+  
+  // Booking modal state
+  const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
+  const [selectedProfessionalForBooking, setSelectedProfessionalForBooking] = useState<Professional | null>(null);
+  const [selectedDayForBooking, setSelectedDayForBooking] = useState<keyof AvailabilitySchedule | null>(null);
+  const [selectedSlotForBooking, setSelectedSlotForBooking] = useState<TimeSlot | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   // Load professionals from Firebase on mount
   useEffect(() => {
@@ -550,33 +557,73 @@ export default function AideScreen() {
     }
   };
 
-  const handleBookAppointment = async (professional: Professional) => {
-    setLoading(true);
+  const handleBookAppointment = (professional: Professional) => {
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert('Erreur', 'Veuillez vous connecter');
+      return;
+    }
+
+    setSelectedProfessionalForBooking(professional);
+    setSelectedDayForBooking(null);
+    setSelectedSlotForBooking(null);
+    setIsBookingModalVisible(true);
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!selectedProfessionalForBooking || !selectedDayForBooking || !selectedSlotForBooking) {
+      Alert.alert('Erreur', 'Veuillez sélectionner un créneau');
+      return;
+    }
+
+    setBookingLoading(true);
     try {
       const user = auth.currentUser;
       if (!user) {
-        alert('Veuillez vous connecter');
+        Alert.alert('Erreur', 'Veuillez vous connecter');
         return;
       }
 
-      // Create appointment booking
+      // Create appointment document
       await addDoc(collection(db, 'appointments'), {
         userId: user.uid,
-        professionalId: professional.id,
-        professionalName: professional.name,
-        professionalType: professional.type,
+        professionalId: selectedProfessionalForBooking.id,
+        professionalName: selectedProfessionalForBooking.name,
+        professionalType: selectedProfessionalForBooking.type,
+        selectedDay: selectedDayForBooking,
+        selectedTimeSlot: selectedSlotForBooking,
         status: 'pending',
         createdAt: serverTimestamp()
       });
 
-      alert(`Demande de rendez-vous envoyée à ${professional.name}`);
-      setExpandedProfessionalId(null);
+      Alert.alert('Succès', `Demande de rendez-vous envoyée à ${selectedProfessionalForBooking.name}`, [
+        {
+          text: 'OK',
+          onPress: () => {
+            setIsBookingModalVisible(false);
+            setExpandedProfessionalId(null);
+            setSelectedProfessionalForBooking(null);
+            setSelectedDayForBooking(null);
+            setSelectedSlotForBooking(null);
+          }
+        }
+      ]);
     } catch (error) {
       console.error('Error booking appointment:', error);
-      alert('Erreur lors de la demande de rendez-vous');
+      Alert.alert('Erreur', 'Erreur lors de la demande de rendez-vous');
     } finally {
-      setLoading(false);
+      setBookingLoading(false);
     }
+  };
+
+  const getAvailableSlotsForDay = (availability: AvailabilitySchedule | undefined): TimeSlot[] => {
+    if (!availability || !selectedDayForBooking) return [];
+
+    const dayAvailability = availability[selectedDayForBooking];
+    if (typeof dayAvailability === 'string') return [];
+
+    if (!dayAvailability.isOpen) return [];
+    return dayAvailability.slots.filter(slot => slot.available);
   };
 
   // Show loading screen while professionals are being loaded
@@ -742,6 +789,207 @@ export default function AideScreen() {
           <ActivityIndicator size="large" color={colors.tint} />
         </View>
       )}
+
+      {/* Booking Modal */}
+      <Modal
+        visible={isBookingModalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setIsBookingModalVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <ScrollView
+            contentContainerStyle={{
+              paddingHorizontal: SPACING.large,
+              paddingTop: V_SPACING.medium,
+              paddingBottom: SAFE_BOTTOM_SPACING
+            }}
+          >
+            {/* Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: V_SPACING.large }}>
+              <TouchableOpacity onPress={() => setIsBookingModalVisible(false)} style={{ marginRight: SPACING.large }}>
+                <IconSymbol name="xmark" size={hs(24)} color={colors.text} />
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '700' }}>
+                  Demander un rendez-vous
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small, marginTop: vs(4) }}>
+                  {selectedProfessionalForBooking?.name}
+                </Text>
+              </View>
+            </View>
+
+            {selectedProfessionalForBooking && (
+              <>
+                {/* Day selector tabs */}
+                <View style={{ marginBottom: V_SPACING.large }}>
+                  <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600', marginBottom: V_SPACING.small }}>
+                    Sélectionner un jour
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: V_SPACING.medium }}>
+                    {Object.entries(selectedProfessionalForBooking.availability || {}).map(([dayKey, dayData]) => {
+                      const dayLabels: { [key: string]: string } = {
+                        'monday': 'Lun',
+                        'tuesday': 'Mar',
+                        'wednesday': 'Mer',
+                        'thursday': 'Jeu',
+                        'friday': 'Ven',
+                        'saturday': 'Sam',
+                        'sunday': 'Dim'
+                      };
+
+                      const dayData_ = dayData as DayAvailability | string;
+                      const isOpen = typeof dayData_ === 'object' ? dayData_.isOpen : false;
+                      const isSelected = selectedDayForBooking === dayKey;
+
+                      return (
+                        <TouchableOpacity
+                          key={dayKey}
+                          onPress={() => {
+                            if (isOpen) {
+                              setSelectedDayForBooking(dayKey as keyof AvailabilitySchedule);
+                              setSelectedSlotForBooking(null);
+                            }
+                          }}
+                          disabled={!isOpen}
+                          style={{
+                            paddingVertical: vs(8),
+                            paddingHorizontal: hs(16),
+                            marginRight: SPACING.medium,
+                            borderRadius: BORDER_RADIUS.medium,
+                            backgroundColor: isSelected ? '#FFCEB0' : isOpen ? colors.cardBackground : colors.textTertiary,
+                            opacity: isOpen ? 1 : 0.5,
+                            borderWidth: isSelected ? 2 : 0,
+                            borderColor: '#FFCEB0'
+                          }}
+                        >
+                          <Text style={{ color: isSelected ? '#FFCEB0' : colors.text, fontSize: FONT_SIZES.small, fontWeight: '600' }}>
+                            {dayLabels[dayKey] || dayKey}
+                          </Text>
+                          <Text style={{ color: isSelected ? '#FFCEB0' : colors.textSecondary, fontSize: FONT_SIZES.tiny, marginTop: vs(2) }}>
+                            {isOpen ? 'Ouvert' : 'Fermé'}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* Available slots */}
+                {selectedDayForBooking && (
+                  <View style={{ marginBottom: V_SPACING.large }}>
+                    <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600', marginBottom: V_SPACING.small }}>
+                      Créneaux disponibles
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                      {getAvailableSlotsForDay(selectedProfessionalForBooking.availability).length > 0 ? (
+                        getAvailableSlotsForDay(selectedProfessionalForBooking.availability).map((slot, idx) => {
+                          const isSelected = selectedSlotForBooking?.start === slot.start && selectedSlotForBooking?.end === slot.end;
+
+                          return (
+                            <TouchableOpacity
+                              key={idx}
+                              onPress={() => setSelectedSlotForBooking(slot)}
+                              style={{
+                                paddingVertical: vs(10),
+                                paddingHorizontal: hs(12),
+                                marginRight: SPACING.small,
+                                marginBottom: V_SPACING.small,
+                                borderRadius: BORDER_RADIUS.medium,
+                                backgroundColor: isSelected ? '#FFCEB0' : colors.cardBackground,
+                                borderWidth: 1,
+                                borderColor: isSelected ? '#FFCEB0' : colors.border
+                              }}
+                            >
+                              <Text style={{ color: isSelected ? '#FFCEB0' : colors.text, fontSize: FONT_SIZES.small, fontWeight: '600' }}>
+                                {slot.start} - {slot.end}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })
+                      ) : (
+                        <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small }}>
+                          Aucun créneau disponible pour ce jour
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* Selected slot confirmation */}
+                {selectedSlotForBooking && selectedDayForBooking && (
+                  <View
+                    style={{
+                      padding: SPACING.large,
+                      borderRadius: BORDER_RADIUS.medium,
+                      backgroundColor: colors.cardBackground,
+                      marginBottom: V_SPACING.large,
+                      borderLeftWidth: 4,
+                      borderLeftColor: '#FFCEB0'
+                    }}
+                  >
+                    <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small, marginBottom: vs(4) }}>
+                      Rendez-vous prévu
+                    </Text>
+                    <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600' }}>
+                      {selectedProfessionalForBooking.name}
+                    </Text>
+                    <View style={{ marginTop: V_SPACING.small }}>
+                      <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small }}>
+                        📅 {selectedDayForBooking}
+                      </Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small, marginTop: vs(4) }}>
+                        🕐 {selectedSlotForBooking.start} - {selectedSlotForBooking.end}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Action buttons */}
+                <View style={{ flexDirection: 'row', gap: SPACING.medium, marginBottom: V_SPACING.large }}>
+                  <TouchableOpacity
+                    onPress={() => setIsBookingModalVisible(false)}
+                    style={{
+                      flex: 1,
+                      paddingVertical: vs(14),
+                      borderRadius: BORDER_RADIUS.medium,
+                      backgroundColor: colors.cardBackground,
+                      borderWidth: 1,
+                      borderColor: colors.border
+                    }}
+                    disabled={bookingLoading}
+                  >
+                    <Text style={{ color: colors.text, textAlign: 'center', fontSize: FONT_SIZES.medium, fontWeight: '600' }}>
+                      Annuler
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleConfirmBooking}
+                    disabled={!selectedSlotForBooking || bookingLoading}
+                    style={{
+                      flex: 1,
+                      paddingVertical: vs(14),
+                      borderRadius: BORDER_RADIUS.medium,
+                      backgroundColor: selectedSlotForBooking ? '#FFCEB0' : colors.textTertiary,
+                      opacity: selectedSlotForBooking ? 1 : 0.5
+                    }}
+                  >
+                    {bookingLoading ? (
+                      <ActivityIndicator size="small" color="#FFCEB0" />
+                    ) : (
+                      <Text style={{ color: '#FFCEB0', textAlign: 'center', fontSize: FONT_SIZES.medium, fontWeight: '600' }}>
+                        Confirmer
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
