@@ -576,11 +576,22 @@ export default function AideScreen() {
       const existingConvDoc = await getDoc(convRef);
 
       if (!existingConvDoc.exists()) {
-        // Créer / écraser la conversation avec l'ID déterministe
+        // Charger les infos du parent pour que le pro voie nom/prénom
+        const parentDoc = await getDoc(doc(db, 'users', user.uid));
+        const parentFirstName = parentDoc.exists() ? (parentDoc.data().firstName || '') : '';
+        const parentLastName = parentDoc.exists() ? (parentDoc.data().lastName || '') : '';
+        const parentPhotoURL = parentDoc.exists() ? (parentDoc.data().photoURL || parentDoc.data().profileImage || '') : '';
+        const parentName = `${parentFirstName} ${parentLastName}`.trim() || (user.email || 'Parent');
+
+        // Créer la conversation avec l'ID déterministe
         await setDoc(convRef, {
           conversationId,
           participants: [user.uid, professional.id],
           parentId: user.uid,
+          parentFirstName,
+          parentLastName,
+          parentPhotoURL,
+          parentName,
           professionalId: professional.id,
           professionalName: professional.name,
           professionalType: professional.type,
@@ -635,9 +646,18 @@ export default function AideScreen() {
         return;
       }
 
+      // Charger les infos du parent pour exposer le nom au professionnel
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const parentFirstName = userDoc.exists() ? (userDoc.data().firstName || '') : '';
+      const parentLastName = userDoc.exists() ? (userDoc.data().lastName || '') : '';
+      const parentName = `${parentFirstName} ${parentLastName}`.trim() || (user.email || 'Parent');
+
       // Create appointment document
       await addDoc(collection(db, 'appointments'), {
         userId: user.uid,
+        parentFirstName,
+        parentLastName,
+        parentName,
         professionalId: selectedProfessionalForBooking.id,
         professionalName: selectedProfessionalForBooking.name,
         professionalType: selectedProfessionalForBooking.type,

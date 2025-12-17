@@ -119,11 +119,22 @@ export default function ConversationScreen() {
             const convSnap = await getDoc(convRef);
 
             if (!convSnap.exists()) {
+              // Charger les infos du parent pour exposer le nom au pro
+              const parentDoc = await getDoc(doc(db, 'users', currentUser.uid));
+              const parentFirstName = parentDoc.exists() ? (parentDoc.data().firstName || '') : '';
+              const parentLastName = parentDoc.exists() ? (parentDoc.data().lastName || '') : '';
+              const parentPhotoURL = parentDoc.exists() ? (parentDoc.data().photoURL || parentDoc.data().profileImage || '') : '';
+              const parentName = `${parentFirstName} ${parentLastName}`.trim() || (currentUser.email || 'Parent');
+
               // Créer la conversation avec l'ID déterministe
               await setDoc(convRef, {
                 conversationId: uniqueConversationId,
                 participants: [currentUser.uid, otherUserId],
                 parentId: currentUser.uid,
+                parentFirstName,
+                parentLastName,
+                parentPhotoURL,
+                parentName,
                 professionalId: otherUserId,
                 createdAt: serverTimestamp(),
                 lastMessage: null,
