@@ -568,33 +568,46 @@ export default function AideScreen() {
         return;
       }
 
-      // Vérifier si une conversation existe déjà entre ce parent et ce professionnel
-      const existingConvQuery = query(
-        collection(db, 'conversations'),
-        where('participants', 'array-contains', user.uid),
-        where('professionalId', '==', professional.id)
-      );
-      
-      const existingConvSnapshot = await getDocs(existingConvQuery);
-      
-      let conversationId;
-      
-      if (!existingConvSnapshot.empty) {
-        // Conversation existante trouvée
-        conversationId = existingConvSnapshot.docs[0].id;
-      } else {
-        // Créer une nouvelle conversation (propre à ce parent uniquement)
-        const conversationRef = await addDoc(collection(db, 'conversations'), {
-          participants: [user.uid, professional.id],
-          professionalId: professional.id,
-          professionalName: professional.name,
-          professionalType: professional.type,
-          createdAt: serverTimestamp(),
-          lastMessage: null,
-          lastMessageTime: serverTimestamp()
-        });
-        conversationId = conversationRef.id;
+      // Créer un ID de conversation unique et déterministe basé sur les deux IDs
+      // Cela garantit que le même ID est généré peu importe qui crée la conversation
+      const conversationId = [user.uid, professional.id].sort().join('_');
+
+      // Vérifier si une conversation existe déjà
+      try {
+        const conversationDoc = await getDocs(query(
+          collection(db, 'conversations'),
+          where('conversationId', '==', conversationId)
+        ));
+        
+        if (!conversationDoc.empty) {
+          // Conversation existante trouvée
+          router.push({
+            pathname: '/conversation',
+            params: {
+              conversationId: conversationId,
+              otherUserId: professional.id,
+              otherUserName: professional.name
+            }
+          });
+          return;
+        }
+      } catch (error) {
+        // Si la requête échoue, on continue pour créer la conversation
+        console.log('Conversation check:', error);
       }
+
+      // Créer une nouvelle conversation avec l'ID unique
+      await addDoc(collection(db, 'conversations'), {
+        conversationId: conversationId,
+        participants: [user.uid, professional.id],
+        parentId: user.uid,
+        professionalId: professional.id,
+        professionalName: professional.name,
+        professionalType: professional.type,
+        createdAt: serverTimestamp(),
+        lastMessage: null,
+        lastMessageTime: serverTimestamp()
+      });
 
       // Naviguer vers la conversation
       router.push({
