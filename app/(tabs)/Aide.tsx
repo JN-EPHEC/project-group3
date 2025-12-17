@@ -3,7 +3,7 @@ import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING,
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { addDoc, collection, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
@@ -569,45 +569,26 @@ export default function AideScreen() {
       }
 
       // Créer un ID de conversation unique et déterministe basé sur les deux IDs
-      // Cela garantit que le même ID est généré peu importe qui crée la conversation
       const conversationId = [user.uid, professional.id].sort().join('_');
 
-      // Vérifier si une conversation existe déjà
-      try {
-        const conversationDoc = await getDocs(query(
-          collection(db, 'conversations'),
-          where('conversationId', '==', conversationId)
-        ));
-        
-        if (!conversationDoc.empty) {
-          // Conversation existante trouvée
-          router.push({
-            pathname: '/conversation',
-            params: {
-              conversationId: conversationId,
-              otherUserId: professional.id,
-              otherUserName: professional.name
-            }
-          });
-          return;
-        }
-      } catch (error) {
-        // Si la requête échoue, on continue pour créer la conversation
-        console.log('Conversation check:', error);
-      }
+      // Vérifier si le document existe déjà (par ID déterministe)
+      const convRef = doc(db, 'conversations', conversationId);
+      const existingConvDoc = await getDoc(convRef);
 
-      // Créer une nouvelle conversation avec l'ID unique
-      await addDoc(collection(db, 'conversations'), {
-        conversationId: conversationId,
-        participants: [user.uid, professional.id],
-        parentId: user.uid,
-        professionalId: professional.id,
-        professionalName: professional.name,
-        professionalType: professional.type,
-        createdAt: serverTimestamp(),
-        lastMessage: null,
-        lastMessageTime: serverTimestamp()
-      });
+      if (!existingConvDoc.exists()) {
+        // Créer / écraser la conversation avec l'ID déterministe
+        await setDoc(convRef, {
+          conversationId,
+          participants: [user.uid, professional.id],
+          parentId: user.uid,
+          professionalId: professional.id,
+          professionalName: professional.name,
+          professionalType: professional.type,
+          createdAt: serverTimestamp(),
+          lastMessage: null,
+          lastMessageTime: serverTimestamp()
+        });
+      }
 
       // Naviguer vers la conversation
       router.push({

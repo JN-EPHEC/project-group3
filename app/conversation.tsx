@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, getDocs, increment, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, increment, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -115,19 +115,12 @@ export default function ConversationScreen() {
             // Un parent ne doit avoir QU'UNE seule conversation avec un professionnel
             // Créer un ID de conversation unique et déterministe basé sur les deux IDs
             const uniqueConversationId = [currentUser.uid, otherUserId].sort().join('_');
-            
-            // Chercher la conversation par conversationId unique
-            const professionalConvQuery = query(
-              collection(db, 'conversations'),
-              where('conversationId', '==', uniqueConversationId)
-            );
-            const professionalSnapshot = await getDocs(professionalConvQuery);
-            
-            if (!professionalSnapshot.empty) {
-              convId = professionalSnapshot.docs[0].id;
-            } else {
-              // Créer une nouvelle conversation avec l'ID unique
-              const newConvRef = await addDoc(collection(db, 'conversations'), {
+            const convRef = doc(db, 'conversations', uniqueConversationId);
+            const convSnap = await getDoc(convRef);
+
+            if (!convSnap.exists()) {
+              // Créer la conversation avec l'ID déterministe
+              await setDoc(convRef, {
                 conversationId: uniqueConversationId,
                 participants: [currentUser.uid, otherUserId],
                 parentId: currentUser.uid,
@@ -136,8 +129,8 @@ export default function ConversationScreen() {
                 lastMessage: null,
                 lastMessageTime: serverTimestamp()
               });
-              convId = newConvRef.id;
             }
+            convId = uniqueConversationId;
           }
           
           if (convId) {
