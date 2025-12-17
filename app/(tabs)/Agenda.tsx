@@ -2,10 +2,10 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs, wp } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import React, { useCallback, useEffect, useState } from 'react';
+import { collection, doc, getDoc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
 
@@ -71,44 +71,77 @@ export default function AgendaScreen() {
     }
 
     setLoading(true);
-    let eventsQuery;
+    const unsubscribers: (() => void)[] = [];
 
-    if (selectedFamilyId === 'all') {
+    // Charger les événements personnels (rendez-vous avec professionnels)
+    const personalEventsQuery = query(
+      collection(db, 'events'),
+      where('userId', '==', uid),
+      orderBy('date', 'asc')
+    );
+
+    const unsubPersonal = onSnapshot(personalEventsQuery, (querySnapshot) => {
+      const personalEvents = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Charger aussi les événements familiaux
+      let familyEventsQuery;
+      if (selectedFamilyId === 'all') {
         const familyIds = families.map(f => f.id);
         if (familyIds.length > 0) {
-            eventsQuery = query(
-                collection(db, 'events'),
-                where('familyId', 'in', familyIds),
-                orderBy('date', 'asc')
-            );
-        }
-    } else {
-        eventsQuery = query(
+          familyEventsQuery = query(
             collection(db, 'events'),
-            where('familyId', '==', selectedFamilyId),
+            where('familyId', 'in', familyIds),
             orderBy('date', 'asc')
+          );
+        }
+      } else {
+        familyEventsQuery = query(
+          collection(db, 'events'),
+          where('familyId', '==', selectedFamilyId),
+          orderBy('date', 'asc')
         );
-    }
-    
-    if (!eventsQuery) {
-        setEvents([]);
+      }
+
+      if (!familyEventsQuery) {
+        setEvents(personalEvents);
         setLoading(false);
         return;
-    }
+      }
 
-    const unsubEvents = onSnapshot(eventsQuery, (querySnapshot) => {
-        const fetchedEvents = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+      const unsubFamily = onSnapshot(familyEventsQuery, (familySnapshot) => {
+        const familyEvents = familySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
         }));
-        setEvents(fetchedEvents);
+        
+        // Combiner les événements personnels et familiaux (sans doublons)
+        const allEvents = [...personalEvents, ...familyEvents];
+        const uniqueEvents = allEvents.filter((event, index, self) => 
+          index === self.findIndex(e => e.id === event.id)
+        );
+        
+        setEvents(uniqueEvents);
         setLoading(false);
+      }, (error) => {
+        console.error("Error fetching family events:", error);
+        setEvents(personalEvents);
+        setLoading(false);
+      });
+
+      unsubscribers.push(unsubFamily);
     }, (error) => {
-        console.error("Error fetching events:", error);
-        setLoading(false);
+      console.error("Error fetching personal events:", error);
+      setLoading(false);
     });
 
-    return () => unsubEvents();
+    unsubscribers.push(unsubPersonal);
+
+    return () => {
+      unsubscribers.forEach(unsub => unsub());
+    };
   }, [families, selectedFamilyId]);
 
   const getDaysInMonth = () => {
