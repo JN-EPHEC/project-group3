@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
@@ -22,8 +22,10 @@ interface Appointment {
   userId: string;
   professionalId: string;
   professionalName: string;
+  professionalType: string;
   selectedDay: string;
   selectedTimeSlot: TimeSlot;
+  selectedDate?: any;
   status: 'pending' | 'confirmed' | 'rejected';
   createdAt: any;
   parentName?: string;
@@ -91,51 +93,80 @@ export default function ProAgendaScreen() {
     if (!currentUser) return;
     const uid = currentUser.uid;
     
-    if (families.length === 0) {
-        setEvents([]);
-        setLoading(false);
-        return;
-    }
-
     setLoading(true);
-    let eventsQuery;
-
-    if (selectedFamilyId === 'all') {
-        const familyIds = families.map(f => f.id);
-        if (familyIds.length > 0) {
-            eventsQuery = query(
-                collection(db, 'events'),
-                where('familyId', 'in', familyIds),
-                orderBy('date', 'asc')
-            );
-        }
-    } else {
-        eventsQuery = query(
-            collection(db, 'events'),
-            where('familyId', '==', selectedFamilyId),
-            orderBy('date', 'asc')
-        );
-    }
     
-    if (!eventsQuery) {
-        setEvents([]);
-        setLoading(false);
-        return;
-    }
+    // Créer deux requêtes : une pour les familles et une pour les événements personnels
+    const unsubscribers: (() => void)[] = [];
+    let allEvents: any[] = [];
 
-    const unsubEvents = onSnapshot(eventsQuery, (querySnapshot) => {
-        const fetchedEvents = querySnapshot.docs.map(doc => ({
+    // Requête pour les événements personnels du professionnel (sans famille)
+    const personalEventsQuery = query(
+        collection(db, 'events'),
+        where('userId', '==', uid),
+        orderBy('date', 'asc')
+    );
+
+    const unsubPersonal = onSnapshot(personalEventsQuery, (querySnapshot) => {
+        const personalEvents = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
         }));
-        setEvents(fetchedEvents);
+        
+        // Fusionner avec les événements de famille
+        allEvents = [...personalEvents, ...allEvents.filter(e => !e.userId)];
+        setEvents(allEvents);
         setLoading(false);
     }, (error) => {
-        console.error("Error fetching events:", error);
-        setLoading(false);
+        console.error("Error fetching personal events:", error);
     });
+    
+    unsubscribers.push(unsubPersonal);
 
-    return () => unsubEvents();
+    // Requête pour les événements de famille (si le professionnel a des familles)
+    if (families.length > 0) {
+        let familyEventsQuery;
+
+        if (selectedFamilyId === 'all') {
+            const familyIds = families.map(f => f.id);
+            if (familyIds.length > 0) {
+                familyEventsQuery = query(
+                    collection(db, 'events'),
+                    where('familyId', 'in', familyIds),
+                    orderBy('date', 'asc')
+                );
+            }
+        } else {
+            familyEventsQuery = query(
+                collection(db, 'events'),
+                where('familyId', '==', selectedFamilyId),
+                orderBy('date', 'asc')
+            );
+        }
+        
+        if (familyEventsQuery) {
+            const unsubFamily = onSnapshot(familyEventsQuery, (querySnapshot) => {
+                const familyEvents = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                
+                // Fusionner avec les événements personnels
+                allEvents = [...allEvents.filter(e => e.userId), ...familyEvents];
+                setEvents(allEvents);
+                setLoading(false);
+            }, (error) => {
+                console.error("Error fetching family events:", error);
+            });
+            
+            unsubscribers.push(unsubFamily);
+        }
+    } else {
+        setLoading(false);
+    }
+
+    return () => {
+        unsubscribers.forEach(unsub => unsub());
+    };
   }, [families, selectedFamilyId]);
 
   // Load appointments for professional
@@ -164,11 +195,96 @@ export default function ProAgendaScreen() {
 
   const handleAcceptAppointment = async (appointment: Appointment) => {
     try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      // Mettre à jour le statut du rendez-vous
       await updateDoc(doc(db, 'appointments', appointment.id), {
         status: 'confirmed',
         confirmedAt: serverTimestamp()
       });
-      Alert.alert('Succès', 'Rendez-vous confirmé');
+
+      // Créer un événement dans le calendrier si une date a été sélectionnée
+      if (appointment.selectedDate) {
+        const appointmentDate = appointment.selectedDate instanceof Date 
+          ? appointment.selectedDate 
+          : appointment.selectedDate.toDate();
+        
+        // Extraire les heures du créneau
+        const [startHour, startMinute] = appointment.selectedTimeSlot.start.split(':').map(Number);
+        const [endHour, endMinute] = appointment.selectedTimeSlot.end.split(':').map(Number);
+        
+        // Créer les objets Date pour le début et la fin
+        const startTime = new Date(appointmentDate);
+        startTime.setHours(startHour, startMinute, 0, 0);
+        
+        const endTime = new Date(appointmentDate);
+        endTime.setHours(endHour, endMinute, 0, 0);
+
+        // Créer l'événement pour le professionnel (dans toutes ses familles)
+        if (families.length > 0) {
+          for (const family of families) {
+            await addDoc(collection(db, 'events'), {
+              title: `Rendez-vous - ${appointment.parentName || 'Parent'}`,
+              date: appointmentDate,
+              startTime: startTime,
+              endTime: endTime,
+              location: 'Cabinet',
+              isAllDay: false,
+              familyId: family.id,
+              createdBy: currentUser.uid,
+              appointmentId: appointment.id,
+              description: `Rendez-vous avec ${appointment.parentName || 'un parent'}\nType: Consultation`,
+              createdAt: serverTimestamp()
+            });
+          }
+        } else {
+          // Si le professionnel n'a pas de famille, créer un événement personnel
+          await addDoc(collection(db, 'events'), {
+            title: `Rendez-vous - ${appointment.parentName || 'Parent'}`,
+            date: appointmentDate,
+            startTime: startTime,
+            endTime: endTime,
+            location: 'Cabinet',
+            isAllDay: false,
+            userId: currentUser.uid,
+            createdBy: currentUser.uid,
+            appointmentId: appointment.id,
+            description: `Rendez-vous avec ${appointment.parentName || 'un parent'}\nType: Consultation`,
+            createdAt: serverTimestamp()
+          });
+        }
+
+        // Récupérer les familles du parent pour créer l'événement dans son calendrier
+        const parentFamilies = await getUserFamilies(appointment.userId);
+        for (const family of parentFamilies) {
+          await addDoc(collection(db, 'events'), {
+            title: `Rendez-vous - ${appointment.professionalName}`,
+            date: appointmentDate,
+            startTime: startTime,
+            endTime: endTime,
+            location: 'Cabinet',
+            isAllDay: false,
+            familyId: family.id,
+            createdBy: currentUser.uid,
+            appointmentId: appointment.id,
+            description: `Rendez-vous avec ${appointment.professionalName}\nType: ${appointment.professionalType === 'avocat' ? 'Avocat' : 'Psychologue'}`,
+            createdAt: serverTimestamp()
+          });
+        }
+
+        // Créer un document pour suivre ce créneau réservé à cette date spécifique
+        await addDoc(collection(db, 'bookedSlots'), {
+          professionalId: currentUser.uid,
+          date: appointmentDate,
+          timeSlot: appointment.selectedTimeSlot,
+          appointmentId: appointment.id,
+          userId: appointment.userId,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      Alert.alert('Succès', 'Rendez-vous confirmé et ajouté au calendrier');
     } catch (error) {
       console.error('Error confirming appointment:', error);
       Alert.alert('Erreur', 'Erreur lors de la confirmation');
@@ -682,7 +798,11 @@ export default function ProAgendaScreen() {
                         {appointment.parentName || 'Parent'}
                       </Text>
                       <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(4) }]}>
-                        📅 {appointment.selectedDay}
+                        📅 {appointment.selectedDate 
+                          ? (appointment.selectedDate instanceof Date 
+                            ? appointment.selectedDate 
+                            : appointment.selectedDate.toDate()).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                          : appointment.selectedDay}
                       </Text>
                       <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(2) }]}>
                         🕐 {appointment.selectedTimeSlot?.start} - {appointment.selectedTimeSlot?.end}
@@ -717,7 +837,11 @@ export default function ProAgendaScreen() {
                         {appointment.parentName || 'Parent'}
                       </Text>
                       <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(4) }]}>
-                        📅 {appointment.selectedDay}
+                        📅 {appointment.selectedDate 
+                          ? (appointment.selectedDate instanceof Date 
+                            ? appointment.selectedDate 
+                            : appointment.selectedDate.toDate()).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                          : appointment.selectedDay}
                       </Text>
                       <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(2) }]}>
                         🕐 {appointment.selectedTimeSlot?.start} - {appointment.selectedTimeSlot?.end}
@@ -776,7 +900,11 @@ export default function ProAgendaScreen() {
                   </Text>
                   <View>
                     <Text style={[styles.eventLocation, { color: colors.text }]}>
-                      📅 {selectedAppointment.selectedDay}
+                      📅 {selectedAppointment.selectedDate 
+                        ? (selectedAppointment.selectedDate instanceof Date 
+                          ? selectedAppointment.selectedDate 
+                          : selectedAppointment.selectedDate.toDate()).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                        : selectedAppointment.selectedDay}
                     </Text>
                     <Text style={[styles.eventLocation, { color: colors.text, marginTop: vs(4) }]}>
                       🕐 {selectedAppointment.selectedTimeSlot?.start} - {selectedAppointment.selectedTimeSlot?.end}
