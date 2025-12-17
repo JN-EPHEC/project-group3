@@ -1,22 +1,22 @@
 import { initializeApp } from 'firebase/app';
 import {
-    createUserWithEmailAndPassword,
-    signOut as fbSignOut,
-    getAuth,
-    signInWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  signOut as fbSignOut,
+  getAuth,
+  signInWithEmailAndPassword
 } from 'firebase/auth';
 import {
-    addDoc,
-    arrayUnion,
-    collection,
-    doc,
-    getDoc,
-    getDocs,
-    getFirestore,
-    query,
-    setDoc,
-    updateDoc,
-    where
+  addDoc,
+  arrayUnion,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  query,
+  setDoc,
+  updateDoc,
+  where
 } from 'firebase/firestore';
 
 import firebaseConfig from './firebaseenv.js';
