@@ -18,6 +18,7 @@ export default function EventDetailsScreen() {
   const [childrenNames, setChildrenNames] = useState<string[]>([]);
   const [parentNames, setParentNames] = useState<string[]>([]);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [familyName, setFamilyName] = useState('');
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -33,15 +34,18 @@ export default function EventDetailsScreen() {
           setEvent(eventData);
 
           // Fetch children names
-          if (eventData.familyId && eventData.childrenIds && eventData.childrenIds.length > 0) {
+          if (eventData.familyId) {
             const familyDoc = await getDoc(doc(db, 'families', eventData.familyId));
             if (familyDoc.exists()) {
               const familyData = familyDoc.data();
-              const allChildren = familyData.children || [];
-              const names = allChildren
-                .filter((child: any) => eventData.childrenIds.includes(child.id))
-                .map((child: any) => child.name);
-              setChildrenNames(names);
+              setFamilyName(familyData.name || '');
+              if (eventData.childrenIds && eventData.childrenIds.length > 0) {
+                const allChildren = familyData.children || [];
+                const names = allChildren
+                  .filter((child: any) => eventData.childrenIds.includes(child.id))
+                  .map((child: any) => child.name);
+                setChildrenNames(names);
+              }
             }
           }
 
@@ -166,6 +170,13 @@ export default function EventDetailsScreen() {
             <View style={styles.header}>
               <Text style={[styles.title, { color: colors.text }]}>{event.title}</Text>
             </View>
+
+            {familyName && (
+              <View style={[styles.infoRow, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>👪 Famille</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{familyName}</Text>
+              </View>
+            )}
 
             {/* Catégorie */}
             {event.category && (

@@ -7,7 +7,7 @@ import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { auth, db, getUserFamily } from '../../constants/firebase';
+import { auth, db, getUserFamilies } from '../../constants/firebase';
 
 export default function AgendaScreen() {
   const router = useRouter();
@@ -30,11 +30,12 @@ export default function AgendaScreen() {
 
     const uid = currentUser.uid;
     try {
-      const userFamily = await getUserFamily(uid);
-      if (userFamily?.id) {
+      const userFamilies = await getUserFamilies(uid);
+      if (userFamilies && userFamilies.length > 0) {
+        const familyIds = userFamilies.map(f => f.id);
         const eventsQuery = query(
           collection(db, 'events'),
-          where('familyId', '==', userFamily.id),
+          where('familyId', 'in', familyIds),
           orderBy('date', 'asc')
         );
         const eventsSnapshot = await getDocs(eventsQuery);
@@ -339,7 +340,7 @@ export default function AgendaScreen() {
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.tint }]}>Agenda partagé</Text>
+            <Text style={[styles.title, { color: colors.tint }]}>Agenda</Text>
             <View style={styles.headerButtons}>
               <TouchableOpacity style={[styles.todayButton, { backgroundColor: colors.secondaryCardBackground }]} onPress={goToToday}>
                 <Text style={[styles.todayButtonText, { color: colors.tint }]}>Aujourd'hui</Text>

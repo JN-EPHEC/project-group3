@@ -1,13 +1,13 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { BORDER_RADIUS, FONT_SIZES, hs, rf, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs, wp } from '@/constants/responsive';
+import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs, wp } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { auth, db, getUserFamily, signOut } from '../../constants/firebase';
+import { auth, db, getUserFamilies, signOut } from '../../constants/firebase';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -18,32 +18,37 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
+  const [families, setFamilies] = useState<any[]>([]);
+  const [selectedFamilyIndex, setSelectedFamilyIndex] = useState(0);
+  const [showFamilyMenu, setShowFamilyMenu] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
   const fetchEvents = useCallback(async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
-
     const uid = currentUser.uid;
+
     try {
-      const userFamily = await getUserFamily(uid);
-      
-      if (userFamily?.id) {
-        const eventsQuery = query(
-          collection(db, 'events'),
-          where('familyId', '==', userFamily.id)
-        );
-        const eventsSnapshot = await getDocs(eventsQuery);
-        
-        const now = new Date();
-        const fetchedEvents = eventsSnapshot.docs
-          .map(d => ({ id: d.id, ...(d.data() as any) }))
-          .filter((event: any) => event.date?.toDate() >= now)
-          .sort((a: any, b: any) => a.date?.toDate() - b.date?.toDate());
-        
-        setEvents(fetchedEvents);
-      }
+        const userFamilies = await getUserFamilies(uid);
+        if (userFamilies && userFamilies.length > 0) {
+            const familyIds = userFamilies.map(f => f.id);
+            const eventsQuery = query(
+                collection(db, 'events'),
+                where('familyId', 'in', familyIds)
+            );
+            const eventsSnapshot = await getDocs(eventsQuery);
+            
+            const now = new Date();
+            const fetchedEvents = eventsSnapshot.docs
+                .map(d => ({ id: d.id, ...(d.data() as any) }))
+                .filter((event: any) => event.date?.toDate() >= now)
+                .sort((a: any, b: any) => a.date?.toDate() - b.date?.toDate());
+            
+            setEvents(fetchedEvents);
+        } else {
+            setEvents([]);
+        }
     } catch (error) {
       console.error("Error fetching events:", error);
     }
@@ -65,14 +70,27 @@ export default function HomeScreen() {
               setFirstName(userDocSnap.data().firstName || 'Utilisateur');
             }
 
-            await fetchEvents();
+            // Charger toutes les familles
+            const userFamilies = await getUserFamilies(uid);
+            
+            const familiesWithData = await Promise.all(userFamilies.map(async (family) => {
+              const familyDoc = await getDoc(doc(db, 'families', family.id));
+              if (familyDoc.exists()) {
+                return { ...family, ...familyDoc.data() };
+              }
+              return family;
+            }));
 
-            // Récupérer les membres de la famille
-            const userFamily = await getUserFamily(uid);
-            if (userFamily?.id) {
+            setFamilies(familiesWithData);
+            
+            if (familiesWithData.length > 0) {
+              await fetchEvents();
+              const currentFamily = familiesWithData[selectedFamilyIndex] || familiesWithData[0];
+              
+              // Récupérer les membres de la famille
               const membersQuery = query(
                 collection(db, 'users'),
-                where('familyId', '==', userFamily.id)
+                where('familyIds', 'array-contains', currentFamily.id)
               );
               const membersSnapshot = await getDocs(membersQuery);
               const members = membersSnapshot.docs
@@ -80,12 +98,10 @@ export default function HomeScreen() {
                 .filter((member: any) => member.uid !== uid);
               
               setFamilyMembers(members);
-            }
 
-            if (userFamily?.id) {
               const conversationsQuery = query(
                 collection(db, 'conversations'),
-                where('familyId', '==', userFamily.id),
+                where('familyId', '==', currentFamily.id),
                 where('participants', 'array-contains', uid),
                 orderBy('lastMessageTime', 'desc')
               );
@@ -117,6 +133,8 @@ export default function HomeScreen() {
               
               setMessages(conversationsWithDetails.filter(c => c !== null) as any);
             } else {
+              setEvents([]);
+              setFamilyMembers([]);
               setMessages([]);
             }
 
@@ -148,6 +166,70 @@ export default function HomeScreen() {
     });
   };
 
+  const handleFamilyChange = async (index: number) => {
+    setSelectedFamilyIndex(index);
+    setLoading(true);
+    
+    const currentUser = auth.currentUser;
+    if (!currentUser || !families[index]) return;
+    
+    const uid = currentUser.uid;
+    const selectedFamily = families[index];
+    
+    try {
+      // Charger les membres
+      const membersQuery = query(
+        collection(db, 'users'),
+        where('familyIds', 'array-contains', selectedFamily.id)
+      );
+      const membersSnapshot = await getDocs(membersQuery);
+      const members = membersSnapshot.docs
+        .map(doc => ({ uid: doc.id, ...doc.data() }))
+        .filter((member: any) => member.uid !== uid);
+      
+      setFamilyMembers(members);
+      
+      // Charger les messages
+      const conversationsQuery = query(
+        collection(db, 'conversations'),
+        where('familyId', '==', selectedFamily.id),
+        where('participants', 'array-contains', uid),
+        orderBy('lastMessageTime', 'desc')
+      );
+      const conversationsSnapshot = await getDocs(conversationsQuery);
+      const conversations = conversationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      const conversationsWithDetails = await Promise.all(
+        conversations.map(async (conv) => {
+          const otherUserId = conv.participants.find((p: string) => p !== uid);
+          if (!otherUserId) return null;
+
+          const userDocRef = doc(db, 'users', otherUserId);
+          const userDocSnap = await getDoc(userDocRef);
+          const otherUserName = userDocSnap.exists() ? userDocSnap.data().firstName : 'Utilisateur';
+
+          const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
+
+          if (unreadCount > 0) {
+            return {
+              ...conv,
+              otherUserName,
+              otherUserId,
+              unreadCount
+            };
+          }
+          return null;
+        })
+      );
+      
+      setMessages(conversationsWithDetails.filter(c => c !== null) as any);
+    } catch (error) {
+      console.error("Error changing family:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     await signOut();
     router.replace('/(auth)/LoginScreen' as any);
@@ -163,7 +245,7 @@ export default function HomeScreen() {
     );
   }
 
-  const displayedEvents = showAllEvents ? events : events.slice(0, 2);
+  const displayedEvents = showAllEvents ? events : events.slice(0, 3);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -171,6 +253,75 @@ export default function HomeScreen() {
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.tint }]}>Accueil</Text>
+            
+            {/* Sélecteur de famille discret */}
+            {families.length > 1 && (
+              <View style={styles.familySelectorWrapper}>
+                <TouchableOpacity 
+                  style={[
+                    styles.familyButton, 
+                    { backgroundColor: showFamilyMenu ? colors.tint : colors.secondaryCardBackground }
+                  ]}
+                  onPress={() => setShowFamilyMenu(!showFamilyMenu)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.familyButtonText, 
+                    { color: showFamilyMenu ? '#fff' : colors.tint }
+                  ]}>
+                    {families[selectedFamilyIndex]?.name || families[selectedFamilyIndex]?.code || 'Famille'}
+                  </Text>
+                  <IconSymbol 
+                    name={showFamilyMenu ? "chevron.up" : "chevron.down"} 
+                    size={16} 
+                    color={showFamilyMenu ? '#fff' : colors.tint}
+                  />
+                </TouchableOpacity>
+                                {/* Overlay pour fermer le menu */}
+                                {showFamilyMenu && (
+                                  <TouchableOpacity 
+                                    style={styles.menuOverlay}
+                                    activeOpacity={1}
+                                    onPress={() => setShowFamilyMenu(false)}
+                                  />
+                                )}
+                
+                
+                {/* Menu déroulant */}
+                {showFamilyMenu && (
+                  <View style={[styles.familyDropdown, { backgroundColor: colors.cardBackground }]}>
+                    {families.map((family, index) => (
+                      <TouchableOpacity
+                        key={family.id}
+                        style={[
+                          styles.familyMenuItem,
+                          { borderBottomColor: colors.border },
+                          selectedFamilyIndex === index && { backgroundColor: colors.secondaryCardBackground },
+                          index === families.length - 1 && { borderBottomWidth: 0 }
+                        ]}
+                        onPress={() => {
+                          handleFamilyChange(index);
+                          setShowFamilyMenu(false);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.familyMenuItemContent}>
+                          <Text style={[styles.familyMenuTitle, { color: colors.text }]}>
+                            {family.name || `Famille ${index + 1}`}
+                          </Text>
+                          <Text style={[styles.familyMenuCode, { color: colors.tint }]}>
+                            {family.code}
+                          </Text>
+                        </View>
+                        {selectedFamilyIndex === index && (
+                          <IconSymbol name="checkmark" size={18} color={colors.tint} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
 
           <View style={styles.welcomeSection}>
@@ -225,14 +376,16 @@ export default function HomeScreen() {
                     </View>
                   </TouchableOpacity>
                 ))}
-                {events.length > 2 && (
+                {events.length > 3 && (
                   <TouchableOpacity 
                     style={[styles.seeMoreButton, { backgroundColor: colors.secondaryCardBackground }]}
                     onPress={() => setShowAllEvents(!showAllEvents)}
                   >
-                    <Text style={[styles.seeMoreText, { color: colors.tint }]}>
-                      {showAllEvents ? 'Voir moins' : `Voir plus (${events.length - 2} autres)`}
-                    </Text>
+                    {showAllEvents ? (
+                      <Text style={[styles.seeMoreText, { color: colors.tint }]}>Voir moins</Text>
+                    ) : (
+                      <Text style={[styles.seeMoreText, { color: colors.tint }]}>Voir plus</Text>
+                    )}
                   </TouchableOpacity>
                 )}
               </>
@@ -405,6 +558,69 @@ const styles = StyleSheet.create({
   },
   unreadText: {
     color: '#fff',
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+  },
+  familySelectorWrapper: {
+    position: 'relative',
+  },
+  familyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: vs(8),
+    paddingHorizontal: SPACING.medium,
+    borderRadius: BORDER_RADIUS.medium,
+    gap: SPACING.tiny,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: vs(2) },
+    shadowRadius: hs(4),
+    elevation: 2,
+  },
+  familyButtonText: {
+      menuOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: -wp(100),
+        right: -wp(100),
+        bottom: -1000,
+        zIndex: 999,
+      },
+    fontSize: FONT_SIZES.regular,
+    fontWeight: '600',
+  },
+  familyDropdown: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: vs(8),
+    minWidth: hs(200),
+    borderRadius: BORDER_RADIUS.large,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: vs(6) },
+    shadowRadius: hs(16),
+    elevation: 10,
+    overflow: 'hidden',
+    zIndex: 1000,
+  },
+  familyMenuItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: V_SPACING.regular,
+    paddingHorizontal: SPACING.large,
+    borderBottomWidth: 1,
+  },
+  familyMenuItemContent: {
+    flex: 1,
+  },
+  familyMenuTitle: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+    marginBottom: V_SPACING.tiny,
+  },
+  familyMenuCode: {
     fontSize: FONT_SIZES.small,
     fontWeight: '600',
   },

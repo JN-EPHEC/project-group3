@@ -40,12 +40,17 @@ export async function signIn(email, password) {
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
   if (!snap.exists()) {
-    await setDoc(userRef, { email, roles: [], familyId: null });
+    await setDoc(userRef, { email, roles: [], familyIds: [] });
   }
 
   const updated = await getDoc(userRef);
   const data = updated.data() || {};
-  return { user: res.user, roles: data.roles || [], familyId: data.familyId || null };
+  // Support pour ancienne structure (familyId) et nouvelle (familyIds)
+  let familyIds = data.familyIds || [];
+  if (data.familyId && !familyIds.includes(data.familyId)) {
+    familyIds = [data.familyId, ...familyIds];
+  }
+  return { user: res.user, roles: data.roles || [], familyIds };
 }
 
 /**
@@ -57,9 +62,9 @@ export async function signUp(email, password, role = 'parent') {
   const uid = res.user.uid;
 
   const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, { email, roles: [role], familyId: null });
+  await setDoc(userRef, { email, roles: [role], familyIds: [] });
 
-  return { user: res.user, roles: [role], familyId: null };
+  return { user: res.user, roles: [role], familyIds: [] };
 }
 
 /**
@@ -73,15 +78,39 @@ export async function getUserRoles(uid) {
 
 /**
  * Get the family document for a user (returns family doc data or null).
+ * Retourne la première famille pour rétrocompatibilité.
  */
 export async function getUserFamily(uid) {
+  const families = await getUserFamilies(uid);
+  return families.length > 0 ? families[0] : null;
+}
+
+/**
+ * Get all families for a user (returns array of family docs).
+ */
+export async function getUserFamilies(uid) {
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
   const data = snap.exists() ? snap.data() : null;
-  if (!data || !data.familyId) return null;
-  const familyRef = doc(db, 'families', data.familyId);
-  const familySnap = await getDoc(familyRef);
-  return familySnap.exists() ? { id: familySnap.id, ...familySnap.data() } : null;
+  if (!data) return [];
+  
+  // Support ancienne structure (familyId unique)
+  let familyIds = data.familyIds || [];
+  if (data.familyId && !familyIds.includes(data.familyId)) {
+    familyIds = [data.familyId, ...familyIds];
+  }
+  
+  if (familyIds.length === 0) return [];
+  
+  const families = [];
+  for (const familyId of familyIds) {
+    const familyRef = doc(db, 'families', familyId);
+    const familySnap = await getDoc(familyRef);
+    if (familySnap.exists()) {
+      families.push({ id: familySnap.id, ...familySnap.data() });
+    }
+  }
+  return families;
 }
 
 /**
@@ -116,9 +145,9 @@ export async function createFamilyForUser(uid) {
     createdAt: new Date()
   });
 
-  // attach familyId to user
+  // attach familyId to user's familyIds array
   const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, { familyId: familyDocRef.id }, { merge: true });
+  await updateDoc(userRef, { familyIds: arrayUnion(familyDocRef.id) });
 
   return { familyId: familyDocRef.id, code };
 }
@@ -139,9 +168,9 @@ export async function joinFamilyByCode(uid, code) {
   // add user to members array
   await updateDoc(familyRef, { members: arrayUnion(uid) });
 
-  // set user's familyId
+  // add familyId to user's familyIds array
   const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, { familyId: familyRef.id }, { merge: true });
+  await updateDoc(userRef, { familyIds: arrayUnion(familyRef.id) });
 
   const updatedFamilySnap = await getDoc(familyRef);
   return { id: familyRef.id, ...updatedFamilySnap.data() };
@@ -172,11 +201,40 @@ export async function signOut() {
 
 // Nouveau helper : sign in + indique si l'utilisateur parent doit passer par l'écran "family code".
 export async function signInAndCheck(email, password) {
-  const result = await signIn(email, password); // { user, roles, familyId }
+  const result = await signIn(email, password); // { user, roles, familyIds }
   const roles = result.roles || [];
-  const familyId = result.familyId || null;
-  const needsFamilyCode = roles.includes('parent') && !familyId;
+  const familyIds = result.familyIds || [];
+  const needsFamilyCode = roles.includes('parent') && familyIds.length === 0;
   return { ...result, needsFamilyCode };
+}
+
+/**
+ * Leave a family: removes user from family members and removes familyId from user's familyIds.
+ */
+export async function leaveFamilyById(uid, familyId) {
+  const familyRef = doc(db, 'families', familyId);
+  const familySnap = await getDoc(familyRef);
+  
+  if (!familySnap.exists()) {
+    throw new Error('Famille introuvable');
+  }
+  
+  const familyData = familySnap.data();
+  const updatedMembers = (familyData.members || []).filter(memberId => memberId !== uid);
+  
+  // Update family members
+  await updateDoc(familyRef, { members: updatedMembers });
+  
+  // Remove familyId from user's familyIds
+  const userRef = doc(db, 'users', uid);
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists()) {
+    const userData = userSnap.data();
+    const updatedFamilyIds = (userData.familyIds || []).filter(id => id !== familyId);
+    await updateDoc(userRef, { familyIds: updatedFamilyIds });
+  }
+  
+  return true;
 }
 
 /**
