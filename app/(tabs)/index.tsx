@@ -4,8 +4,8 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { useCallback, useState } from 'react';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, signOut } from '../../constants/firebase';
 
@@ -24,133 +24,118 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
-  const fetchEvents = useCallback(async () => {
+  useEffect(() => {
     const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!currentUser) {
+      router.replace('/(auth)/WelcomeScreen');
+      return;
+    }
+    setUser(currentUser);
     const uid = currentUser.uid;
 
-    try {
-        const userFamilies = await getUserFamilies(uid);
-        if (userFamilies && userFamilies.length > 0) {
-            const familyIds = userFamilies.map(f => f.id);
-            const eventsQuery = query(
-                collection(db, 'events'),
-                where('familyId', 'in', familyIds)
-            );
-            const eventsSnapshot = await getDocs(eventsQuery);
-            
-            const now = new Date();
-            const fetchedEvents = eventsSnapshot.docs
-                .map(d => ({ id: d.id, ...(d.data() as any) }))
-                .filter((event: any) => event.date?.toDate() >= now)
-                .sort((a: any, b: any) => a.date?.toDate() - b.date?.toDate());
-            
-            setEvents(fetchedEvents);
-        } else {
-            setEvents([]);
-        }
-    } catch (error) {
-      console.error("Error fetching events:", error);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        setUser(currentUser);
-        const uid = currentUser.uid;
-
-        const fetchData = async () => {
-          setLoading(true);
-          try {
-            const userDocRef = doc(db, 'users', uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-              setFirstName(userDocSnap.data().firstName || 'Utilisateur');
-            }
-
-            // Charger toutes les familles
-            const userFamilies = await getUserFamilies(uid);
-            
-            const familiesWithData = await Promise.all(userFamilies.map(async (family) => {
-              const familyDoc = await getDoc(doc(db, 'families', family.id));
-              if (familyDoc.exists()) {
-                return { ...family, ...familyDoc.data() };
-              }
-              return family;
-            }));
-
-            setFamilies(familiesWithData);
-            
-            if (familiesWithData.length > 0) {
-              await fetchEvents();
-              const currentFamily = familiesWithData[selectedFamilyIndex] || familiesWithData[0];
-              
-              // Récupérer les membres de la famille
-              const membersQuery = query(
-                collection(db, 'users'),
-                where('familyIds', 'array-contains', currentFamily.id)
-              );
-              const membersSnapshot = await getDocs(membersQuery);
-              const members = membersSnapshot.docs
-                .map(doc => ({ uid: doc.id, ...doc.data() }))
-                .filter((member: any) => member.uid !== uid);
-              
-              setFamilyMembers(members);
-
-              const conversationsQuery = query(
-                collection(db, 'conversations'),
-                where('familyId', '==', currentFamily.id),
-                where('participants', 'array-contains', uid),
-                orderBy('lastMessageTime', 'desc')
-              );
-              const conversationsSnapshot = await getDocs(conversationsQuery);
-              const conversations = conversationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-              const conversationsWithDetails = await Promise.all(
-                conversations.map(async (conv) => {
-                  const otherUserId = conv.participants.find((p: string) => p !== uid);
-                  if (!otherUserId) return null;
-
-                  const userDocRef = doc(db, 'users', otherUserId);
-                  const userDocSnap = await getDoc(userDocRef);
-                  const otherUserName = userDocSnap.exists() ? userDocSnap.data().firstName : 'Utilisateur';
-
-                  const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
-
-                  if (unreadCount > 0) {
-                    return {
-                      ...conv,
-                      otherUserName,
-                      otherUserId,
-                      unreadCount
-                    };
-                  }
-                  return null;
-                })
-              );
-              
-              setMessages(conversationsWithDetails.filter(c => c !== null) as any);
-            } else {
-              setEvents([]);
-              setFamilyMembers([]);
-              setMessages([]);
-            }
-
-          } catch (error) {
-            console.error("Error fetching data:", error);
-          } finally {
-            setLoading(false);
-          }
-        };
-
-        fetchData();
-      } else {
-        router.replace('/(auth)/WelcomeScreen' as any);
+    const unsubUser = onSnapshot(doc(db, 'users', uid), (doc) => {
+      if (doc.exists()) {
+        setFirstName(doc.data().firstName || 'Utilisateur');
       }
-    }, [router, fetchEvents])
-  );
+    });
+
+    const fetchFamilies = async () => {
+        try {
+            const userFamilies = await getUserFamilies(uid);
+            const familiesWithData = await Promise.all(userFamilies.map(async (family) => {
+                const familyDoc = await getDoc(doc(db, 'families', family.id));
+                return familyDoc.exists() ? { ...family, ...familyDoc.data() } : family;
+            }));
+            setFamilies(familiesWithData);
+        } catch (error) {
+            console.error("Error fetching families:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchFamilies();
+
+    return () => unsubUser();
+  }, [router]);
+
+  useEffect(() => {
+    if (families.length === 0) return;
+
+    const familyIds = families.map(f => f.id);
+    const eventsQuery = query(
+        collection(db, 'events'),
+        where('familyId', 'in', familyIds),
+        orderBy('date', 'asc')
+    );
+    const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
+        const now = new Date();
+        const fetchedEvents = snapshot.docs
+            .map(d => ({ id: d.id, ...(d.data()) }))
+            .filter((event) => event.date?.toDate() >= now)
+            .sort((a, b) => a.date?.toDate() - b.date?.toDate());
+        setEvents(fetchedEvents);
+    });
+
+    return () => unsubEvents();
+  }, [families]);
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || families.length === 0) {
+        setFamilyMembers([]);
+        setMessages([]);
+        return;
+    };
+    const uid = currentUser.uid;
+    
+    const currentFamily = families[selectedFamilyIndex];
+    if (!currentFamily) return;
+
+    const membersQuery = query(
+        collection(db, 'users'),
+        where('familyIds', 'array-contains', currentFamily.id)
+    );
+    const unsubMembers = onSnapshot(membersQuery, (snapshot) => {
+        const members = snapshot.docs
+            .map(doc => ({ uid: doc.id, ...doc.data() }))
+            .filter((member) => member.uid !== uid);
+        setFamilyMembers(members);
+    });
+
+    const conversationsQuery = query(
+        collection(db, 'conversations'),
+        where('familyId', '==', currentFamily.id),
+        where('participants', 'array-contains', uid),
+        orderBy('lastMessageTime', 'desc')
+    );
+    const unsubConversations = onSnapshot(conversationsQuery, (snapshot) => {
+        const conversations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        Promise.all(
+            conversations.map(async (conv) => {
+              const otherUserId = conv.participants.find((p) => p !== uid);
+              if (!otherUserId) return null;
+
+              const userDocRef = doc(db, 'users', otherUserId);
+              const userDocSnap = await getDoc(userDocRef);
+              const otherUserName = userDocSnap.exists() ? userDocSnap.data().firstName : 'Utilisateur';
+              const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
+
+              if (unreadCount > 0) {
+                return { ...conv, otherUserName, otherUserId, unreadCount };
+              }
+              return null;
+            })
+        ).then(conversationsWithDetails => {
+            setMessages(conversationsWithDetails.filter(c => c !== null) as any[]);
+        });
+    });
+
+    return () => {
+        unsubMembers();
+        unsubConversations();
+    }
+  }, [families, selectedFamilyIndex]);
 
   const handleNewMessage = () => {
     if (familyMembers.length === 0) {
@@ -168,66 +153,6 @@ export default function HomeScreen() {
 
   const handleFamilyChange = async (index: number) => {
     setSelectedFamilyIndex(index);
-    setLoading(true);
-    
-    const currentUser = auth.currentUser;
-    if (!currentUser || !families[index]) return;
-    
-    const uid = currentUser.uid;
-    const selectedFamily = families[index];
-    
-    try {
-      // Charger les membres
-      const membersQuery = query(
-        collection(db, 'users'),
-        where('familyIds', 'array-contains', selectedFamily.id)
-      );
-      const membersSnapshot = await getDocs(membersQuery);
-      const members = membersSnapshot.docs
-        .map(doc => ({ uid: doc.id, ...doc.data() }))
-        .filter((member: any) => member.uid !== uid);
-      
-      setFamilyMembers(members);
-      
-      // Charger les messages
-      const conversationsQuery = query(
-        collection(db, 'conversations'),
-        where('familyId', '==', selectedFamily.id),
-        where('participants', 'array-contains', uid),
-        orderBy('lastMessageTime', 'desc')
-      );
-      const conversationsSnapshot = await getDocs(conversationsQuery);
-      const conversations = conversationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      const conversationsWithDetails = await Promise.all(
-        conversations.map(async (conv) => {
-          const otherUserId = conv.participants.find((p: string) => p !== uid);
-          if (!otherUserId) return null;
-
-          const userDocRef = doc(db, 'users', otherUserId);
-          const userDocSnap = await getDoc(userDocRef);
-          const otherUserName = userDocSnap.exists() ? userDocSnap.data().firstName : 'Utilisateur';
-
-          const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
-
-          if (unreadCount > 0) {
-            return {
-              ...conv,
-              otherUserName,
-              otherUserId,
-              unreadCount
-            };
-          }
-          return null;
-        })
-      );
-      
-      setMessages(conversationsWithDetails.filter(c => c !== null) as any);
-    } catch (error) {
-      console.error("Error changing family:", error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleLogout = async () => {

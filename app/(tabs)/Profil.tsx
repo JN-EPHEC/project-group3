@@ -5,7 +5,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, joinFamilyByCode, leaveFamilyById, signOut } from '../../constants/firebase';
@@ -53,71 +53,97 @@ export default function ProfilScreen() {
       setEmail(currentUser.email || '');
       const uid = currentUser.uid;
 
-      const fetchData = async () => {
+      const userDocRef = doc(db, 'users', uid);
+      const unsubscribeUser = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          const userData = doc.data();
+          const userFirstName = userData.firstName || 'Utilisateur';
+          const userLastName = userData.lastName || '';
+          setFirstName(userFirstName);
+          setLastName(userLastName);
+          setEditFirstName(userFirstName);
+          setEditLastName(userLastName);
+          if (userData.userType) {
+            setUserRole(userData.userType);
+          }
+          if (userData.profileImage) {
+            setProfileImage(userData.profileImage);
+          }
+        }
+      });
+
+      const fetchFamilies = async () => {
         try {
-          const userDocRef = doc(db, 'users', uid);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            const userFirstName = userData.firstName || 'Utilisateur';
-            const userLastName = userData.lastName || '';
-            setFirstName(userFirstName);
-            setLastName(userLastName);
-            setEditFirstName(userFirstName);
-            setEditLastName(userLastName);
-            if (userData.userType) {
-              setUserRole(userData.userType);
-            }
-            if (userData.profileImage) {
-              setProfileImage(userData.profileImage);
-            }
-          }
-
           const userFamilies = await getUserFamilies(uid);
-          if (userFamilies && userFamilies.length > 0) {
-            setFamilies(userFamilies);
-            
-            // Charger les détails de la première famille par défaut
-            const firstFamily = userFamilies[0];
-            const familyDoc = await getDoc(doc(db, 'families', firstFamily.id));
-            if (familyDoc.exists()) {
-                const familyData = familyDoc.data();
-                setChildren(familyData.children || []);
-                setFamilyName(familyData.name || `Famille ${1}`);
-                setEditFamilyName(familyData.name || `Famille ${1}`);
-            }
-
-            if (firstFamily.members && firstFamily.members.length > 0) {
-              const membersDetails = await Promise.all(
-                firstFamily.members.map(async (memberId: string) => {
-                  const memberDocRef = doc(db, 'users', memberId);
-                  const memberDocSnap = await getDoc(memberDocRef);
-                  if (memberDocSnap.exists()) {
-                    const memberData = memberDocSnap.data();
-                    return {
-                      id: memberId,
-                      firstName: memberData.firstName || 'Membre',
-                      lastName: memberData.lastName || '',
-                    };
-                  }
-                  return null;
-                })
-              );
-              setFamilyMembers(membersDetails.filter(Boolean) as { id: string; firstName: string; lastName: string }[]);
-            }
-          }
+          setFamilies(userFamilies);
         } catch (error) {
-          console.error("Error fetching data:", error);
-        } finally {
-          setLoading(false);
+          console.error("Error fetching families:", error);
         }
       };
+      fetchFamilies();
 
-      fetchData();
+      return () => unsubscribeUser();
+
     } else {
       router.replace('/(auth)/LoginScreen');
     }
   }, [router]);
+
+  useEffect(() => {
+    if (families.length === 0 && !loading) {
+        setChildren([]);
+        setFamilyMembers([]);
+        setFamilyName('');
+        setEditFamilyName('');
+        return;
+    };
+
+    if (families.length > 0) {
+      const family = families[selectedFamilyIndex];
+      if (!family) return;
+
+      const familyDocRef = doc(db, 'families', family.id);
+      
+      let unsubscribeMembers = () => {};
+
+      const unsubscribeFamily = onSnapshot(familyDocRef, (doc) => {
+        unsubscribeMembers(); // Unsubscribe from previous members listener
+
+        if (doc.exists()) {
+          const familyData = doc.data();
+          setChildren(familyData.children || []);
+          setFamilyName(familyData.name || `Famille ${selectedFamilyIndex + 1}`);
+          setEditFamilyName(familyData.name || `Famille ${selectedFamilyIndex + 1}`);
+          
+          if (familyData.members && familyData.members.length > 0) {
+            const membersQuery = query(collection(db, 'users'), where('__name__', 'in', familyData.members));
+            unsubscribeMembers = onSnapshot(membersQuery, (querySnapshot) => {
+              const membersDetails = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                firstName: doc.data().firstName || 'Membre',
+                lastName: doc.data().lastName || '',
+              }));
+              setFamilyMembers(membersDetails);
+              if (loading) setLoading(false);
+            });
+          } else {
+            setFamilyMembers([]);
+            if (loading) setLoading(false);
+          }
+        } else {
+          if (loading) setLoading(false);
+        }
+      }, (error) => {
+        console.error("Error listening to family data:", error);
+        if (loading) setLoading(false);
+      });
+
+      return () => {
+          unsubscribeFamily();
+          unsubscribeMembers();
+      };
+    }
+  }, [selectedFamilyIndex, families, loading]);
 
   const uploadImage = async (uri: string) => {
     if (!user) return null;
@@ -132,7 +158,7 @@ export default function ProfilScreen() {
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission refusée', 'Vous devez autoriser l\'accès à la galerie pour changer votre photo de profil.');
+      Alert.alert('Permission refusée', 'Vous devez autoriser l\\\'accès à la galerie pour changer votre photo de profil.');
       return;
     }
 
@@ -347,38 +373,6 @@ export default function ProfilScreen() {
         },
       ]
     );
-  };
-
-  const loadFamilyData = async (familyIndex: number) => {
-    if (!families[familyIndex]) return;
-    
-    const family = families[familyIndex];
-    const familyDoc = await getDoc(doc(db, 'families', family.id));
-    if (familyDoc.exists()) {
-      const familyData = familyDoc.data();
-      setChildren(familyData.children || []);
-      setFamilyName(familyData.name || `Famille ${familyIndex + 1}`);
-      setEditFamilyName(familyData.name || `Famille ${familyIndex + 1}`);
-    }
-
-    if (family.members && family.members.length > 0) {
-      const membersDetails = await Promise.all(
-        family.members.map(async (memberId: string) => {
-          const memberDocRef = doc(db, 'users', memberId);
-          const memberDocSnap = await getDoc(memberDocRef);
-          if (memberDocSnap.exists()) {
-            const memberData = memberDocSnap.data();
-            return {
-              id: memberId,
-              firstName: memberData.firstName || 'Membre',
-              lastName: memberData.lastName || '',
-            };
-          }
-          return null;
-        })
-      );
-      setFamilyMembers(membersDetails.filter(Boolean) as { id: string; firstName: string; lastName: string }[]);
-    }
   };
 
   const handleSaveChild = async (childId: string) => {
@@ -790,7 +784,6 @@ export default function ProfilScreen() {
                       ]}
                       onPress={() => {
                         setSelectedFamilyIndex(index);
-                        loadFamilyData(index);
                       }}
                     >
                       <View style={styles.familyTabContent}>

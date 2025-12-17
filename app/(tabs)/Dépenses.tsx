@@ -2,9 +2,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getCurrencySymbol } from '../../constants/currencies';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
@@ -19,91 +19,127 @@ export default function DepensesScreen() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<any[]>([]);
   const [currency, setCurrency] = useState('€');
+  const [families, setFamilies] = useState<any[]>([]);
+  const [selectedFamilyIndex, setSelectedFamilyIndex] = useState(0);
+  const [user, setUser] = useState<User | null>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
-  const fetchExpenses = useCallback(async () => {
+  useEffect(() => {
     const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
+    if (!currentUser) {
+      router.replace('/(auth)/LoginScreen');
+      return;
+    }
+    setUser(currentUser);
     const uid = currentUser.uid;
+
+    const userDocRef = doc(db, 'users', uid);
+    const unsubUser = onSnapshot(userDocRef, (doc) => {
+      if (doc.exists()) {
+        setFirstName(doc.data().firstName || 'Utilisateur');
+      }
+    });
+
+    const loadFamilies = async () => {
+      setLoading(true);
+      try {
+        const userFamilies = await getUserFamilies(uid);
+        setFamilies(userFamilies || []);
+        if (userFamilies && userFamilies.length > 0) {
+          setSelectedFamilyIndex((prev) => Math.min(prev, userFamilies.length - 1));
+        } else {
+          setSelectedFamilyIndex(0);
+        }
+      } catch (error) {
+        console.error('Error fetching families:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFamilies();
+
+    return () => {
+      unsubUser();
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
+    const uid = user.uid;
+    const activeFamily = families[selectedFamilyIndex];
+
+    if (!activeFamily) {
+      setExpenses([]);
+      setCategories([]);
+      return;
+    }
+
+    setLoading(true);
+    setExpenses([]);
+    setTotalExpenses(0);
+    setMyShare(0);
+    setPartnerShare(0);
+
+    let unsubExpenses = () => {};
+    let unsubBudgets = () => {};
+    let unsubFamily = () => {};
+
     try {
-      const userFamily = await getUserFamily(uid);
-      
-      if (userFamily?.id) {
-        // Récupérer la devise de la famille
-        const familyRef = doc(db, 'families', userFamily.id);
-        const familySnap = await getDoc(familyRef);
+      const familyId = activeFamily.id;
+
+      // Currency listener for active family
+      const familyRef = doc(db, 'families', familyId);
+      unsubFamily = onSnapshot(familyRef, (familySnap) => {
         if (familySnap.exists()) {
           const currencyCode = familySnap.data().currency || 'EUR';
           setCurrency(getCurrencySymbol(currencyCode));
         }
+      });
 
-        // Récupérer les dépenses
-        const expensesQuery = query(
-          collection(db, 'expenses'),
-          where('familyId', '==', userFamily.id),
-          orderBy('date', 'desc')
-        );
-        const expensesSnapshot = await getDocs(expensesQuery);
+      // Expenses for active family only
+      const expensesQuery = query(
+        collection(db, 'expenses'),
+        where('familyId', '==', familyId),
+        orderBy('date', 'desc')
+      );
+      unsubExpenses = onSnapshot(expensesQuery, (expensesSnapshot) => {
         const expensesList = expensesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setExpenses(expensesList);
 
-        // Calculer les totaux
-        const total = expensesList.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
+        const total = expensesList.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         setTotalExpenses(total);
         
         const myExpenses = expensesList
-          .filter((exp: any) => exp.paidBy === uid)
-          .reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
+          .filter(exp => exp.paidBy === uid)
+          .reduce((sum, exp) => sum + (exp.amount || 0), 0);
         
-        const partnerExpenses = total - myExpenses;
         setMyShare(myExpenses);
-        setPartnerShare(partnerExpenses);
+        setPartnerShare(total - myExpenses);
+        setLoading(false);
+      });
 
-        // Récupérer les catégories de budget
-        const budgetDoc = await getDoc(doc(db, 'budgets', userFamily.id));
+      // Budget categories for active family
+      const budgetDocRef = doc(db, 'budgets', familyId);
+      unsubBudgets = onSnapshot(budgetDocRef, (budgetDoc) => {
         if (budgetDoc.exists()) {
           setCategories(budgetDoc.data().categories || []);
+        } else {
+          setCategories([]);
         }
-      }
+      });
     } catch (error) {
-      console.error("Error fetching expenses:", error);
+      console.error('Error setting up listeners:', error);
+      setLoading(false);
     }
-  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchExpenses();
-    }, [fetchExpenses])
-  );
-
-  useEffect(() => {
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      const uid = currentUser.uid;
-
-      const fetchData = async () => {
-        try {
-          const userDocRef = doc(db, 'users', uid);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            setFirstName(userDocSnap.data().firstName || 'Utilisateur');
-          }
-
-          await fetchExpenses();
-        } catch (error) {
-          console.error("Error fetching data:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchData();
-    } else {
-      router.replace('/(auth)/LoginScreen');
-    }
-  }, [router, fetchExpenses]);
+    return () => {
+      unsubExpenses();
+      unsubBudgets();
+      unsubFamily();
+    };
+  }, [user, families, selectedFamilyIndex]);
 
   const getCategoryBudget = (categoryName: string) => {
     const category = categories.find((c: any) => c.name === categoryName);
@@ -143,6 +179,35 @@ export default function DepensesScreen() {
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Sélecteur de famille */}
+          {families.length > 0 && (
+            <View style={styles.familySelector}>
+              <Text style={[styles.familySelectorLabel, { color: colors.textSecondary }]}>Famille active</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.familyChipsContainer}>
+                {families.map((family, index) => (
+                  <TouchableOpacity
+                    key={family.id}
+                    style={[
+                      styles.familyChip,
+                      {
+                        backgroundColor: selectedFamilyIndex === index ? colors.tint : colors.secondaryCardBackground,
+                        borderColor: selectedFamilyIndex === index ? colors.tint : 'transparent',
+                      },
+                    ]}
+                    onPress={() => setSelectedFamilyIndex(index)}
+                  >
+                    <Text style={[styles.familyChipText, { color: selectedFamilyIndex === index ? '#fff' : colors.text }]}>
+                      {family.name || `Famille ${index + 1}`}
+                    </Text>
+                    <Text style={[styles.familyChipCode, { color: selectedFamilyIndex === index ? 'rgba(255,255,255,0.8)' : colors.textSecondary }]}>
+                      Code: {family.code}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Summary Cards */}
           <View style={styles.summarySection}>
@@ -249,6 +314,35 @@ const styles = StyleSheet.create({
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  familySelector: {
+    marginBottom: V_SPACING.large,
+  },
+  familySelectorLabel: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+    marginBottom: V_SPACING.tiny,
+  },
+  familyChipsContainer: {
+    flexDirection: 'row',
+    gap: SPACING.small,
+  },
+  familyChip: {
+    paddingVertical: vs(10),
+    paddingHorizontal: SPACING.large,
+    borderRadius: BORDER_RADIUS.large,
+    borderWidth: 2,
+    minWidth: hs(120),
+    marginRight: SPACING.small,
+  },
+  familyChipText: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
+  },
+  familyChipCode: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+    marginTop: V_SPACING.tiny,
   },
   settingsButton: {
     paddingHorizontal: SPACING.regular,

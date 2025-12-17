@@ -2,12 +2,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs, wp } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
-import { auth, db, getUserFamily } from '../../constants/firebase';
+import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { auth, db, getUserFamilies } from '../../constants/firebase';
 
 export default function MessageScreen() {
   const router = useRouter();
@@ -22,58 +22,77 @@ export default function MessageScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
-  const fetchConversations = useCallback(async () => {
+  useEffect(() => {
     const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
-    const uid = currentUser.uid;
-    try {
-      const userFamily = await getUserFamily(uid);
-      
-      if (userFamily?.id) {
-        const membersQuery = query(
-          collection(db, 'users'),
-          where('familyId', '==', userFamily.id)
-        );
-        const membersSnapshot = await getDocs(membersQuery);
-        const members = membersSnapshot.docs
-          .map(doc => ({ uid: doc.id, ...doc.data() }))
-          .filter((member: any) => member.uid !== uid);
-        
-        setFamilyMembers(members);
-
-        const messagesQuery = query(
-          collection(db, 'conversations'),
-          where('familyId', '==', userFamily.id),
-          where('participants', 'array-contains', uid),
-          orderBy('lastMessageTime', 'desc')
-        );
-        
-        const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-          const convs = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setConversations(convs);
-        });
-
-        return unsubscribe;
-      }
-    } catch (error) {
-      console.error("Error fetching conversations:", error);
+    if (!currentUser) {
+      router.replace('/(auth)/LoginScreen');
+      return;
     }
-  }, []);
+    setUser(currentUser);
+    const uid = currentUser.uid;
 
-  useFocusEffect(
-    useCallback(() => {
-      const unsubscribe = fetchConversations();
-      return () => {
-        if (unsubscribe && typeof unsubscribe.then === 'function') {
-          unsubscribe.then((unsub: any) => unsub && unsub());
+    const unsubUser = onSnapshot(doc(db, 'users', uid), (doc) => {
+      if (doc.exists()) {
+        setFirstName(doc.data().firstName || 'Utilisateur');
+      }
+    });
+
+    let unsubConversations = () => {};
+    let unsubMembers = () => {};
+
+    const setupListeners = async () => {
+        setLoading(true);
+        try {
+            const userFamilies = await getUserFamilies(uid);
+            if (userFamilies && userFamilies.length > 0) {
+                const allMemberIds = userFamilies.flatMap(f => f.members || []);
+                const uniqueMemberIds = [...new Set(allMemberIds)].filter(id => id !== uid);
+
+                if (uniqueMemberIds.length > 0) {
+                    const membersQuery = query(collection(db, 'users'), where('__name__', 'in', uniqueMemberIds));
+                    unsubMembers = onSnapshot(membersQuery, (snapshot) => {
+                        const members = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+                        setFamilyMembers(members);
+                    });
+                } else {
+                    setFamilyMembers([]);
+                }
+                
+                const familyIds = userFamilies.map(f => f.id);
+                // Listen to conversations from all families
+                const conversationsQuery = query(
+                    collection(db, 'conversations'),
+                    where('familyId', 'in', familyIds),
+                    where('participants', 'array-contains', uid),
+                    orderBy('lastMessageTime', 'desc')
+                );
+                unsubConversations = onSnapshot(conversationsQuery, (snapshot) => {
+                    const convs = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    setConversations(convs);
+                    setLoading(false);
+                });
+            } else {
+                setLoading(false);
+                setFamilyMembers([]);
+                setConversations([]);
+            }
+        } catch (error) {
+            console.error("Error setting up listeners:", error);
+            setLoading(false);
         }
-      };
-    }, [fetchConversations])
-  );
+    };
+
+    setupListeners();
+
+    return () => {
+      unsubUser();
+      unsubConversations();
+      unsubMembers();
+    };
+  }, [router]);
 
   useEffect(() => {
     if (user?.uid) {
@@ -86,41 +105,11 @@ export default function MessageScreen() {
 
   useEffect(() => {
     if (user?.uid) {
-      const membersWithConversation = new Set(
-        conversations.map(conv => conv.participants.find((p: string) => p !== user.uid)).filter(Boolean)
-      );
-      const membersWithout = familyMembers.filter(member => !membersWithConversation.has(member.uid));
-      setMembersWithoutConversation(membersWithout);
+      // Dans cette vue, on doit pouvoir choisir n'importe quel membre de la famille pour démarrer une conversation
+      // On synchronise donc directement avec la liste des membres disponibles (hors soi-même déjà filtré en amont)
+      setMembersWithoutConversation(familyMembers);
     }
-  }, [conversations, familyMembers, user]);
-
-  useEffect(() => {
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      setUser(currentUser);
-      const uid = currentUser.uid;
-
-      const fetchData = async () => {
-        try {
-          const userDocRef = doc(db, 'users', uid);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            setFirstName(userDocSnap.data().firstName || 'Utilisateur');
-          }
-
-          await fetchConversations();
-        } catch (error) {
-          console.error("Error fetching data:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchData();
-    } else {
-      router.replace('/(auth)/LoginScreen');
-    }
-  }, [router, fetchConversations]);
+  }, [familyMembers, user]);
 
   const handleNewMessage = () => {
     setIsModalVisible(true);
@@ -167,7 +156,7 @@ export default function MessageScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.tint }]}>Messages</Text>
           <View style={styles.headerButtons}>
-                      {membersWithoutConversation.length > 0 && (
+                      {familyMembers.length > 0 && (
                         <TouchableOpacity 
                           style={[styles.addButton, { backgroundColor: colors.primaryButton }]}
                           onPress={handleNewMessage}
