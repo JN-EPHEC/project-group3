@@ -9,7 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
 
-const PRO_COLOR = 'rgb(255, 206, 176)'; // Couleur principale pour les professionnels
+const PRO_COLOR = '#FFCEB0'; // Professional accent color (salmon/peach)
 
 export default function ProAgendaScreen() {
   const router = useRouter();

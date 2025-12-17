@@ -9,8 +9,20 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, signOut } from '../../constants/firebase';
 
-const PRO_COLOR = '#2E5C6E'; // Teal/Blue accent color matching parent design
-const PRO_SECONDARY = 'rgb(255, 206, 176)'; // Secondary accent
+const PRO_COLOR = '#FFCEB0'; // Professional accent color (salmon/peach)
+const PRO_SECONDARY = '#FFCEB0'; // Secondary accent
+
+interface ClientContact {
+  uid: string;
+  firstName: string;
+  lastName?: string;
+  email: string;
+  familyId?: string;
+  familyName?: string;
+  lastContact?: Date;
+  hasUpcomingEvent?: boolean;
+  lastEventDate?: any;
+}
 
 interface ClientFamily {
   familyId: string;
@@ -70,6 +82,7 @@ export default function ProHomeScreen() {
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [families, setFamilies] = useState<any[]>([]);
   const [clientFamilies, setClientFamilies] = useState<ClientFamily[]>([]);
+  const [clientContacts, setClientContacts] = useState<ClientContact[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -136,6 +149,7 @@ export default function ProHomeScreen() {
         setFamilyMembers([]);
         setMessages([]);
         setClientFamilies([]);
+        setClientContacts([]);
         return;
     };
     const uid = currentUser.uid;
@@ -177,43 +191,55 @@ export default function ProHomeScreen() {
     }
 
     const familyIds = families.map(f => f.id);
+    
+    // Fetch ALL conversations with this professional (to get all contacts)
     const conversationsQuery = query(
         collection(db, 'conversations'),
-        where('familyId', 'in', familyIds),
         where('participants', 'array-contains', uid),
         orderBy('lastMessageTime', 'desc')
     );
-    const unsubConversations = onSnapshot(conversationsQuery, (snapshot) => {
+    
+    const unsubConversations = onSnapshot(conversationsQuery, async (snapshot) => {
         const conversations: ConversationData[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         let totalUnread = 0;
-        Promise.all(
-            conversations.map(async (conv): Promise<MessageData | null> => {
+        let contactsFromConversations: ClientContact[] = [];
+        
+        await Promise.all(
+            conversations.map(async (conv): Promise<void> => {
               const otherUserId = conv.participants?.find((p: string) => p !== uid);
-              if (!otherUserId) return null;
+              if (!otherUserId) return;
 
               const userDocRef = doc(db, 'users', otherUserId);
               const userDocSnap = await getDoc(userDocRef);
-              const otherUserName = userDocSnap.exists() ? userDocSnap.data().firstName : 'Utilisateur';
-              const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
-
-              totalUnread += unreadCount;
-
-              if (unreadCount > 0) {
-                return { 
-                  id: conv.id,
-                  otherUserName, 
-                  otherUserId, 
-                  unreadCount,
-                  lastMessage: conv.lastMessage || ''
-                };
+              
+              if (userDocSnap.exists()) {
+                const userData = userDocSnap.data();
+                const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
+                totalUnread += unreadCount;
+                
+                // Add to contacts if they're a parent
+                if (userData.roles?.includes('parent')) {
+                  contactsFromConversations.push({
+                    uid: otherUserId,
+                    firstName: userData.firstName || 'Utilisateur',
+                    lastName: userData.lastName || '',
+                    email: userData.email || '',
+                    familyId: conv.familyId,
+                    lastContact: conv.lastMessageTime?.toDate()
+                  });
+                }
               }
-              return null;
             })
-        ).then(conversationsWithDetails => {
-            setMessages(conversationsWithDetails.filter((c): c is MessageData => c !== null));
-            setUnreadCount(totalUnread);
-        });
+        );
+
+        // Remove duplicates and merge with family data
+        const uniqueContacts = Array.from(
+          new Map(contactsFromConversations.map(c => [c.uid, c])).values()
+        );
+
+        setClientContacts(uniqueContacts);
+        setUnreadCount(totalUnread);
     });
 
     return () => {
@@ -296,66 +322,52 @@ export default function ProHomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: PRO_COLOR }]}>Gestion des Clients</Text>
-              <TouchableOpacity onPress={() => router.push('/Message')}>
-                <Text style={[styles.viewAllLink, { color: PRO_COLOR }]}>Tout voir →</Text>
-              </TouchableOpacity>
+              {clientContacts.length > 6 && (
+                <TouchableOpacity onPress={() => router.push('/(pro-tabs)/Message')}>
+                  <Text style={[styles.viewAllLink, { color: PRO_COLOR }]}>Tout voir →</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
-            {clientFamilies.length > 0 ? (
-              clientFamilies.slice(0, 4).map((family) => (
-                <View 
-                  key={family.familyId}
-                  style={[styles.familyCard, { backgroundColor: colors.cardBackground }]}
+            {clientContacts.length > 0 ? (
+              clientContacts.slice(0, 6).map((contact) => (
+                <TouchableOpacity
+                  key={contact.uid}
+                  style={[styles.contactCard, { backgroundColor: colors.cardBackground }]}
+                  onPress={() => router.push({
+                    pathname: '/conversation',
+                    params: {
+                      otherUserId: contact.uid,
+                      otherUserName: `${contact.firstName} ${contact.lastName}`
+                    }
+                  })}
                 >
-                  <View style={styles.familyHeader}>
-                    <View style={[styles.familyIconCircle, { backgroundColor: PRO_COLOR + '15' }]}>
-                      <IconSymbol name="house.fill" size={20} color={PRO_COLOR} />
-                    </View>
-                    <View style={styles.familyInfo}>
-                      <Text style={[styles.familyName, { color: colors.text }]}>{family.familyName}</Text>
-                      <Text style={[styles.familyId, { color: colors.textSecondary }]}>
-                        ID: {family.familyId.substring(0, 8)}...
+                  <View style={[styles.contactAvatar, { backgroundColor: PRO_COLOR + '30' }]}>
+                    <Text style={[styles.contactInitial, { color: PRO_COLOR }]}>
+                      {contact.firstName.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.contactDetails}>
+                    <Text style={[styles.contactName, { color: colors.text }]}>
+                      {contact.firstName} {contact.lastName}
+                    </Text>
+                    <Text style={[styles.contactEmail, { color: colors.textSecondary }]}>
+                      {contact.email}
+                    </Text>
+                    {contact.lastContact && (
+                      <Text style={[styles.contactDate, { color: colors.textTertiary }]}>
+                        Dernier contact: {contact.lastContact.toLocaleDateString('fr-FR')}
                       </Text>
-                    </View>
+                    )}
                   </View>
-                  
-                  <View style={styles.parentsContainer}>
-                    {family.parents.map((parent, idx) => (
-                      <TouchableOpacity
-                        key={parent.uid}
-                        style={styles.parentRow}
-                        onPress={() => router.push({
-                          pathname: '/conversation',
-                          params: {
-                            otherUserId: parent.uid,
-                            otherUserName: `${parent.firstName} ${parent.lastName}`
-                          }
-                        })}
-                      >
-                        <View style={[styles.parentAvatar, { backgroundColor: PRO_COLOR + '30' }]}>
-                          <Text style={[styles.parentInitial, { color: PRO_COLOR }]}>
-                            {parent.firstName.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                        <View style={styles.parentDetails}>
-                          <Text style={[styles.parentName, { color: colors.text }]}>
-                            {parent.firstName} {parent.lastName}
-                          </Text>
-                          <Text style={[styles.parentEmail, { color: colors.textSecondary }]}>
-                            {parent.email}
-                          </Text>
-                        </View>
-                        <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
+                  <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
               ))
             ) : (
               <View style={[styles.emptyCard, { backgroundColor: colors.cardBackground }]}>
                 <IconSymbol name="person.2" size={48} color={colors.textSecondary} />
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  Aucune famille cliente pour le moment
+                  Aucun contact pour le moment
                 </Text>
               </View>
             )}
@@ -364,10 +376,7 @@ export default function ProHomeScreen() {
           {/* Upcoming Events Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: PRO_COLOR }]}>Prochains Évènements</Text>
-              <TouchableOpacity onPress={() => router.push('/Agenda')}>
-                <Text style={[styles.viewAllLink, { color: PRO_COLOR }]}>Agenda →</Text>
-              </TouchableOpacity>
+              <Text style={[styles.sectionTitle, { color: PRO_COLOR }]}>Prochains rendez-vous ({events.length})</Text>
             </View>
 
             {displayedEvents.length > 0 ? (
@@ -411,13 +420,13 @@ export default function ProHomeScreen() {
                     <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
                   </TouchableOpacity>
                 ))}
-                {events.length > 3 && (
+                {events.length > 0 && (
                   <TouchableOpacity 
                     style={[styles.seeMoreButton, { backgroundColor: colors.secondaryCardBackground }]}
                     onPress={() => setShowAllEvents(!showAllEvents)}
                   >
                     <Text style={[styles.seeMoreText, { color: PRO_COLOR }]}>
-                      {showAllEvents ? 'Voir moins' : 'Voir plus'}
+                      {showAllEvents ? 'Voir moins' : `Voir les ${events.length} évènements`}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -436,9 +445,6 @@ export default function ProHomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: PRO_COLOR }]}>Messagerie</Text>
-              <TouchableOpacity onPress={() => router.push('/Message')}>
-                <Text style={[styles.viewAllLink, { color: PRO_COLOR }]}>Messages →</Text>
-              </TouchableOpacity>
             </View>
 
             {messages.length > 0 ? (
@@ -589,6 +595,48 @@ const styles = StyleSheet.create({
     shadowRadius: hs(8),
     elevation: 2,
   },
+  
+  // Contact Card (simplified client card)
+  contactCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.large,
+    padding: SPACING.large,
+    marginBottom: V_SPACING.medium,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: vs(2) },
+    shadowRadius: hs(8),
+    elevation: 2,
+  },
+  contactAvatar: {
+    width: hs(44),
+    height: hs(44),
+    borderRadius: hs(22),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.medium,
+  },
+  contactInitial: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
+  },
+  contactDetails: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+    marginBottom: V_SPACING.tiny,
+  },
+  contactEmail: {
+    fontSize: FONT_SIZES.small,
+    marginBottom: V_SPACING.tiny,
+  },
+  contactDate: {
+    fontSize: FONT_SIZES.small,
+  },
+  
   familyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
