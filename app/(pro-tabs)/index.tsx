@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, signOut } from '../../constants/firebase';
@@ -122,24 +122,68 @@ export default function ProHomeScreen() {
   }, [router]);
 
   useEffect(() => {
-    if (families.length === 0) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
 
-    const familyIds = families.map(f => f.id);
-    const eventsQuery = query(
+    // Si pas de familles, on cherche tout de même les événements personnels (userId)
+    if (families.length === 0) {
+      const personalEventsQuery = query(
         collection(db, 'events'),
-        where('familyId', 'in', familyIds),
+        where('userId', '==', currentUser.uid),
         orderBy('date', 'asc')
-    );
-    const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
+      );
+      const unsub = onSnapshot(personalEventsQuery, (snapshot) => {
         const now = new Date();
         const fetchedEvents: EventData[] = snapshot.docs
-            .map(d => ({ id: d.id, ...d.data() } as EventData))
-            .filter((event) => event.date?.toDate() >= now)
-            .sort((a, b) => (a.date?.toDate() || 0) - (b.date?.toDate() || 0));
+          .map(d => ({ id: d.id, ...d.data() } as EventData))
+          .filter((event) => event.date?.toDate() >= now)
+          .sort((a, b) => (a.date?.toDate() || 0) - (b.date?.toDate() || 0));
         setEvents(fetchedEvents);
+      });
+      return () => unsub();
+    }
+
+    const familyIds = families.map(f => f.id);
+
+    // Deux sources : événements familiaux et événements personnels (userId)
+    const familyEventsQuery = query(
+      collection(db, 'events'),
+      where('familyId', 'in', familyIds),
+      orderBy('date', 'asc')
+    );
+
+    const personalEventsQuery = query(
+      collection(db, 'events'),
+      where('userId', '==', currentUser.uid),
+      orderBy('date', 'asc')
+    );
+
+    let familyEvents: EventData[] = [];
+    let personalEvents: EventData[] = [];
+
+    const now = new Date();
+
+    const mergeAndSet = () => {
+      const combined = [...familyEvents, ...personalEvents]
+        .filter((event) => event.date?.toDate() >= now)
+        .sort((a, b) => (a.date?.toDate() || 0) - (b.date?.toDate() || 0));
+      setEvents(combined);
+    };
+
+    const unsubFamily = onSnapshot(familyEventsQuery, (snapshot) => {
+      familyEvents = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventData));
+      mergeAndSet();
     });
 
-    return () => unsubEvents();
+    const unsubPersonal = onSnapshot(personalEventsQuery, (snapshot) => {
+      personalEvents = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventData));
+      mergeAndSet();
+    });
+
+    return () => {
+      unsubFamily();
+      unsubPersonal();
+    };
   }, [families]);
 
   // Fetch client families grouped by family
@@ -190,13 +234,11 @@ export default function ProHomeScreen() {
         setClientFamilies([]);
     }
 
-    const familyIds = families.map(f => f.id);
-    
-    // Fetch ALL conversations with this professional (to get all contacts)
+    // Conversations pro : deux sources (familyId ou professionalId)
     const conversationsQuery = query(
-        collection(db, 'conversations'),
-        where('participants', 'array-contains', uid),
-        orderBy('lastMessageTime', 'desc')
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', uid),
+      orderBy('lastMessageTime', 'desc')
     );
     
     const unsubConversations = onSnapshot(conversationsQuery, async (snapshot) => {
@@ -204,42 +246,68 @@ export default function ProHomeScreen() {
         
         let totalUnread = 0;
         let contactsFromConversations: ClientContact[] = [];
-        
-        await Promise.all(
-            conversations.map(async (conv): Promise<void> => {
-              const otherUserId = conv.participants?.find((p: string) => p !== uid);
-              if (!otherUserId) return;
+        const participantIds = new Set<string>();
+        const unreadMessages: MessageData[] = [];
 
-              const userDocRef = doc(db, 'users', otherUserId);
-              const userDocSnap = await getDoc(userDocRef);
-              
-              if (userDocSnap.exists()) {
-                const userData = userDocSnap.data();
-                const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
-                totalUnread += unreadCount;
-                
-                // Add to contacts if they're a parent
-                if (userData.roles?.includes('parent')) {
-                  contactsFromConversations.push({
-                    uid: otherUserId,
-                    firstName: userData.firstName || 'Utilisateur',
-                    lastName: userData.lastName || '',
-                    email: userData.email || '',
-                    familyId: conv.familyId,
-                    lastContact: conv.lastMessageTime?.toDate()
-                  });
-                }
-              }
-            })
-        );
+        // Collect participant ids (parents) pour un fetch en batch
+        conversations.forEach(conv => {
+          conv.participants?.forEach((p: string) => {
+            if (p !== uid) participantIds.add(p);
+          });
+        });
 
-        // Remove duplicates and merge with family data
-        const uniqueContacts = Array.from(
-          new Map(contactsFromConversations.map(c => [c.uid, c])).values()
-        );
+        let participantsData: Record<string, any> = {};
+        if (participantIds.size > 0) {
+          const ids = Array.from(participantIds);
+          const usersQuery = query(collection(db, 'users'), where('__name__', 'in', ids));
+          const usersSnap = await getDocs(usersQuery);
+          usersSnap.docs.forEach((d: any) => {
+            participantsData[d.id] = d.data();
+          });
+        }
 
+        conversations.forEach((conv) => {
+          const otherUserId = conv.participants?.find((p: string) => p !== uid);
+          if (!otherUserId) return;
+
+          const userData = participantsData[otherUserId];
+          const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
+          totalUnread += unreadCount;
+
+          // Infos parent depuis userData ou fallback conv
+          const firstName = userData?.firstName || conv.parentFirstName || 'Parent';
+          const lastName = userData?.lastName || conv.parentLastName || '';
+          const email = userData?.email || '';
+          const displayName = `${firstName} ${lastName}`.trim();
+
+          // Ajouter le contact s'il s'agit d'un parent
+          if ((userData?.roles && userData.roles.includes('parent')) || conv.parentId) {
+            contactsFromConversations.push({
+              uid: otherUserId,
+              firstName,
+              lastName,
+              email,
+              familyId: conv.familyId,
+              lastContact: conv.lastMessageTime?.toDate()
+            });
+          }
+
+          // Construire la liste des messages non lus pour l'encart messagerie
+          if (unreadCount > 0) {
+            unreadMessages.push({
+              id: conv.id,
+              otherUserId,
+              otherUserName: displayName || 'Parent',
+              unreadCount,
+              lastMessage: conv.lastMessage || 'Nouveau message'
+            });
+          }
+        });
+
+        const uniqueContacts = Array.from(new Map(contactsFromConversations.map(c => [c.uid, c])).values());
         setClientContacts(uniqueContacts);
         setUnreadCount(totalUnread);
+        setMessages(unreadMessages);
     });
 
     return () => {
