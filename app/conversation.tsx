@@ -9,21 +9,21 @@ import { addDoc, collection, doc, getDoc, getDocs, increment, onSnapshot, orderB
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Linking,
-  Modal,
-  Platform,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  useColorScheme
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Linking,
+    Modal,
+    Platform,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+    useColorScheme
 } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
@@ -74,44 +74,59 @@ export default function ConversationScreen() {
 
     const initConversation = async () => {
       try {
-        const userFamily = await getUserFamily(currentUser.uid);
-        if (!userFamily?.id) return;
-
         let convId = currentConversationId;
 
         if (!convId) {
-          // Chercher une conversation existante
-          const convQuery = query(
-            collection(db, 'conversations'),
-            where('familyId', '==', userFamily.id),
-            where('participants', 'array-contains', currentUser.uid)
-          );
-          const convSnapshot = await getDocs(convQuery);
+          // Cas 1: Conversation familiale (avec familyId)
+          const userFamily = await getUserFamily(currentUser.uid);
           
-          const existingConv = convSnapshot.docs.find(doc => {
-            const data = doc.data();
-            return data.participants?.includes(otherUserId);
-          });
-
-          if (existingConv) {
-            convId = existingConv.id;
-          } else {
-            // Créer une nouvelle conversation
-            const newConvRef = await addDoc(collection(db, 'conversations'), {
-              familyId: userFamily.id,
-              participants: [currentUser.uid, otherUserId],
-              createdAt: serverTimestamp(),
-              lastMessage: '',
-              lastMessageTime: serverTimestamp(),
-              unreadCount: {
-                [currentUser.uid]: 0,
-                [String(otherUserId)]: 0
-              }
+          if (userFamily?.id) {
+            const convQuery = query(
+              collection(db, 'conversations'),
+              where('familyId', '==', userFamily.id),
+              where('participants', 'array-contains', currentUser.uid)
+            );
+            const convSnapshot = await getDocs(convQuery);
+            
+            const existingConv = convSnapshot.docs.find(doc => {
+              const data = doc.data();
+              return data.participants?.includes(otherUserId);
             });
-            convId = newConvRef.id;
+
+            if (existingConv) {
+              convId = existingConv.id;
+            } else {
+              // Créer une nouvelle conversation familiale
+              const newConvRef = await addDoc(collection(db, 'conversations'), {
+                familyId: userFamily.id,
+                participants: [currentUser.uid, otherUserId],
+                createdAt: serverTimestamp(),
+                lastMessage: '',
+                lastMessageTime: serverTimestamp(),
+                unreadCount: {
+                  [currentUser.uid]: 0,
+                  [String(otherUserId)]: 0
+                }
+              });
+              convId = newConvRef.id;
+            }
+          } else {
+            // Cas 2: Conversation avec professionnel (sans familyId, avec professionalId)
+            const professionalConvQuery = query(
+              collection(db, 'conversations'),
+              where('participants', 'array-contains', currentUser.uid),
+              where('professionalId', '==', otherUserId)
+            );
+            const professionalSnapshot = await getDocs(professionalConvQuery);
+            
+            if (!professionalSnapshot.empty) {
+              convId = professionalSnapshot.docs[0].id;
+            }
           }
           
-          setCurrentConversationId(convId);
+          if (convId) {
+            setCurrentConversationId(convId);
+          }
         }
 
         // Écouter les messages
@@ -131,6 +146,8 @@ export default function ConversationScreen() {
           });
 
           return () => unsubscribe();
+        } else {
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error initializing conversation:', error);

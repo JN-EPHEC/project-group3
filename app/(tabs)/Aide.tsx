@@ -568,22 +568,46 @@ export default function AideScreen() {
         return;
       }
 
-      // Create conversation
-      const conversationRef = await addDoc(collection(db, 'conversations'), {
-        participants: [user.uid],
-        professionalId: professional.id,
-        professionalName: professional.name,
-        professionalType: professional.type,
-        createdAt: serverTimestamp(),
-        lastMessage: null,
-        lastMessageTime: null
-      });
+      // Vérifier si une conversation existe déjà entre ce parent et ce professionnel
+      const existingConvQuery = query(
+        collection(db, 'conversations'),
+        where('participants', 'array-contains', user.uid),
+        where('professionalId', '==', professional.id)
+      );
+      
+      const existingConvSnapshot = await getDocs(existingConvQuery);
+      
+      let conversationId;
+      
+      if (!existingConvSnapshot.empty) {
+        // Conversation existante trouvée
+        conversationId = existingConvSnapshot.docs[0].id;
+      } else {
+        // Créer une nouvelle conversation (propre à ce parent uniquement)
+        const conversationRef = await addDoc(collection(db, 'conversations'), {
+          participants: [user.uid],
+          professionalId: professional.id,
+          professionalName: professional.name,
+          professionalType: professional.type,
+          createdAt: serverTimestamp(),
+          lastMessage: null,
+          lastMessageTime: null
+        });
+        conversationId = conversationRef.id;
+      }
 
-      // Navigate to message
-      router.push(`/(tabs)/Message?conversationId=${conversationRef.id}&professionalName=${professional.name}`);
+      // Naviguer vers la conversation
+      router.push({
+        pathname: '/conversation',
+        params: {
+          conversationId: conversationId,
+          otherUserId: professional.id,
+          otherUserName: professional.name
+        }
+      });
     } catch (error) {
-      console.error('Error creating conversation:', error);
-      alert('Erreur lors de la création de la conversation');
+      console.error('Error handling conversation:', error);
+      alert('Erreur lors de l\'ouverture de la conversation');
     } finally {
       setLoading(false);
     }
