@@ -45,7 +45,7 @@ export default function MessageScreen() {
         try {
             const userFamilies = await getUserFamilies(uid);
             if (userFamilies && userFamilies.length > 0) {
-                const allMemberIds = userFamilies.flatMap(f => f.members || []);
+                const allMemberIds = userFamilies.flatMap((f: any) => f.members || []);
                 const uniqueMemberIds = [...new Set(allMemberIds)].filter(id => id !== uid);
 
                 if (uniqueMemberIds.length > 0) {
@@ -59,21 +59,69 @@ export default function MessageScreen() {
                 }
                 
                 const familyIds = userFamilies.map(f => f.id);
-                // Listen to conversations from all families
-                const conversationsQuery = query(
+                
+                // Charger les conversations familiales et les conversations avec professionnels
+                let unsubscribers = [];
+                
+                // 1. Conversations familiales
+                const familyConversationsQuery = query(
                     collection(db, 'conversations'),
                     where('familyId', 'in', familyIds),
                     where('participants', 'array-contains', uid),
                     orderBy('lastMessageTime', 'desc')
                 );
-                unsubConversations = onSnapshot(conversationsQuery, (snapshot) => {
-                    const convs = snapshot.docs.map(doc => ({
+                
+                // 2. Conversations avec professionnels (propres à cet utilisateur)
+                const professionalConversationsQuery = query(
+                    collection(db, 'conversations'),
+                    where('participants', 'array-contains', uid),
+                    where('professionalId', '!=', null),
+                    orderBy('lastMessageTime', 'desc')
+                );
+                
+                let familyConvs: any[] = [];
+                let professionalConvs: any[] = [];
+                
+                const unsubFamily = onSnapshot(familyConversationsQuery, (snapshot) => {
+                    familyConvs = snapshot.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
                     }));
-                    setConversations(convs);
+                    // Combiner et mettre à jour
+                    const allConvs = [...familyConvs, ...professionalConvs];
+                    setConversations(allConvs);
                     setLoading(false);
+                }, (error) => {
+                    console.error("Error fetching family conversations:", error);
+                    // Continuer avec les conversations existantes
+                    const allConvs = [...familyConvs, ...professionalConvs];
+                    if (allConvs.length > 0) {
+                        setConversations(allConvs);
+                    }
                 });
+                
+                const unsubProfessional = onSnapshot(professionalConversationsQuery, (snapshot) => {
+                    professionalConvs = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    // Combiner et mettre à jour
+                    const allConvs = [...familyConvs, ...professionalConvs];
+                    setConversations(allConvs);
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Error fetching professional conversations:", error);
+                    // Continuer avec les conversations existantes
+                    const allConvs = [...familyConvs, ...professionalConvs];
+                    if (allConvs.length > 0) {
+                        setConversations(allConvs);
+                    }
+                });
+                
+                unsubConversations = () => {
+                    unsubFamily();
+                    unsubProfessional();
+                };
             } else {
                 setLoading(false);
                 setFamilyMembers([]);
@@ -173,8 +221,24 @@ export default function MessageScreen() {
         >
           {conversations.length > 0 ? (
             conversations.map((conv: any) => {
-              const otherParticipant = conv.participants?.find((p: string) => p !== user?.uid);
-              const otherUserData = familyMembers.find((m: any) => m.uid === otherParticipant);
+              // Vérifier si c'est une conversation avec un professionnel
+              const isProfessionalConversation = conv.professionalId;
+              
+              let otherParticipant: string | undefined;
+              let displayName: string;
+              let displayImage: string | undefined;
+              
+              if (isProfessionalConversation) {
+                // Conversation avec professionnel
+                displayName = conv.professionalName || 'Professionnel';
+                // Utiliser la première lettre du nom du professionnel pour l'avatar
+              } else {
+                // Conversation familiale
+                otherParticipant = conv.participants?.find((p: string) => p !== user?.uid);
+                const otherUserData = familyMembers.find((m: any) => m.uid === otherParticipant);
+                displayName = `${otherUserData?.firstName || 'Co-parent'} ${otherUserData?.lastName || ''}`;
+                displayImage = otherUserData?.photoURL || otherUserData?.profileImage;
+              }
               
               return (
                 <TouchableOpacity 
@@ -184,25 +248,26 @@ export default function MessageScreen() {
                     pathname: '/conversation',
                     params: {
                       conversationId: conv.id,
-                      otherUserId: otherParticipant,
-                      otherUserName: `${otherUserData?.firstName || 'Co-parent'} ${otherUserData?.lastName || ''}`,
-                      otherUserPhotoURL: otherUserData?.photoURL || otherUserData?.profileImage
+                      otherUserId: isProfessionalConversation ? conv.professionalId : otherParticipant,
+                      otherUserName: displayName,
+                      otherUserPhotoURL: displayImage,
+                      isProfessionalConversation: isProfessionalConversation
                     }
                   })}
                 >
-                  {(otherUserData?.photoURL || otherUserData?.profileImage) ? (
-                    <Image source={{ uri: otherUserData.photoURL || otherUserData.profileImage }} style={styles.avatarImage} />
+                  {displayImage ? (
+                    <Image source={{ uri: displayImage }} style={styles.avatarImage} />
                   ) : (
                     <View style={[styles.avatarCircle, { backgroundColor: colors.tint }]}>
                       <Text style={styles.avatarText}>
-                        {(otherUserData?.firstName?.[0] || 'C').toUpperCase()}
+                        {(displayName?.[0] || 'C').toUpperCase()}
                       </Text>
                     </View>
                   )}
                   <View style={styles.conversationDetails}>
                     <View style={styles.conversationHeader}>
                       <Text style={[styles.conversationName, { color: colors.text }]}>
-                        {otherUserData?.firstName || 'Co-parent'} {otherUserData?.lastName || ''}
+                        {displayName}
                       </Text>
                       <Text style={[styles.messageTime, { color: colors.textTertiary }]}>
                         {formatTime(conv.lastMessageTime)}

@@ -58,7 +58,7 @@ export default function ProMessageScreen() {
         try {
             const userFamilies = await getUserFamilies(uid);
             
-            // Fetch ALL conversations with this professional (to get all contacts)
+            // Fetch ALL conversations with this professional (familial conversations + conversations from parents)
             const conversationsQuery = query(
                 collection(db, 'conversations'),
                 where('participants', 'array-contains', uid),
@@ -190,6 +190,12 @@ export default function ProMessageScreen() {
               const otherParticipant = conv.participants?.find((p: string) => p !== user?.uid);
               const otherUserData = familyMembers.find((m: any) => m.uid === otherParticipant);
               
+              // Déterminer le nom à afficher
+              let displayName = otherUserData?.firstName || 'Parent';
+              if (otherUserData?.lastName) {
+                displayName += ` ${otherUserData.lastName}`;
+              }
+              
               return (
                 <TouchableOpacity 
                   key={conv.id} 
@@ -199,7 +205,7 @@ export default function ProMessageScreen() {
                     params: {
                       conversationId: conv.id,
                       otherUserId: otherParticipant,
-                      otherUserName: `${otherUserData?.firstName || 'Co-parent'} ${otherUserData?.lastName || ''}`,
+                      otherUserName: displayName,
                       otherUserPhotoURL: otherUserData?.photoURL || otherUserData?.profileImage
                     }
                   })}
@@ -209,14 +215,14 @@ export default function ProMessageScreen() {
                   ) : (
                     <View style={[styles.avatarCircle, { backgroundColor: PRO_COLOR }]}>
                       <Text style={styles.avatarText}>
-                        {(otherUserData?.firstName?.[0] || 'C').toUpperCase()}
+                        {(displayName?.[0] || 'P').toUpperCase()}
                       </Text>
                     </View>
                   )}
                   <View style={styles.conversationDetails}>
                     <View style={styles.conversationHeader}>
                       <Text style={[styles.conversationName, { color: colors.text }]}>
-                        {otherUserData?.firstName || 'Co-parent'} {otherUserData?.lastName || ''}
+                        {displayName}
                       </Text>
                       <Text style={[styles.messageTime, { color: colors.textTertiary }]}>
                         {formatTime(conv.lastMessageTime)}
