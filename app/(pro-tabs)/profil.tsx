@@ -1,10 +1,59 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRouter } from 'expo-router';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { auth, db, signOut } from '../../constants/firebase';
 import { Colors } from '../../constants/theme';
+
+type ProfessionalType = 'avocat' | 'psychologue' | '';
+
+interface TimeSlot {
+  start: string;
+  end: string;
+  available: boolean;
+}
+
+interface DayAvailability {
+  isOpen: boolean;
+  slots: TimeSlot[];
+}
+
+interface AvailabilitySchedule {
+  lundi: DayAvailability;
+  mardi: DayAvailability;
+  mercredi: DayAvailability;
+  jeudi: DayAvailability;
+  vendredi: DayAvailability;
+  samedi: DayAvailability;
+  dimanche: DayAvailability;
+}
+
+// Default time slots for a working day
+const DEFAULT_SLOTS: TimeSlot[] = [
+  { start: '08:00', end: '09:00', available: false },
+  { start: '09:00', end: '10:00', available: true },
+  { start: '10:00', end: '11:00', available: true },
+  { start: '11:00', end: '12:00', available: true },
+  { start: '12:00', end: '13:00', available: false }, // Lunch break
+  { start: '13:00', end: '14:00', available: false },
+  { start: '14:00', end: '15:00', available: true },
+  { start: '15:00', end: '16:00', available: true },
+  { start: '16:00', end: '17:00', available: true },
+  { start: '17:00', end: '18:00', available: true },
+  { start: '18:00', end: '19:00', available: false },
+  { start: '19:00', end: '20:00', available: false },
+];
+
+const DEFAULT_AVAILABILITY: AvailabilitySchedule = {
+  lundi: { isOpen: true, slots: DEFAULT_SLOTS },
+  mardi: { isOpen: true, slots: DEFAULT_SLOTS },
+  mercredi: { isOpen: true, slots: DEFAULT_SLOTS },
+  jeudi: { isOpen: true, slots: DEFAULT_SLOTS },
+  vendredi: { isOpen: true, slots: DEFAULT_SLOTS },
+  samedi: { isOpen: false, slots: [] },
+  dimanche: { isOpen: false, slots: [] },
+};
 
 export default function ProProfilScreen() {
   const router = useRouter();
@@ -14,6 +63,28 @@ export default function ProProfilScreen() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // Professional-specific fields
+  const [professionalType, setProfessionalType] = useState<ProfessionalType>('');
+  const [address, setAddress] = useState('');
+  const [phone, setPhone] = useState('');
+  const [specialty, setSpecialty] = useState('');
+  const [description, setDescription] = useState('');
+  const [availability, setAvailability] = useState<AvailabilitySchedule>(DEFAULT_AVAILABILITY);
+  
+  // Edit modal states
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editField, setEditField] = useState<'name' | 'contact' | 'description' | 'availability' | 'type'>('name');
+  const [tempFirstName, setTempFirstName] = useState('');
+  const [tempLastName, setTempLastName] = useState('');
+  const [tempAddress, setTempAddress] = useState('');
+  const [tempPhone, setTempPhone] = useState('');
+  const [tempSpecialty, setTempSpecialty] = useState('');
+  const [tempDescription, setTempDescription] = useState('');
+  const [tempAvailability, setTempAvailability] = useState<AvailabilitySchedule>(DEFAULT_AVAILABILITY);
+  const [tempProfessionalType, setTempProfessionalType] = useState<ProfessionalType>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<keyof AvailabilitySchedule>('lundi');
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -23,11 +94,40 @@ export default function ProProfilScreen() {
 
       const fetchData = async () => {
         try {
+          // Get user basic info
           const userDocRef = doc(db, 'users', uid);
           const userDocSnap = await getDoc(userDocRef);
           if (userDocSnap.exists()) {
-            setFirstName(userDocSnap.data().firstName || 'Professionnel');
-            setLastName(userDocSnap.data().lastName || '');
+            const userData = userDocSnap.data();
+            setFirstName(userData.firstName || 'Professionnel');
+            setLastName(userData.lastName || '');
+          }
+          
+          // Get professional profile
+          const professionalDocRef = doc(db, 'professionals', uid);
+          const professionalDocSnap = await getDoc(professionalDocRef);
+          if (professionalDocSnap.exists()) {
+            const profData = professionalDocSnap.data();
+            setProfessionalType(profData.type || '');
+            setAddress(profData.address || '');
+            setPhone(profData.phone || '');
+            setSpecialty(profData.specialty || '');
+            setDescription(profData.description || '');
+            
+            // Handle availability - support both old (string) and new (object) format
+            if (profData.availability) {
+              // Check if it's the old format (strings) or new format (objects)
+              const firstDay = profData.availability.lundi;
+              if (typeof firstDay === 'string') {
+                // Old format - convert to new format
+                setAvailability(DEFAULT_AVAILABILITY);
+              } else if (firstDay && typeof firstDay === 'object' && 'isOpen' in firstDay) {
+                // New format - use as is
+                setAvailability(profData.availability);
+              } else {
+                setAvailability(DEFAULT_AVAILABILITY);
+              }
+            }
           }
         } catch (error) {
           console.error("Error fetching data:", error);
@@ -51,6 +151,93 @@ export default function ProProfilScreen() {
     }
   };
 
+  const openEditModal = (field: 'name' | 'contact' | 'description' | 'availability' | 'type') => {
+    setEditField(field);
+    setTempFirstName(firstName);
+    setTempLastName(lastName);
+    setTempAddress(address);
+    setTempPhone(phone);
+    setTempSpecialty(specialty);
+    setTempDescription(description);
+    setTempAvailability(availability);
+    setTempProfessionalType(professionalType);
+    setIsEditModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    setIsSaving(true);
+    try {
+      const uid = currentUser.uid;
+      
+      // Update user basic info
+      if (editField === 'name') {
+        const userDocRef = doc(db, 'users', uid);
+        await setDoc(userDocRef, {
+          firstName: tempFirstName,
+          lastName: tempLastName
+        }, { merge: true });
+        setFirstName(tempFirstName);
+        setLastName(tempLastName);
+      }
+      
+      // Update professional profile
+      const professionalDocRef = doc(db, 'professionals', uid);
+      const updateData: any = {
+        userId: uid,
+        email: currentUser.email,
+        firstName: editField === 'name' ? tempFirstName : firstName,
+        lastName: editField === 'name' ? tempLastName : lastName,
+      };
+
+      if (editField === 'contact') {
+        updateData.address = tempAddress;
+        updateData.phone = tempPhone;
+        updateData.specialty = tempSpecialty;
+        setAddress(tempAddress);
+        setPhone(tempPhone);
+        setSpecialty(tempSpecialty);
+      } else if (editField === 'description') {
+        updateData.description = tempDescription;
+        setDescription(tempDescription);
+      } else if (editField === 'availability') {
+        updateData.availability = tempAvailability;
+        setAvailability(tempAvailability);
+      } else if (editField === 'type') {
+        updateData.type = tempProfessionalType;
+        setProfessionalType(tempProfessionalType);
+      }
+      
+      // Always include current values for fields not being edited
+      if (editField !== 'contact') {
+        updateData.address = address;
+        updateData.phone = phone;
+        updateData.specialty = specialty;
+      }
+      if (editField !== 'description') {
+        updateData.description = description;
+      }
+      if (editField !== 'availability') {
+        updateData.availability = availability;
+      }
+      if (editField !== 'type') {
+        updateData.type = professionalType;
+      }
+
+      await setDoc(professionalDocRef, updateData, { merge: true });
+      
+      setIsEditModalVisible(false);
+      Alert.alert('Succès', 'Votre profil a été mis à jour');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour le profil');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -66,11 +253,24 @@ export default function ProProfilScreen() {
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.tint }]}>Profil</Text>
+            <Text style={[styles.title, { color: colors.tint }]}>Profil Professionnel</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+              Cliquez sur l'icône crayon pour modifier vos informations
+            </Text>
           </View>
 
           <View style={styles.userInfoSection}>
             <Text style={[styles.name, { color: colors.text }]}>{firstName} {lastName}</Text>
+            {professionalType && (
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                {professionalType === 'avocat' ? 'Avocat' : 'Psychologue'}
+              </Text>
+            )}
+            {!professionalType && (
+              <Text style={[styles.warningText, { color: '#FF6B6B' }]}>
+                ⚠️ Définissez votre type de professionnel pour apparaître dans les recherches
+              </Text>
+            )}
           </View>
 
           <View style={styles.avatarSection}>
@@ -79,8 +279,42 @@ export default function ProProfilScreen() {
             </View>
           </View>
 
+          {/* Type de professionnel */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.tint }]}>Informations du compte</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Type de professionnel</Text>
+              <TouchableOpacity 
+                onPress={() => openEditModal('type')}
+                style={[styles.editButton, { backgroundColor: colors.tint }]}
+              >
+                <IconSymbol name="pencil" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              <View style={styles.infoRow}>
+                <IconSymbol name="briefcase" size={20} color={colors.textSecondary} />
+                <View style={styles.infoText}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Profession</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>
+                    {professionalType === 'avocat' ? 'Avocat' : professionalType === 'psychologue' ? 'Psychologue' : 'Non défini'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Informations personnelles */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Informations personnelles</Text>
+              <TouchableOpacity 
+                onPress={() => openEditModal('name')}
+                style={[styles.editButton, { backgroundColor: colors.tint }]}
+              >
+                <IconSymbol name="pencil" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
             
             <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
               <View style={styles.infoRow}>
@@ -103,12 +337,380 @@ export default function ProProfilScreen() {
             </View>
           </View>
 
+          {/* Coordonnées professionnelles */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Coordonnées professionnelles</Text>
+              <TouchableOpacity 
+                onPress={() => openEditModal('contact')}
+                style={[styles.editButton, { backgroundColor: colors.tint }]}
+              >
+                <IconSymbol name="pencil" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              <View style={styles.infoRow}>
+                <IconSymbol name="mappin" size={20} color={colors.textSecondary} />
+                <View style={styles.infoText}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Adresse</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>{address || 'Non renseignée'}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              <View style={styles.infoRow}>
+                <IconSymbol name="phone" size={20} color={colors.textSecondary} />
+                <View style={styles.infoText}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Téléphone</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>{phone || 'Non renseigné'}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              <View style={styles.infoRow}>
+                <IconSymbol name="star" size={20} color={colors.textSecondary} />
+                <View style={styles.infoText}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Spécialité</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>{specialty || 'Non renseignée'}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Description */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Description</Text>
+              <TouchableOpacity 
+                onPress={() => openEditModal('description')}
+                style={[styles.editButton, { backgroundColor: colors.tint }]}
+              >
+                <IconSymbol name="pencil" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.descriptionText, { color: colors.text }]}>
+                {description || 'Aucune description'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Disponibilités */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Disponibilités</Text>
+              <TouchableOpacity 
+                onPress={() => openEditModal('availability')}
+                style={[styles.editButton, { backgroundColor: colors.tint }]}
+              >
+                <IconSymbol name="pencil" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              {Object.entries(availability).map(([day, dayData]) => {
+                const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                const availableSlots = dayData.isOpen 
+                  ? dayData.slots.filter(slot => slot.available)
+                  : [];
+                
+                return (
+                  <View key={day} style={styles.availabilityRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.dayText, { color: colors.text, fontWeight: '600' }]}>
+                        {dayName}
+                      </Text>
+                      {!dayData.isOpen ? (
+                        <Text style={[styles.slotText, { color: colors.textSecondary, fontStyle: 'italic' }]}>
+                          Fermé
+                        </Text>
+                      ) : availableSlots.length === 0 ? (
+                        <Text style={[styles.slotText, { color: colors.textSecondary, fontStyle: 'italic' }]}>
+                          Aucun créneau disponible
+                        </Text>
+                      ) : (
+                        <View style={styles.slotsContainer}>
+                          {availableSlots.map((slot, idx) => (
+                            <View key={idx} style={[styles.slotChip, { backgroundColor: colors.tint + '20', borderColor: colors.tint }]}>
+                              <Text style={[styles.slotText, { color: colors.tint }]}>
+                                {slot.start} - {slot.end}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <IconSymbol name="arrow.right.square" size={20} color="#fff" />
             <Text style={styles.logoutText}>Se déconnecter</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Edit Modal */}
+      <Modal
+        visible={isEditModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                {editField === 'name' && 'Modifier le nom'}
+                {editField === 'contact' && 'Modifier les coordonnées'}
+                {editField === 'description' && 'Modifier la description'}
+                {editField === 'availability' && 'Modifier les disponibilités'}
+                {editField === 'type' && 'Modifier le type'}
+              </Text>
+              <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
+                <IconSymbol name="xmark" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              {editField === 'name' && (
+                <>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Prénom</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.background, color: colors.text }]}
+                    value={tempFirstName}
+                    onChangeText={setTempFirstName}
+                    placeholder="Prénom"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Nom</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.background, color: colors.text }]}
+                    value={tempLastName}
+                    onChangeText={setTempLastName}
+                    placeholder="Nom"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </>
+              )}
+
+              {editField === 'type' && (
+                <>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Type de professionnel</Text>
+                  <TouchableOpacity
+                    style={[styles.typeButton, { 
+                      backgroundColor: tempProfessionalType === 'avocat' ? colors.tint : colors.background,
+                      borderColor: colors.border,
+                      borderWidth: 1
+                    }]}
+                    onPress={() => setTempProfessionalType('avocat')}
+                  >
+                    <IconSymbol name="doc.text" size={24} color={tempProfessionalType === 'avocat' ? '#fff' : colors.text} />
+                    <Text style={[styles.typeButtonText, { 
+                      color: tempProfessionalType === 'avocat' ? '#fff' : colors.text 
+                    }]}>
+                      Avocat
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.typeButton, { 
+                      backgroundColor: tempProfessionalType === 'psychologue' ? colors.tint : colors.background,
+                      borderColor: colors.border,
+                      borderWidth: 1
+                    }]}
+                    onPress={() => setTempProfessionalType('psychologue')}
+                  >
+                    <IconSymbol name="person.fill" size={24} color={tempProfessionalType === 'psychologue' ? '#fff' : colors.text} />
+                    <Text style={[styles.typeButtonText, { 
+                      color: tempProfessionalType === 'psychologue' ? '#fff' : colors.text 
+                    }]}>
+                      Psychologue
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {editField === 'contact' && (
+                <>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Adresse</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.background, color: colors.text }]}
+                    value={tempAddress}
+                    onChangeText={setTempAddress}
+                    placeholder="Ville, Code postal"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Téléphone</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.background, color: colors.text }]}
+                    value={tempPhone}
+                    onChangeText={setTempPhone}
+                    placeholder="+33 X XX XX XX XX"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="phone-pad"
+                  />
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Spécialité</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.background, color: colors.text }]}
+                    value={tempSpecialty}
+                    onChangeText={setTempSpecialty}
+                    placeholder="Ex: Droit de la Famille"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </>
+              )}
+
+              {editField === 'description' && (
+                <>
+                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Description</Text>
+                  <TextInput
+                    style={[styles.textArea, { backgroundColor: colors.background, color: colors.text }]}
+                    value={tempDescription}
+                    onChangeText={setTempDescription}
+                    placeholder="Décrivez votre parcours et vos compétences..."
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                    numberOfLines={6}
+                    textAlignVertical="top"
+                  />
+                </>
+              )}
+
+              {editField === 'availability' && (
+                <>
+                  {/* Day selector */}
+                  <View style={styles.daySelector}>
+                    {Object.keys(tempAvailability).map((day) => (
+                      <TouchableOpacity
+                        key={day}
+                        style={[
+                          styles.dayTab,
+                          { 
+                            backgroundColor: selectedDay === day ? colors.tint : colors.background,
+                            borderColor: colors.border,
+                          }
+                        ]}
+                        onPress={() => setSelectedDay(day as keyof AvailabilitySchedule)}
+                      >
+                        <Text style={[
+                          styles.dayTabText,
+                          { color: selectedDay === day ? '#fff' : colors.text }
+                        ]}>
+                          {day.substring(0, 3).charAt(0).toUpperCase() + day.substring(1, 3)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {/* Selected day configuration */}
+                  <View style={styles.dayConfig}>
+                    <Text style={[styles.inputLabel, { color: colors.text, fontSize: 18, fontWeight: '600' }]}>
+                      {selectedDay.charAt(0).toUpperCase() + selectedDay.slice(1)}
+                    </Text>
+                    
+                    {/* Open/Closed toggle */}
+                    <View style={styles.toggleRow}>
+                      <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+                        Jour ouvert
+                      </Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.toggleButton,
+                          { backgroundColor: tempAvailability[selectedDay].isOpen ? colors.tint : colors.border }
+                        ]}
+                        onPress={() => {
+                          setTempAvailability({
+                            ...tempAvailability,
+                            [selectedDay]: {
+                              ...tempAvailability[selectedDay],
+                              isOpen: !tempAvailability[selectedDay].isOpen
+                            }
+                          });
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '600' }}>
+                          {tempAvailability[selectedDay].isOpen ? 'Ouvert' : 'Fermé'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Time slots */}
+                    {tempAvailability[selectedDay].isOpen && (
+                      <>
+                        <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 16 }]}>
+                          Créneaux horaires disponibles
+                        </Text>
+                        <ScrollView style={{ maxHeight: 200 }}>
+                          {tempAvailability[selectedDay].slots.map((slot, index) => (
+                            <TouchableOpacity
+                              key={index}
+                              style={[
+                                styles.slotRow,
+                                {
+                                  backgroundColor: slot.available ? colors.tint + '20' : colors.background,
+                                  borderColor: slot.available ? colors.tint : colors.border,
+                                }
+                              ]}
+                              onPress={() => {
+                                const newSlots = [...tempAvailability[selectedDay].slots];
+                                newSlots[index] = { ...newSlots[index], available: !newSlots[index].available };
+                                setTempAvailability({
+                                  ...tempAvailability,
+                                  [selectedDay]: {
+                                    ...tempAvailability[selectedDay],
+                                    slots: newSlots
+                                  }
+                                });
+                              }}
+                            >
+                              <Text style={[
+                                styles.slotTimeText,
+                                { color: slot.available ? colors.tint : colors.textSecondary }
+                              ]}>
+                                {slot.start} - {slot.end}
+                              </Text>
+                              {slot.available && (
+                                <IconSymbol name="checkmark.circle.fill" size={20} color={colors.tint} />
+                              )}
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </>
+                    )}
+                  </View>
+                </>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setIsEditModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
+                onPress={handleSaveProfile}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Enregistrer</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -120,17 +722,53 @@ const styles = StyleSheet.create({
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { marginBottom: 16 },
   title: { fontSize: 28, fontWeight: '700', color: '#FFCEB0' },
+  headerSubtitle: { fontSize: 14, fontWeight: '400', marginTop: 6, opacity: 0.8 },
   userInfoSection: { marginBottom: 24 },
   name: { fontSize: 24, fontWeight: '600', color: '#111' },
+  subtitle: { fontSize: 16, fontWeight: '500', marginTop: 4 },
+  warningText: { fontSize: 14, fontWeight: '500', marginTop: 8, lineHeight: 20 },
   avatarSection: { alignItems: 'center', marginBottom: 32 },
   avatarCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#FFF5EE', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 4 },
   section: { marginBottom: 28 },
-  sectionTitle: { fontSize: 22, fontWeight: '600', marginBottom: 16 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontSize: 22, fontWeight: '600' },
+  editButton: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 2 },
   infoCard: { backgroundColor: '#E8E8E8', borderRadius: 20, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 2 },
   infoRow: { flexDirection: 'row', alignItems: 'center' },
   infoText: { marginLeft: 16, flex: 1 },
   infoLabel: { fontSize: 12, color: '#666', marginBottom: 4 },
   infoValue: { fontSize: 16, fontWeight: '600', color: '#111' },
+  descriptionText: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
+  availabilityRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#ddd' },
+  dayText: { fontSize: 14, fontWeight: '500' },
+  hoursText: { fontSize: 14, fontWeight: '400' },
+  slotsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  slotChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, marginRight: 4, marginBottom: 4 },
+  slotText: { fontSize: 12, fontWeight: '500' },
+  daySelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  dayTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  dayTabText: { fontSize: 13, fontWeight: '600' },
+  dayConfig: { marginTop: 8 },
+  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  toggleButton: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
+  slotRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
+  slotTimeText: { fontSize: 15, fontWeight: '500' },
   logoutButton: { backgroundColor: '#FF6B6B', borderRadius: 20, paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 3 },
   logoutText: { color: '#fff', fontSize: 16, fontWeight: '700', marginLeft: 10 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '90%', maxHeight: '80%', borderRadius: 20, padding: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: '700' },
+  modalScroll: { maxHeight: 400 },
+  inputLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8, marginTop: 12 },
+  input: { borderRadius: 12, padding: 12, fontSize: 16, marginBottom: 8 },
+  textArea: { borderRadius: 12, padding: 12, fontSize: 16, marginBottom: 8, minHeight: 120 },
+  typeButton: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, marginBottom: 12 },
+  typeButtonText: { fontSize: 16, fontWeight: '600', marginLeft: 12 },
+  modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
+  modalButton: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginHorizontal: 6 },
+  cancelButton: { backgroundColor: '#ddd' },
+  saveButton: { backgroundColor: '#FFCEB0' },
+  cancelButtonText: { fontSize: 16, fontWeight: '600', color: '#333' },
+  saveButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
 });
