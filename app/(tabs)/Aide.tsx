@@ -3,7 +3,7 @@ import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING,
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { addDoc, collection, getDocs, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, serverTimestamp, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
@@ -493,7 +493,9 @@ export default function AideScreen() {
   const [selectedProfessionalForBooking, setSelectedProfessionalForBooking] = useState<Professional | null>(null);
   const [selectedDayForBooking, setSelectedDayForBooking] = useState<keyof AvailabilitySchedule | null>(null);
   const [selectedSlotForBooking, setSelectedSlotForBooking] = useState<TimeSlot | null>(null);
+  const [selectedDateForBooking, setSelectedDateForBooking] = useState<Date | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookedSlots, setBookedSlots] = useState<any[]>([]);
 
   // Load professionals from Firebase on mount
   useEffect(() => {
@@ -510,6 +512,36 @@ export default function AideScreen() {
   const filteredProfessionals = selectedCategory
     ? professionals.filter(p => p.type === selectedCategory)
     : [];
+
+  // Charger les créneaux réservés quand un professionnel ou une date est sélectionné
+  useEffect(() => {
+    const loadBookedSlots = async () => {
+      if (!selectedProfessionalForBooking || !selectedDateForBooking) {
+        setBookedSlots([]);
+        return;
+      }
+
+      try {
+        const bookedSlotsQuery = query(
+          collection(db, 'bookedSlots'),
+          where('professionalId', '==', selectedProfessionalForBooking.id)
+        );
+        
+        const snapshot = await getDocs(bookedSlotsQuery);
+        const slots = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        setBookedSlots(slots);
+      } catch (error) {
+        console.error('Error loading booked slots:', error);
+        setBookedSlots([]);
+      }
+    };
+
+    loadBookedSlots();
+  }, [selectedProfessionalForBooking, selectedDateForBooking]);
 
   const handleSelectCategory = (category: 'avocat' | 'psychologue') => {
     setSelectedCategory(category);
@@ -567,12 +599,13 @@ export default function AideScreen() {
     setSelectedProfessionalForBooking(professional);
     setSelectedDayForBooking(null);
     setSelectedSlotForBooking(null);
+    setSelectedDateForBooking(null);
     setIsBookingModalVisible(true);
   };
 
   const handleConfirmBooking = async () => {
-    if (!selectedProfessionalForBooking || !selectedDayForBooking || !selectedSlotForBooking) {
-      Alert.alert('Erreur', 'Veuillez sélectionner un créneau');
+    if (!selectedProfessionalForBooking || !selectedDayForBooking || !selectedSlotForBooking || !selectedDateForBooking) {
+      Alert.alert('Erreur', 'Veuillez sélectionner une date et un créneau');
       return;
     }
 
@@ -592,22 +625,21 @@ export default function AideScreen() {
         professionalType: selectedProfessionalForBooking.type,
         selectedDay: selectedDayForBooking,
         selectedTimeSlot: selectedSlotForBooking,
+        selectedDate: selectedDateForBooking,
         status: 'pending',
         createdAt: serverTimestamp()
       });
 
-      Alert.alert('Succès', `Demande de rendez-vous envoyée à ${selectedProfessionalForBooking.name}`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            setIsBookingModalVisible(false);
-            setExpandedProfessionalId(null);
-            setSelectedProfessionalForBooking(null);
-            setSelectedDayForBooking(null);
-            setSelectedSlotForBooking(null);
-          }
-        }
-      ]);
+      // Fermer le modal et réinitialiser les états
+      setIsBookingModalVisible(false);
+      setExpandedProfessionalId(null);
+      setSelectedProfessionalForBooking(null);
+      setSelectedDayForBooking(null);
+      setSelectedSlotForBooking(null);
+      setSelectedDateForBooking(null);
+      
+      // Afficher un message de succès
+      Alert.alert('Succès', `Demande de rendez-vous envoyée à ${selectedProfessionalForBooking.name}`);
     } catch (error) {
       console.error('Error booking appointment:', error);
       Alert.alert('Erreur', 'Erreur lors de la demande de rendez-vous');
@@ -617,13 +649,35 @@ export default function AideScreen() {
   };
 
   const getAvailableSlotsForDay = (availability: AvailabilitySchedule | undefined): TimeSlot[] => {
-    if (!availability || !selectedDayForBooking) return [];
+    if (!availability || !selectedDayForBooking || !selectedDateForBooking) return [];
 
     const dayAvailability = availability[selectedDayForBooking];
     if (typeof dayAvailability === 'string') return [];
 
     if (!dayAvailability.isOpen) return [];
-    return dayAvailability.slots.filter(slot => slot.available);
+    
+    // Filtrer les créneaux disponibles et non réservés à cette date
+    return dayAvailability.slots.filter(slot => {
+      if (!slot.available) return false;
+      
+      // Vérifier si ce créneau est déjà réservé à cette date
+      const isBooked = bookedSlots.some(booked => {
+        const bookedDate = booked.date instanceof Date ? booked.date : booked.date.toDate();
+        const selectedDate = selectedDateForBooking;
+        
+        // Comparer les dates (même jour)
+        const sameDate = bookedDate.getFullYear() === selectedDate.getFullYear() &&
+                        bookedDate.getMonth() === selectedDate.getMonth() &&
+                        bookedDate.getDate() === selectedDate.getDate();
+        
+        // Vérifier si le créneau horaire correspond
+        const sameSlot = booked.timeSlot.start === slot.start && booked.timeSlot.end === slot.end;
+        
+        return sameDate && sameSlot;
+      });
+      
+      return !isBooked;
+    });
   };
 
   // Show loading screen while professionals are being loaded
@@ -822,10 +876,52 @@ export default function AideScreen() {
 
             {selectedProfessionalForBooking && (
               <>
+                {/* Date selector */}
+                <View style={{ marginBottom: V_SPACING.large }}>
+                  <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600', marginBottom: V_SPACING.small }}>
+                    Sélectionner une date
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: V_SPACING.medium }}>
+                    {[...Array(14)].map((_, index) => {
+                      const date = new Date();
+                      date.setDate(date.getDate() + index);
+                      const isSelected = selectedDateForBooking?.toDateString() === date.toDateString();
+                      
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          onPress={() => setSelectedDateForBooking(date)}
+                          style={{
+                            paddingVertical: vs(12),
+                            paddingHorizontal: hs(16),
+                            marginRight: SPACING.medium,
+                            borderRadius: BORDER_RADIUS.medium,
+                            backgroundColor: isSelected ? '#FFCEB0' : colors.cardBackground,
+                            borderWidth: isSelected ? 2 : 1,
+                            borderColor: isSelected ? '#FFCEB0' : colors.border,
+                            minWidth: hs(80),
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Text style={{ color: isSelected ? '#FFFFFF' : colors.textSecondary, fontSize: FONT_SIZES.tiny, fontWeight: '600' }}>
+                            {date.toLocaleDateString('fr-FR', { weekday: 'short' })}
+                          </Text>
+                          <Text style={{ color: isSelected ? '#FFFFFF' : colors.text, fontSize: FONT_SIZES.medium, fontWeight: '700', marginTop: vs(4) }}>
+                            {date.getDate()}
+                          </Text>
+                          <Text style={{ color: isSelected ? '#FFFFFF' : colors.textSecondary, fontSize: FONT_SIZES.tiny, marginTop: vs(2) }}>
+                            {date.toLocaleDateString('fr-FR', { month: 'short' })}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
                 {/* Day selector tabs */}
                 <View style={{ marginBottom: V_SPACING.large }}>
                   <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600', marginBottom: V_SPACING.small }}>
-                    Sélectionner un jour
+                    Jour de la semaine
                   </Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: V_SPACING.medium }}>
                     {Object.entries(selectedProfessionalForBooking.availability || {}).map(([dayKey, dayData]) => {
@@ -918,7 +1014,7 @@ export default function AideScreen() {
                 )}
 
                 {/* Selected slot confirmation */}
-                {selectedSlotForBooking && selectedDayForBooking && (
+                {selectedSlotForBooking && selectedDayForBooking && selectedDateForBooking && (
                   <View
                     style={{
                       padding: SPACING.large,
@@ -937,7 +1033,7 @@ export default function AideScreen() {
                     </Text>
                     <View style={{ marginTop: V_SPACING.small }}>
                       <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small }}>
-                        📅 {selectedDayForBooking}
+                        📅 {selectedDateForBooking.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                       </Text>
                       <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.small, marginTop: vs(4) }}>
                         🕐 {selectedSlotForBooking.start} - {selectedSlotForBooking.end}
@@ -967,19 +1063,19 @@ export default function AideScreen() {
 
                   <TouchableOpacity
                     onPress={handleConfirmBooking}
-                    disabled={!selectedSlotForBooking || bookingLoading}
+                    disabled={!selectedSlotForBooking || !selectedDateForBooking || bookingLoading}
                     style={{
                       flex: 1,
                       paddingVertical: vs(14),
                       borderRadius: BORDER_RADIUS.medium,
-                      backgroundColor: selectedSlotForBooking ? '#FFCEB0' : colors.textTertiary,
-                      opacity: selectedSlotForBooking ? 1 : 0.5
+                      backgroundColor: (selectedSlotForBooking && selectedDateForBooking) ? '#FFCEB0' : colors.textTertiary,
+                      opacity: (selectedSlotForBooking && selectedDateForBooking) ? 1 : 0.5
                     }}
                   >
                     {bookingLoading ? (
-                      <ActivityIndicator size="small" color="#FFCEB0" />
+                      <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <Text style={{ color: '#FFCEB0', textAlign: 'center', fontSize: FONT_SIZES.medium, fontWeight: '600' }}>
+                      <Text style={{ color: '#FFFFFF', textAlign: 'center', fontSize: FONT_SIZES.medium, fontWeight: '600' }}>
                         Confirmer
                       </Text>
                     )}
