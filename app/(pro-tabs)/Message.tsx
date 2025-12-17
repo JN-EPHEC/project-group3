@@ -58,22 +58,64 @@ export default function ProMessageScreen() {
         try {
             const userFamilies = await getUserFamilies(uid);
             
-            // Fetch ALL conversations with this professional (familial conversations + conversations from parents)
-            const conversationsQuery = query(
+            let unsubFamily: any = () => {};
+            let unsubProfessional: any = () => {};
+            let familyConvs: ConversationData[] = [];
+            let professionalConvs: ConversationData[] = [];
+            const allConversations: ConversationData[] = [];
+            
+            // 1. Charger les conversations familiales avec familyId
+            if (userFamilies.length > 0) {
+                const familyIds = userFamilies.map(f => f.id);
+                const familyConversationsQuery = query(
+                    collection(db, 'conversations'),
+                    where('familyId', 'in', familyIds),
+                    where('participants', 'array-contains', uid),
+                    orderBy('lastMessageTime', 'desc')
+                );
+                
+                unsubFamily = onSnapshot(familyConversationsQuery, (snapshot) => {
+                    familyConvs = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    } as ConversationData));
+                    
+                    // Combiner et afficher toutes les conversations
+                    const combined = [...familyConvs, ...professionalConvs];
+                    setConversations(combined);
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Error fetching family conversations:", error);
+                });
+            }
+            
+            // 2. Charger les conversations initiées par les parents (avec professionalId)
+            const professionalConversationsQuery = query(
                 collection(db, 'conversations'),
-                where('participants', 'array-contains', uid),
+                where('professionalId', '==', uid),
                 orderBy('lastMessageTime', 'desc')
             );
             
-            unsubConversations = onSnapshot(conversationsQuery, async (snapshot) => {
-                const convs: ConversationData[] = snapshot.docs.map(doc => ({
+            unsubProfessional = onSnapshot(professionalConversationsQuery, (snapshot) => {
+                professionalConvs = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 } as ConversationData));
                 
-                // Fetch user data for all other participants
-                const uniqueParticipantIds = new Set<string>();
-                convs.forEach((conv: ConversationData) => {
+                // Combiner et afficher toutes les conversations
+                const combined = [...familyConvs, ...professionalConvs];
+                setConversations(combined);
+                setLoading(false);
+            }, (error) => {
+                console.error("Error fetching professional conversations:", error);
+            });
+            
+            // Récupérer les données des utilisateurs
+            const uniqueParticipantIds = new Set<string>();
+            
+            const updateMembersData = () => {
+                const allConvs = [...familyConvs, ...professionalConvs];
+                allConvs.forEach((conv: ConversationData) => {
                     conv.participants?.forEach((p: string) => {
                         if (p !== uid) {
                             uniqueParticipantIds.add(p);
@@ -89,10 +131,14 @@ export default function ProMessageScreen() {
                         setFamilyMembers(members);
                     });
                 }
-                
-                setConversations(convs);
-                setLoading(false);
-            });
+            };
+            
+            updateMembersData();
+            
+            unsubConversations = () => {
+                unsubFamily();
+                unsubProfessional();
+            };
         } catch (error) {
             console.error("Error setting up listeners:", error);
             setLoading(false);

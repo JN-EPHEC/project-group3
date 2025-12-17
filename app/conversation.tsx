@@ -113,19 +113,24 @@ export default function ConversationScreen() {
           } else {
             // Cas 2: Conversation avec professionnel (sans familyId, avec professionalId)
             // Un parent ne doit avoir QU'UNE seule conversation avec un professionnel
+            // Créer un ID de conversation unique et déterministe basé sur les deux IDs
+            const uniqueConversationId = [currentUser.uid, otherUserId].sort().join('_');
+            
+            // Chercher la conversation par conversationId unique
             const professionalConvQuery = query(
               collection(db, 'conversations'),
-              where('participants', 'array-contains', currentUser.uid),
-              where('professionalId', '==', otherUserId)
+              where('conversationId', '==', uniqueConversationId)
             );
             const professionalSnapshot = await getDocs(professionalConvQuery);
             
             if (!professionalSnapshot.empty) {
               convId = professionalSnapshot.docs[0].id;
             } else {
-              // Créer une nouvelle conversation avec le professionnel
+              // Créer une nouvelle conversation avec l'ID unique
               const newConvRef = await addDoc(collection(db, 'conversations'), {
+                conversationId: uniqueConversationId,
                 participants: [currentUser.uid, otherUserId],
+                parentId: currentUser.uid,
                 professionalId: otherUserId,
                 createdAt: serverTimestamp(),
                 lastMessage: null,
