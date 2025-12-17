@@ -112,6 +112,7 @@ export default function ConversationScreen() {
             }
           } else {
             // Cas 2: Conversation avec professionnel (sans familyId, avec professionalId)
+            // Un parent ne doit avoir QU'UNE seule conversation avec un professionnel
             const professionalConvQuery = query(
               collection(db, 'conversations'),
               where('participants', 'array-contains', currentUser.uid),
@@ -121,6 +122,16 @@ export default function ConversationScreen() {
             
             if (!professionalSnapshot.empty) {
               convId = professionalSnapshot.docs[0].id;
+            } else {
+              // Créer une nouvelle conversation avec le professionnel
+              const newConvRef = await addDoc(collection(db, 'conversations'), {
+                participants: [currentUser.uid, otherUserId],
+                professionalId: otherUserId,
+                createdAt: serverTimestamp(),
+                lastMessage: null,
+                lastMessageTime: serverTimestamp()
+              });
+              convId = newConvRef.id;
             }
           }
           

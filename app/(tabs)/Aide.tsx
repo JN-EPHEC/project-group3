@@ -585,13 +585,13 @@ export default function AideScreen() {
       } else {
         // Créer une nouvelle conversation (propre à ce parent uniquement)
         const conversationRef = await addDoc(collection(db, 'conversations'), {
-          participants: [user.uid],
+          participants: [user.uid, professional.id],
           professionalId: professional.id,
           professionalName: professional.name,
           professionalType: professional.type,
           createdAt: serverTimestamp(),
           lastMessage: null,
-          lastMessageTime: null
+          lastMessageTime: serverTimestamp()
         });
         conversationId = conversationRef.id;
       }
