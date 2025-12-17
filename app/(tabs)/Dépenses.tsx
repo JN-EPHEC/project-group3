@@ -7,7 +7,7 @@ import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebas
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { getCurrencySymbol } from '../../constants/currencies';
-import { auth, db, getUserFamily } from '../../constants/firebase';
+import { auth, db, getUserFamilies } from '../../constants/firebase';
 
 export default function DepensesScreen() {
   const router = useRouter();

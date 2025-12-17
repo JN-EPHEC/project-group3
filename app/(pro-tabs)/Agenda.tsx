@@ -4,7 +4,7 @@ import { User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { auth, db, getUserFamily } from '../../constants/firebase';
+import { auth, db, getUserFamilies } from '../../constants/firebase';
 import { Colors } from '../../constants/theme';
 
 export default function AgendaScreen() {
@@ -24,34 +24,28 @@ export default function AgendaScreen() {
 
     const uid = currentUser.uid;
     try {
-      console.log('=== FETCHING EVENTS IN AGENDA ===');
-      const userFamily = await getUserFamily(uid);
-      console.log('User family:', userFamily);
-      
-      if (userFamily?.id) {
-        console.log('Querying events with familyId:', userFamily.id);
+      const userFamilies = await getUserFamilies(uid);
+      if (userFamilies && userFamilies.length > 0) {
+        const familyIds = userFamilies.map(f => f.id);
         const eventsQuery = query(
           collection(db, 'events'),
-          where('familyId', '==', userFamily.id),
+          where('familyId', 'in', familyIds),
           orderBy('date', 'asc')
         );
         const eventsSnapshot = await getDocs(eventsQuery);
-        console.log('Events found:', eventsSnapshot.docs.length);
-        const fetchedEvents = eventsSnapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data() 
+        const fetchedEvents = eventsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
         }));
-        console.log('Events data:', fetchedEvents);
         setEvents(fetchedEvents);
       } else {
-        console.log('No family found, querying by userID');
+        // Fallback for users who might not be in any family but have events
         const eventsQuery = query(
           collection(db, 'events'),
           where('userID', '==', uid),
           orderBy('date', 'asc')
         );
         const eventsSnapshot = await getDocs(eventsQuery);
-        console.log('Events found by userID:', eventsSnapshot.docs.length);
         setEvents(eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }
     } catch (error) {

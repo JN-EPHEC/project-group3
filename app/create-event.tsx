@@ -34,6 +34,7 @@ export default function CreateEventScreen() {
   const [allParents, setAllParents] = useState<any[]>([]);
   const [selectedParents, setSelectedParents] = useState<string[]>([]);
   const [showParentPicker, setShowParentPicker] = useState(false);
+  const [familyName, setFamilyName] = useState('');
 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -73,6 +74,7 @@ export default function CreateEventScreen() {
           if (familyDoc.exists()) {
             const familyData = familyDoc.data();
             setChildren(familyData.children || []);
+            setFamilyName(familyData.name || '');
             // Sélectionner tous les enfants par défaut
             if (familyData.children && familyData.children.length > 0) {
               setSelectedChildren(familyData.children.map((child: any) => child.id));
@@ -296,6 +298,17 @@ export default function CreateEventScreen() {
                 />
                 {titleError ? <Text style={styles.errorText}>{titleError}</Text> : null}
               </View>
+
+              {familyName && (
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: colors.text }]}>Famille</Text>
+                  <TextInput 
+                    style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text, opacity: 0.7 }]}
+                    value={familyName}
+                    editable={false}
+                  />
+                </View>
+              )}
 
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>Enfants concernés *</Text>

@@ -8,7 +8,7 @@ import { User } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { auth, db, getUserFamily, signOut } from '../../constants/firebase';
+import { auth, db, getUserFamilies, joinFamilyByCode, leaveFamilyById, signOut } from '../../constants/firebase';
 
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
@@ -20,10 +20,13 @@ export default function ProfilScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [familyCode, setFamilyCode] = useState<string | null>(null);
+  const [families, setFamilies] = useState<any[]>([]);
+  const [selectedFamilyIndex, setSelectedFamilyIndex] = useState(0);
+  const [showJoinFamily, setShowJoinFamily] = useState(false);
+  const [showLeaveFamily, setShowLeaveFamily] = useState(false);
+  const [joinFamilyCode, setJoinFamilyCode] = useState('');  
   const [familyMembers, setFamilyMembers] = useState<{ id: string; firstName: string; lastName: string }[]>([]);
   const [children, setChildren] = useState<any[]>([]);
-  const [familyId, setFamilyId] = useState<string | null>(null);
   const [isChildrenDropdownOpen, setIsChildrenDropdownOpen] = useState(false);
   const [newChildName, setNewChildName] = useState('');
   const [showAddChild, setShowAddChild] = useState(false);
@@ -37,6 +40,9 @@ export default function ProfilScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userRole, setUserRole] = useState('parent');
+  const [familyName, setFamilyName] = useState('');
+  const [editFamilyName, setEditFamilyName] = useState('');
+  const [isEditingFamilyName, setIsEditingFamilyName] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -67,19 +73,23 @@ export default function ProfilScreen() {
             }
           }
 
-          const family = await getUserFamily(uid);
-          if (family) {
-            setFamilyId(family.id);
-            setFamilyCode(family.code);
-            const familyDoc = await getDoc(doc(db, 'families', family.id));
+          const userFamilies = await getUserFamilies(uid);
+          if (userFamilies && userFamilies.length > 0) {
+            setFamilies(userFamilies);
+            
+            // Charger les détails de la première famille par défaut
+            const firstFamily = userFamilies[0];
+            const familyDoc = await getDoc(doc(db, 'families', firstFamily.id));
             if (familyDoc.exists()) {
                 const familyData = familyDoc.data();
                 setChildren(familyData.children || []);
+                setFamilyName(familyData.name || `Famille ${1}`);
+                setEditFamilyName(familyData.name || `Famille ${1}`);
             }
 
-            if (family.members && family.members.length > 0) {
+            if (firstFamily.members && firstFamily.members.length > 0) {
               const membersDetails = await Promise.all(
-                family.members.map(async (memberId: string) => {
+                firstFamily.members.map(async (memberId: string) => {
                   const memberDocRef = doc(db, 'users', memberId);
                   const memberDocSnap = await getDoc(memberDocRef);
                   if (memberDocSnap.exists()) {
@@ -196,6 +206,37 @@ export default function ProfilScreen() {
     );
   };
   
+  const handleSaveFamilyName = async () => {
+    if (!editFamilyName.trim()) {
+      Alert.alert('Erreur', 'Le nom de la famille ne peut pas être vide');
+      return;
+    }
+    if (families.length === 0 || !families[selectedFamilyIndex]) {
+      Alert.alert('Erreur', 'ID de famille introuvable.');
+      return;
+    }
+    const familyId = families[selectedFamilyIndex].id;
+
+    setIsSaving(true);
+    try {
+      const familyDocRef = doc(db, 'families', familyId);
+      await updateDoc(familyDocRef, { name: editFamilyName.trim() });
+      
+      setFamilyName(editFamilyName.trim());
+      const updatedFamilies = [...families];
+      updatedFamilies[selectedFamilyIndex].name = editFamilyName.trim();
+      setFamilies(updatedFamilies);
+
+      setIsEditingFamilyName(false);
+      Alert.alert('Succès', 'Le nom de la famille a été mis à jour');
+    } catch (error) {
+      console.error('Error updating family name:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour le nom de la famille');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
     
@@ -231,7 +272,8 @@ export default function ProfilScreen() {
   };
 
   const handleShareFamilyCode = async () => {
-    if (!familyCode) return;
+    if (families.length === 0 || !families[selectedFamilyIndex]) return;
+    const familyCode = families[selectedFamilyIndex].code;
 
     try {
       await Share.share({
@@ -244,15 +286,111 @@ export default function ProfilScreen() {
     }
   };
 
+  const handleJoinFamily = async () => {
+    if (!joinFamilyCode.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer un code famille');
+      return;
+    }
+    if (!user) return;
+
+    try {
+      setIsSaving(true);
+      const newFamily = await joinFamilyByCode(user.uid, joinFamilyCode.trim());
+      if (!newFamily) {
+        Alert.alert('Erreur', 'Code famille invalide');
+        return;
+      }
+      
+      // Recharger les familles
+      const userFamilies = await getUserFamilies(user.uid);
+      setFamilies(userFamilies);
+      setJoinFamilyCode('');
+      setShowJoinFamily(false);
+      Alert.alert('Succès', 'Vous avez rejoint la famille avec succès');
+    } catch (error) {
+      console.error('Error joining family:', error);
+      Alert.alert('Erreur', 'Impossible de rejoindre la famille');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLeaveFamily = async (familyId: string) => {
+    if (!user) return;
+
+    Alert.alert(
+      "Quitter la famille",
+      "Êtes-vous sûr de vouloir quitter cette famille ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Quitter",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsSaving(true);
+              await leaveFamilyById(user.uid, familyId);
+              
+              // Recharger les familles
+              const userFamilies = await getUserFamilies(user.uid);
+              setFamilies(userFamilies);
+              setShowLeaveFamily(false);
+              setSelectedFamilyIndex(0);
+              Alert.alert('Succès', 'Vous avez quitté la famille');
+            } catch (error) {
+              console.error('Error leaving family:', error);
+              Alert.alert('Erreur', 'Impossible de quitter la famille');
+            } finally {
+              setIsSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const loadFamilyData = async (familyIndex: number) => {
+    if (!families[familyIndex]) return;
+    
+    const family = families[familyIndex];
+    const familyDoc = await getDoc(doc(db, 'families', family.id));
+    if (familyDoc.exists()) {
+      const familyData = familyDoc.data();
+      setChildren(familyData.children || []);
+      setFamilyName(familyData.name || `Famille ${familyIndex + 1}`);
+      setEditFamilyName(familyData.name || `Famille ${familyIndex + 1}`);
+    }
+
+    if (family.members && family.members.length > 0) {
+      const membersDetails = await Promise.all(
+        family.members.map(async (memberId: string) => {
+          const memberDocRef = doc(db, 'users', memberId);
+          const memberDocSnap = await getDoc(memberDocRef);
+          if (memberDocSnap.exists()) {
+            const memberData = memberDocSnap.data();
+            return {
+              id: memberId,
+              firstName: memberData.firstName || 'Membre',
+              lastName: memberData.lastName || '',
+            };
+          }
+          return null;
+        })
+      );
+      setFamilyMembers(membersDetails.filter(Boolean) as { id: string; firstName: string; lastName: string }[]);
+    }
+  };
+
   const handleSaveChild = async (childId: string) => {
     if (!editingChildName.trim()) {
       Alert.alert('Erreur', 'Le nom ne peut pas être vide.');
       return;
     }
-    if (!familyId) {
+    if (families.length === 0 || !families[selectedFamilyIndex]) {
       Alert.alert('Erreur', 'ID de famille introuvable.');
       return;
     }
+    const familyId = families[selectedFamilyIndex].id;
 
     const updatedChildren = children.map(child => 
       child.id === childId ? { ...child, name: editingChildName.trim() } : child
@@ -275,10 +413,11 @@ export default function ProfilScreen() {
       Alert.alert('Erreur', "Veuillez entrer un nom pour l'enfant");
       return;
     }
-    if (!familyId) {
+    if (families.length === 0 || !families[selectedFamilyIndex]) {
       Alert.alert('Erreur', 'ID de famille introuvable.');
       return;
     }
+    const familyId = families[selectedFamilyIndex].id;
 
     const newChild = {
       id: `${Date.now()}`,
@@ -300,10 +439,11 @@ export default function ProfilScreen() {
   };
 
   const handleDeleteChild = async (childId: string) => {
-    if (!familyId) {
+    if (families.length === 0 || !families[selectedFamilyIndex]) {
       Alert.alert('Erreur', 'ID de famille introuvable.');
       return;
     }
+    const familyId = families[selectedFamilyIndex].id;
 
     Alert.alert(
       "Supprimer l'enfant",
@@ -496,8 +636,205 @@ export default function ProfilScreen() {
           {/* Famille Section */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.tint }]}>Famille</Text>
+            
+            {families.length > 0 && (
+              <View style={[styles.infoCard, { backgroundColor: colors.cardBackground, marginBottom: V_SPACING.medium }]}>
+                <View style={styles.subSectionHeader}>
+                  <Text style={[styles.subSectionTitle, { color: colors.textSecondary }]}>Nom de la famille</Text>
+                  {!isEditingFamilyName && (
+                    <TouchableOpacity 
+                      onPress={() => setIsEditingFamilyName(true)} 
+                      style={[styles.editButton, { backgroundColor: colors.tint }]}>
+                      <IconSymbol name="pencil" size={14} color="#fff" />
+                      <Text style={styles.editButtonText}>Modifier</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {isEditingFamilyName ? (
+                  <View>
+                    <TextInput
+                      style={[styles.input, { color: colors.text, borderColor: colors.textSecondary }]}
+                      value={editFamilyName}
+                      onChangeText={setEditFamilyName}
+                      placeholder="Nom de la famille"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                    <View style={styles.editButtonsContainer}>
+                      <TouchableOpacity 
+                        style={[styles.cancelButton, { backgroundColor: colors.cardBackground }]} 
+                        onPress={() => setIsEditingFamilyName(false)}
+                        disabled={isSaving}
+                      >
+                        <Text style={[styles.cancelButtonText, { color: colors.text }]}>Annuler</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.saveButton, { backgroundColor: colors.tint }]} 
+                        onPress={handleSaveFamilyName}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={styles.saveButtonText}>Enregistrer</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={[styles.infoValue, { color: colors.text, marginTop: V_SPACING.small }]}>{familyName}</Text>
+                )}
+              </View>
+            )}
+            
+            {/* Boutons Rejoindre/Quitter famille */}
+            <View style={styles.familyActionsContainer}>
+              <TouchableOpacity 
+                style={[styles.familyActionButton, { backgroundColor: colors.tint }]}
+                onPress={() => setShowJoinFamily(true)}
+              >
+                <IconSymbol name="plus.circle" size={20} color="#fff" />
+                <Text style={styles.familyActionButtonText}>Rejoindre une famille</Text>
+              </TouchableOpacity>
+              
+              {families.length > 0 && (
+                <TouchableOpacity 
+                  style={[styles.familyActionButton, { backgroundColor: colors.dangerButton }]}
+                  onPress={() => setShowLeaveFamily(true)}
+                >
+                  <IconSymbol name="xmark.circle" size={20} color="#fff" />
+                  <Text style={styles.familyActionButtonText}>Quitter une famille</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
-            {familyMembers.length > 0 && (
+            {/* Modal Rejoindre famille */}
+            {showJoinFamily && (
+              <View style={[styles.modalOverlay, { backgroundColor: colors.secondaryCardBackground, padding: SPACING.large, borderRadius: BORDER_RADIUS.large, marginBottom: V_SPACING.medium }]}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Rejoindre une nouvelle famille</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text, borderColor: colors.textSecondary, marginVertical: V_SPACING.medium, paddingVertical: vs(12), paddingHorizontal: SPACING.medium, borderWidth: 1, borderRadius: BORDER_RADIUS.medium }]}
+                  value={joinFamilyCode}
+                  onChangeText={setJoinFamilyCode}
+                  placeholder="Entrez le code famille"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCapitalize="characters"
+                />
+                <View style={styles.modalButtonsContainer}>
+                  <TouchableOpacity 
+                    style={[styles.cancelButton, { flex: 1 }]}
+                    onPress={() => {
+                      setShowJoinFamily(false);
+                      setJoinFamilyCode('');
+                    }}
+                  >
+                    <Text style={[styles.cancelButtonText, { color: colors.text }]}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.saveButton, { flex: 1 }]}
+                    onPress={handleJoinFamily}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>Rejoindre</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Modal Quitter famille */}
+            {showLeaveFamily && (
+              <View style={[styles.modalOverlay, { backgroundColor: colors.secondaryCardBackground, padding: SPACING.large, borderRadius: BORDER_RADIUS.large, marginBottom: V_SPACING.medium }]}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionnez la famille à quitter</Text>
+                <View style={styles.familyLeaveList}>
+                  {families.map((family, index) => (
+                    <TouchableOpacity
+                      key={family.id}
+                      style={[styles.familyLeaveItem, { backgroundColor: colors.cardBackground }]}
+                      onPress={() => handleLeaveFamily(family.id)}
+                    >
+                      <View>
+                        <Text style={[styles.familyLeaveTitle, { color: colors.text }]}>{family.name || `Famille ${index + 1}`}</Text>
+                        <Text style={[styles.familyLeaveCode, { color: colors.textSecondary }]}>Code: {family.code}</Text>
+                      </View>
+                      <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TouchableOpacity 
+                  style={[styles.cancelButton, { marginTop: V_SPACING.medium }]}
+                  onPress={() => setShowLeaveFamily(false)}
+                >
+                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>Annuler</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Sélecteur de famille */}
+            {families.length > 1 && (
+              <View style={[styles.infoCard, { backgroundColor: colors.cardBackground, marginBottom: V_SPACING.medium }]}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary, marginBottom: V_SPACING.small }]}>Sélectionner une famille :</Text>
+                <View style={styles.familySelectorContainer}>
+                  {families.map((family, index) => (
+                    <TouchableOpacity
+                      key={family.id}
+                      style={[
+                        styles.familyTab,
+                        { 
+                          backgroundColor: selectedFamilyIndex === index ? colors.tint : colors.secondaryCardBackground,
+                          borderWidth: 2,
+                          borderColor: selectedFamilyIndex === index ? colors.tint : 'transparent'
+                        }
+                      ]}
+                      onPress={() => {
+                        setSelectedFamilyIndex(index);
+                        loadFamilyData(index);
+                      }}
+                    >
+                      <View style={styles.familyTabContent}>
+                        <Text style={[
+                          styles.familyTabText,
+                          { color: selectedFamilyIndex === index ? '#fff' : colors.text }
+                        ]}>
+                          {family.name || `Famille ${index + 1}`}
+                        </Text>
+                        <Text style={[
+                          styles.familyTabCode,
+                          { color: selectedFamilyIndex === index ? '#fff' : colors.tint }
+                        ]}>
+                          Code: {family.code}
+                        </Text>
+                        <Text style={[
+                          styles.familyTabMembers,
+                          { color: selectedFamilyIndex === index ? 'rgba(255,255,255,0.8)' : colors.textSecondary }
+                        ]}>
+                          {family.members?.length || 0} membre{(family.members?.length || 0) > 1 ? 's' : ''}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Code de la famille active */}
+            {families.length > 0 && families[selectedFamilyIndex] && (
+              <View style={[styles.infoCard, { backgroundColor: colors.cardBackground, marginBottom: V_SPACING.medium }]}>
+                <View style={styles.infoRow}>
+                  <IconSymbol name="number" size={20} color={colors.textSecondary} />
+                  <View style={styles.infoText}>
+                    <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
+                      {families.length > 1 ? `Code famille active (${families[selectedFamilyIndex].name || `Famille ${selectedFamilyIndex + 1}`})` : 'Code famille'}
+                    </Text>
+                    <Text style={[styles.familyCodeDisplay, { color: colors.tint }]}>{families[selectedFamilyIndex].code}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {families.length > 0 && familyMembers.length > 0 && (
               <View>
                 <TouchableOpacity 
                   style={[styles.settingCard, { backgroundColor: colors.cardBackground }]} 
@@ -523,6 +860,7 @@ export default function ProfilScreen() {
             )}
 
             {/* Children Section */}
+            {families.length > 0 && (
             <View>
               <TouchableOpacity 
                 style={[styles.settingCard, { backgroundColor: colors.cardBackground }]} 
@@ -594,15 +932,18 @@ export default function ProfilScreen() {
                 </View>
               )}
             </View>
+            )}
 
-            <TouchableOpacity 
-              style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}
-              onPress={handleShareFamilyCode}
-            >
-              <IconSymbol name="square.and.arrow.up" size={24} color={colors.textSecondary} />
-              <Text style={[styles.settingText, { color: colors.text }]}>Inviter un membre</Text>
-              <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+            {families.length > 0 && (
+              <TouchableOpacity 
+                style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}
+                onPress={handleShareFamilyCode}
+              >
+                <IconSymbol name="square.and.arrow.up" size={24} color={colors.textSecondary} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Inviter un membre</Text>
+                <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Support Section */}
@@ -899,5 +1240,96 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#87CEEB',
     fontWeight: '600',
+  },
+  familySelectorContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.medium,
+  },
+  familyTab: {
+    paddingVertical: vs(14),
+    paddingHorizontal: SPACING.large,
+    borderRadius: BORDER_RADIUS.large,
+    minWidth: hs(140),
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: vs(2) },
+    shadowRadius: hs(8),
+    elevation: 2,
+  },
+  familyTabContent: {
+    alignItems: 'center',
+  },
+  familyTabText: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
+    marginBottom: V_SPACING.tiny,
+  },
+  familyTabCode: {
+    fontSize: FONT_SIZES.regular,
+    fontWeight: '600',
+    marginBottom: V_SPACING.tiny,
+  },
+  familyTabMembers: {
+    fontSize: FONT_SIZES.small,
+  },
+  familyCodeText: {
+    fontSize: FONT_SIZES.small,
+    marginTop: V_SPACING.tiny,
+  },
+  familyCodeDisplay: {
+    fontSize: FONT_SIZES.xlarge,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  familyActionsContainer: {
+    flexDirection: 'row',
+    gap: SPACING.medium,
+    marginBottom: V_SPACING.medium,
+  },
+  familyActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: V_SPACING.medium,
+    borderRadius: BORDER_RADIUS.large,
+    gap: SPACING.small,
+  },
+  familyActionButtonText: {
+    color: '#fff',
+    fontSize: FONT_SIZES.regular,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    marginVertical: V_SPACING.medium,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.large,
+    fontWeight: '600',
+    marginBottom: V_SPACING.small,
+  },
+  modalButtonsContainer: {
+    flexDirection: 'row',
+    gap: SPACING.medium,
+  },
+  familyLeaveList: {
+    marginTop: V_SPACING.medium,
+    gap: SPACING.small,
+  },
+  familyLeaveItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  familyLeaveTitle: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+  },
+  familyLeaveCode: {
+    fontSize: FONT_SIZES.small,
+    marginTop: V_SPACING.tiny,
   },
 });

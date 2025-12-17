@@ -40,6 +40,7 @@ export default function EditEventScreen() {
   const [selectedParents, setSelectedParents] = useState<string[]>([]);
   const [initialSelectedParents, setInitialSelectedParents] = useState<string[]>([]);
   const [showParentPicker, setShowParentPicker] = useState(false);
+  const [familyName, setFamilyName] = useState('');
 
   const categories = [
     { name: 'Loisirs', color: '#FFA07A' },
@@ -179,6 +180,7 @@ export default function EditEventScreen() {
             if (familyDoc.exists()) {
               const familyData = familyDoc.data();
               setChildren(familyData.children || []);
+              setFamilyName(familyData.name || '');
             }
             // Fetch parents from the same family
             const usersRef = collection(db, 'users');
@@ -385,6 +387,17 @@ export default function EditEventScreen() {
                 />
                 {titleError ? <Text style={styles.errorText}>{titleError}</Text> : null}
               </View>
+
+              {familyName && (
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: colors.text }]}>Famille</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text, opacity: 0.7 }]}
+                    value={familyName}
+                    editable={false}
+                  />
+                </View>
+              )}
 
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>Enfants concernés</Text>
