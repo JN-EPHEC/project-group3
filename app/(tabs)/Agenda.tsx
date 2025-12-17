@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
@@ -24,73 +24,70 @@ export default function AgendaScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
-  const fetchEvents = useCallback(async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
-    const uid = currentUser.uid;
-    try {
-      const userFamilies = await getUserFamilies(uid);
-      if (userFamilies && userFamilies.length > 0) {
-        const familyIds = userFamilies.map(f => f.id);
-        const eventsQuery = query(
-          collection(db, 'events'),
-          where('familyId', 'in', familyIds),
-          orderBy('date', 'asc')
-        );
-        const eventsSnapshot = await getDocs(eventsQuery);
-        const fetchedEvents = eventsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setEvents(fetchedEvents);
-      } else {
-        const eventsQuery = query(
-          collection(db, 'events'),
-          where('userID', '==', uid),
-          orderBy('date', 'asc')
-        );
-        const eventsSnapshot = await getDocs(eventsQuery);
-        setEvents(eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }
-    } catch (error) {
-      console.error("Error fetching events:", error);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchEvents();
-    }, [fetchEvents])
-  );
-
   useEffect(() => {
     const currentUser = auth.currentUser;
-    if (currentUser) {
-      setUser(currentUser);
-      const uid = currentUser.uid;
-
-      const fetchData = async () => {
-        try {
-          const userDocRef = doc(db, 'users', uid);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            setFirstName(userDocSnap.data().firstName || 'Utilisateur');
-          }
-
-          await fetchEvents();
-        } catch (error) {
-          console.error("Error fetching data:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchData();
-    } else {
+    if (!currentUser) {
       router.replace('/(auth)/WelcomeScreen');
+      return;
     }
-  }, [router, fetchEvents]);
+
+    setUser(currentUser);
+    const uid = currentUser.uid;
+
+    const userDocRef = doc(db, 'users', uid);
+    const unsubUser = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          setFirstName(doc.data().firstName || 'Utilisateur');
+        }
+    });
+
+    let unsubEvents = () => {};
+
+    const setupEventsListener = async () => {
+      setLoading(true);
+      try {
+        const userFamilies = await getUserFamilies(uid);
+        let eventsQuery;
+        if (userFamilies && userFamilies.length > 0) {
+          const familyIds = userFamilies.map(f => f.id);
+          eventsQuery = query(
+            collection(db, 'events'),
+            where('familyId', 'in', familyIds),
+            orderBy('date', 'asc')
+          );
+        } else {
+          eventsQuery = query(
+            collection(db, 'events'),
+            where('userID', '==', uid),
+            orderBy('date', 'asc')
+          );
+        }
+
+        unsubEvents = onSnapshot(eventsQuery, (querySnapshot) => {
+          const fetchedEvents = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setEvents(fetchedEvents);
+          setLoading(false);
+        }, (error) => {
+            console.error("Error fetching events:", error);
+            setLoading(false);
+        });
+
+      } catch (error) {
+        console.error("Error setting up events listener:", error);
+        setLoading(false);
+      }
+    };
+
+    setupEventsListener();
+
+    return () => {
+      unsubUser();
+      unsubEvents();
+    };
+  }, [router]);
 
   const getDaysInMonth = () => {
     const year = currentMonth.getFullYear();
