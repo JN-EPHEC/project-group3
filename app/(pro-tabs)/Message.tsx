@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
@@ -32,6 +32,7 @@ export default function ProMessageScreen() {
   const [membersWithoutConversation, setMembersWithoutConversation] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const [participantProfiles, setParticipantProfiles] = useState<Record<string, any>>({});
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -54,100 +55,78 @@ export default function ProMessageScreen() {
     let unsubMembers = () => {};
 
     const setupListeners = async () => {
-        setLoading(true);
-        try {
-            const userFamilies = await getUserFamilies(uid);
-            
-            let unsubFamily: any = () => {};
-            let unsubProfessional: any = () => {};
-            let familyConvs: ConversationData[] = [];
-            let professionalConvs: ConversationData[] = [];
-            const allConversations: ConversationData[] = [];
-            
-            // 1. Charger les conversations familiales avec familyId
-            if (userFamilies.length > 0) {
-                const familyIds = userFamilies.map(f => f.id);
-                const familyConversationsQuery = query(
-                    collection(db, 'conversations'),
-                    where('familyId', 'in', familyIds),
-                    where('participants', 'array-contains', uid),
-                    orderBy('lastMessageTime', 'desc')
-                );
-                
-                unsubFamily = onSnapshot(familyConversationsQuery, (snapshot) => {
-                  familyConvs = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                  } as ConversationData));
-                    
-                  // Combiner et afficher toutes les conversations
-                  const combined = [...familyConvs, ...professionalConvs];
-                  setConversations(combined);
-                  refreshMembersData();
-                  setLoading(false);
-                }, (error) => {
-                  console.error("Error fetching family conversations:", error);
-                });
-            }
-            
-            // 2. Charger les conversations initiées par les parents (avec professionalId)
-            const professionalConversationsQuery = query(
-                collection(db, 'conversations'),
-                where('professionalId', '==', uid),
-                orderBy('lastMessageTime', 'desc')
-            );
-            
-            unsubProfessional = onSnapshot(professionalConversationsQuery, (snapshot) => {
-              professionalConvs = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-              } as ConversationData));
-                
-              // Combiner et afficher toutes les conversations
-              const combined = [...familyConvs, ...professionalConvs];
-              setConversations(combined);
-              refreshMembersData();
-              setLoading(false);
-            }, (error) => {
-              console.error("Error fetching professional conversations:", error);
+      setLoading(true);
+      try {
+        const userFamilies = await getUserFamilies(uid);
+
+        // Suivre les membres de famille pour permettre la création de nouvelles conversations
+        if (userFamilies && userFamilies.length > 0) {
+          const allMemberIds = userFamilies.flatMap((f: any) => f.members || []);
+          const uniqueMemberIds = [...new Set(allMemberIds)].filter(id => id !== uid);
+
+          if (uniqueMemberIds.length > 0) {
+            const membersQuery = query(collection(db, 'users'), where('__name__', 'in', uniqueMemberIds));
+            unsubMembers = onSnapshot(membersQuery, (snapshot) => {
+              const members = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+              setFamilyMembers(members);
             });
-            
-            // Récupérer les données des utilisateurs à chaque mise à jour des conversations
-            const refreshMembersData = () => {
-              // Nettoyer l'abonnement précédent si existant
-              unsubMembers();
-
-              const uniqueParticipantIds = new Set<string>();
-              const allConvs = [...familyConvs, ...professionalConvs];
-
-              allConvs.forEach((conv: ConversationData) => {
-                conv.participants?.forEach((p: string) => {
-                  if (p !== uid) {
-                    uniqueParticipantIds.add(p);
-                  }
-                });
-              });
-                
-              if (uniqueParticipantIds.size > 0) {
-                const participantIds = Array.from(uniqueParticipantIds);
-                const membersQuery = query(collection(db, 'users'), where('__name__', 'in', participantIds));
-                unsubMembers = onSnapshot(membersQuery, (snapshot) => {
-                  const members = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-                  setFamilyMembers(members);
-                });
-              } else {
-                setFamilyMembers([]);
-              }
-            };
-            
-            unsubConversations = () => {
-                unsubFamily();
-                unsubProfessional();
-            };
-        } catch (error) {
-            console.error("Error setting up listeners:", error);
-            setLoading(false);
+          } else {
+            setFamilyMembers([]);
+          }
+        } else {
+          setFamilyMembers([]);
         }
+
+        // Conversations du professionnel : tout échange où il est participant
+        const conversationsQuery = query(
+          collection(db, 'conversations'),
+          where('participants', 'array-contains', uid),
+          orderBy('lastMessageTime', 'desc')
+        );
+
+        const refreshParticipantProfiles = async (convs: ConversationData[]) => {
+          const ids = new Set<string>();
+          convs.forEach((conv) => {
+            conv.participants?.forEach((p: string) => {
+              if (p !== uid) ids.add(p);
+            });
+          });
+
+          if (ids.size === 0) {
+            setParticipantProfiles({});
+            return;
+          }
+
+          const allIds = Array.from(ids);
+          const batches: string[][] = [];
+          for (let i = 0; i < allIds.length; i += 10) {
+            batches.push(allIds.slice(i, i + 10));
+          }
+
+          const profiles: Record<string, any> = {};
+          for (const batch of batches) {
+            const usersQuery = query(collection(db, 'users'), where('__name__', 'in', batch));
+            const snap = await getDocs(usersQuery);
+            snap.docs.forEach((d: any) => {
+              profiles[d.id] = d.data();
+            });
+          }
+          setParticipantProfiles(profiles);
+        };
+
+        unsubConversations = onSnapshot(conversationsQuery, async (snapshot) => {
+          const convs: ConversationData[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setConversations(convs);
+          setLoading(false);
+          refreshParticipantProfiles(convs);
+        }, (error) => {
+          console.error('Error fetching conversations:', error);
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error('Error setting up listeners:', error);
+        setLoading(false);
+      }
     };
 
     setupListeners();
@@ -239,19 +218,21 @@ export default function ProMessageScreen() {
           {conversations.length > 0 ? (
             conversations.map((conv: any) => {
               const otherParticipant = conv.participants?.find((p: string) => p !== user?.uid);
-              const otherUserData = familyMembers.find((m: any) => m.uid === otherParticipant);
+              const participantProfile = participantProfiles[otherParticipant || ''];
+              const otherUserData = participantProfile || familyMembers.find((m: any) => m.uid === otherParticipant);
 
               // Fallbacks depuis le document de conversation si pas de données utilisateur chargées
               const convName = conv.parentName || '';
               const convPhoto = conv.parentPhotoURL || '';
 
               // Déterminer le nom à afficher
-              let displayName = otherUserData?.firstName || convName || 'Parent';
-              if (otherUserData?.lastName) {
-                displayName += ` ${otherUserData.lastName}`;
+              let displayName = participantProfile?.firstName || otherUserData?.firstName || convName || 'Parent';
+              const lastName = participantProfile?.lastName || otherUserData?.lastName;
+              if (lastName) {
+                displayName += ` ${lastName}`;
               }
 
-              const displayPhoto = otherUserData?.photoURL || otherUserData?.profileImage || convPhoto;
+              const displayPhoto = participantProfile?.photoURL || participantProfile?.profileImage || otherUserData?.photoURL || otherUserData?.profileImage || convPhoto;
               const avatarLetter = (displayName?.[0] || 'P').toUpperCase();
 
               return (

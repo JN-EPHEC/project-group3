@@ -1,12 +1,35 @@
 import { HapticTab } from '@/components/haptic-tab';
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
-import React from 'react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import { Image, Platform, useColorScheme } from 'react-native';
+import { auth, db } from '../../constants/firebase';
 
 export default function ProTabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const conversationsQuery = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(conversationsQuery, (snapshot) => {
+      const total = snapshot.docs.reduce((sum, doc) => {
+        const data = doc.data();
+        return sum + (data.unreadCount?.[currentUser.uid] || 0);
+      }, 0);
+      setUnreadCount(total);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
     <Tabs
@@ -101,6 +124,7 @@ export default function ProTabLayout() {
         options={{
           title: 'Messages',
           headerShown: false,
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarIcon: ({ focused, color }) => (
             <Image
               source={require('../../ImageAndLogo/logomessage.png')}
