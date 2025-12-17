@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, increment, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -336,7 +336,7 @@ export default function ConversationScreen() {
         lastMessage: lastMessageText,
         lastMessageTime: serverTimestamp(),
         lastMessageType: lastMessageType,
-        [`unreadCount.${otherUserId}`]: 1 
+        [`unreadCount.${otherUserId}`]: increment(1) 
       });
 
     } catch (error) {
