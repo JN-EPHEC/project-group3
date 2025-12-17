@@ -51,91 +51,88 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchEvents();
-    }, [fetchEvents])
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        setUser(currentUser);
+        const uid = currentUser.uid;
+
+        const fetchData = async () => {
+          setLoading(true);
+          try {
+            const userDocRef = doc(db, 'users', uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+              setFirstName(userDocSnap.data().firstName || 'Utilisateur');
+            }
+
+            await fetchEvents();
+
+            // Récupérer les membres de la famille
+            const userFamily = await getUserFamily(uid);
+            if (userFamily?.id) {
+              const membersQuery = query(
+                collection(db, 'users'),
+                where('familyId', '==', userFamily.id)
+              );
+              const membersSnapshot = await getDocs(membersQuery);
+              const members = membersSnapshot.docs
+                .map(doc => ({ uid: doc.id, ...doc.data() }))
+                .filter((member: any) => member.uid !== uid);
+              
+              setFamilyMembers(members);
+            }
+
+            if (userFamily?.id) {
+              const conversationsQuery = query(
+                collection(db, 'conversations'),
+                where('familyId', '==', userFamily.id),
+                where('participants', 'array-contains', uid),
+                orderBy('lastMessageTime', 'desc')
+              );
+              const conversationsSnapshot = await getDocs(conversationsQuery);
+              const conversations = conversationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+              const conversationsWithDetails = await Promise.all(
+                conversations.map(async (conv) => {
+                  const otherUserId = conv.participants.find((p: string) => p !== uid);
+                  if (!otherUserId) return null;
+
+                  const userDocRef = doc(db, 'users', otherUserId);
+                  const userDocSnap = await getDoc(userDocRef);
+                  const otherUserName = userDocSnap.exists() ? userDocSnap.data().firstName : 'Utilisateur';
+
+                  const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
+
+                  if (unreadCount > 0) {
+                    return {
+                      ...conv,
+                      otherUserName,
+                      otherUserId,
+                      unreadCount
+                    };
+                  }
+                  return null;
+                })
+              );
+              
+              setMessages(conversationsWithDetails.filter(c => c !== null) as any);
+            } else {
+              setMessages([]);
+            }
+
+          } catch (error) {
+            console.error("Error fetching data:", error);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        fetchData();
+      } else {
+        router.replace('/(auth)/WelcomeScreen' as any);
+      }
+    }, [router, fetchEvents])
   );
-
-  useEffect(() => {
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      setUser(currentUser);
-      const uid = currentUser.uid;
-
-      const fetchData = async () => {
-        try {
-          const userDocRef = doc(db, 'users', uid);
-          const userDocSnap = await getDoc(userDocRef);
-          if (userDocSnap.exists()) {
-            setFirstName(userDocSnap.data().firstName || 'Utilisateur');
-          }
-
-          await fetchEvents();
-
-          // Récupérer les membres de la famille
-          const userFamily = await getUserFamily(uid);
-          if (userFamily?.id) {
-            const membersQuery = query(
-              collection(db, 'users'),
-              where('familyId', '==', userFamily.id)
-            );
-            const membersSnapshot = await getDocs(membersQuery);
-            const members = membersSnapshot.docs
-              .map(doc => ({ uid: doc.id, ...doc.data() }))
-              .filter((member: any) => member.uid !== uid);
-            
-            setFamilyMembers(members);
-          }
-
-          if (userFamily?.id) {
-            const conversationsQuery = query(
-              collection(db, 'conversations'),
-              where('familyId', '==', userFamily.id),
-              where('participants', 'array-contains', uid),
-              orderBy('lastMessageTime', 'desc')
-            );
-            const conversationsSnapshot = await getDocs(conversationsQuery);
-            const conversations = conversationsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-            const conversationsWithDetails = await Promise.all(
-              conversations.map(async (conv) => {
-                const otherUserId = conv.participants.find((p: string) => p !== uid);
-                if (!otherUserId) return null;
-
-                const userDocRef = doc(db, 'users', otherUserId);
-                const userDocSnap = await getDoc(userDocRef);
-                const otherUserName = userDocSnap.exists() ? userDocSnap.data().firstName : 'Utilisateur';
-
-                const unreadCount = conv.unreadCount ? conv.unreadCount[uid] || 0 : 0;
-
-                if (unreadCount > 0) {
-                  return {
-                    ...conv,
-                    otherUserName,
-                    otherUserId,
-                    unreadCount
-                  };
-                }
-                return null;
-              })
-            );
-            
-            setMessages(conversationsWithDetails.filter(c => c !== null) as any);
-          } else {
-            setMessages([]);
-          }
-
-        } catch (error) {
-          console.error("Error fetching data:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchData();
-    } else {
-      router.replace('/(auth)/WelcomeScreen' as any);
-    }
-  }, [router, fetchEvents]);
 
   const handleNewMessage = () => {
     if (familyMembers.length === 0) {
