@@ -20,6 +20,8 @@ export default function AgendaScreen() {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [viewMode, setViewMode] = useState('mois');
   const [showViewOptions, setShowViewOptions] = useState(false);
+  const [families, setFamilies] = useState<any[]>([]);
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('all');
   const flatListRef = React.useRef<FlatList>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -30,7 +32,6 @@ export default function AgendaScreen() {
       router.replace('/(auth)/WelcomeScreen');
       return;
     }
-
     setUser(currentUser);
     const uid = currentUser.uid;
 
@@ -41,53 +42,74 @@ export default function AgendaScreen() {
         }
     });
 
-    let unsubEvents = () => {};
-
-    const setupEventsListener = async () => {
-      setLoading(true);
-      try {
-        const userFamilies = await getUserFamilies(uid);
-        let eventsQuery;
-        if (userFamilies && userFamilies.length > 0) {
-          const familyIds = userFamilies.map(f => f.id);
-          eventsQuery = query(
-            collection(db, 'events'),
-            where('familyId', 'in', familyIds),
-            orderBy('date', 'asc')
-          );
-        } else {
-          eventsQuery = query(
-            collection(db, 'events'),
-            where('userID', '==', uid),
-            orderBy('date', 'asc')
-          );
+    const fetchFamilies = async () => {
+        try {
+            const userFamilies = await getUserFamilies(uid);
+            const familiesWithData = await Promise.all(userFamilies.map(async (family) => {
+                const familyDoc = await getDoc(doc(db, 'families', family.id));
+                return familyDoc.exists() ? { ...family, ...familyDoc.data() } : family;
+            }));
+            setFamilies(familiesWithData);
+        } catch (error) {
+            console.error("Error fetching families:", error);
         }
+    }
+    fetchFamilies();
 
-        unsubEvents = onSnapshot(eventsQuery, (querySnapshot) => {
-          const fetchedEvents = querySnapshot.docs.map(doc => ({
+    return () => unsubUser();
+  }, [router]);
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    const uid = currentUser.uid;
+    
+    if (families.length === 0) {
+        setEvents([]);
+        setLoading(false);
+        return;
+    }
+
+    setLoading(true);
+    let eventsQuery;
+
+    if (selectedFamilyId === 'all') {
+        const familyIds = families.map(f => f.id);
+        if (familyIds.length > 0) {
+            eventsQuery = query(
+                collection(db, 'events'),
+                where('familyId', 'in', familyIds),
+                orderBy('date', 'asc')
+            );
+        }
+    } else {
+        eventsQuery = query(
+            collection(db, 'events'),
+            where('familyId', '==', selectedFamilyId),
+            orderBy('date', 'asc')
+        );
+    }
+    
+    if (!eventsQuery) {
+        setEvents([]);
+        setLoading(false);
+        return;
+    }
+
+    const unsubEvents = onSnapshot(eventsQuery, (querySnapshot) => {
+        const fetchedEvents = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-          }));
-          setEvents(fetchedEvents);
-          setLoading(false);
-        }, (error) => {
-            console.error("Error fetching events:", error);
-            setLoading(false);
-        });
-
-      } catch (error) {
-        console.error("Error setting up events listener:", error);
+        }));
+        setEvents(fetchedEvents);
         setLoading(false);
-      }
-    };
+    }, (error) => {
+        console.error("Error fetching events:", error);
+        setLoading(false);
+    });
 
-    setupEventsListener();
-
-    return () => {
-      unsubUser();
-      unsubEvents();
-    };
-  }, [router]);
+    return () => unsubEvents();
+  }, [families, selectedFamilyId]);
 
   const getDaysInMonth = () => {
     const year = currentMonth.getFullYear();
@@ -384,6 +406,26 @@ export default function AgendaScreen() {
             </View>
           </View>
 
+          <View style={styles.familySelectorContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <TouchableOpacity
+                    style={[styles.familyChip, {backgroundColor: selectedFamilyId === 'all' ? colors.tint : colors.secondaryCardBackground}]}
+                    onPress={() => setSelectedFamilyId('all')}
+                >
+                    <Text style={[styles.familyChipText, {color: selectedFamilyId === 'all' ? '#fff' : colors.text}]}>Toutes</Text>
+                </TouchableOpacity>
+                {families.map((family) => (
+                    <TouchableOpacity
+                        key={family.id}
+                        style={[styles.familyChip, {backgroundColor: selectedFamilyId === family.id ? colors.tint : colors.secondaryCardBackground}]}
+                        onPress={() => setSelectedFamilyId(family.id)}
+                    >
+                        <Text style={[styles.familyChipText, {color: selectedFamilyId === family.id ? '#fff' : colors.text}]}>{family.name || `Famille`}</Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+          </View>
+
           {viewMode === 'mois' && (
             <>
               {/* Calendar */}
@@ -528,6 +570,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: hs(6),
     flexShrink: 0,
+  },
+  familySelectorContainer: {
+    marginBottom: V_SPACING.large,
+  },
+  familyChip: {
+    paddingHorizontal: SPACING.large,
+    paddingVertical: vs(8),
+    borderRadius: BORDER_RADIUS.large,
+    marginRight: SPACING.small,
+  },
+  familyChipText: {
+    fontSize: FONT_SIZES.regular,
+    fontWeight: '600',
   },
   todayButton: {
     paddingHorizontal: hs(10),
