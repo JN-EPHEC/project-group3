@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import { Colors } from '../../constants/theme';
 
 // Fonction de validation détaillée pour expliquer l'erreur spécifique
@@ -147,85 +147,90 @@ const RegisterScreen = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => router.back()}
-      >
-        <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
-      </TouchableOpacity>
-
-      <View style={styles.contentContainer}>
-        <Text style={[styles.title, { color: colors.tint }]}>Inscription</Text>
-        
-        <View style={styles.formContainer}>
-          <Text style={[styles.label, { color: colors.text }]}>Nom*</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-            placeholder="Dupont"
-            placeholderTextColor={colors.textSecondary}
-            value={lastName}
-            onChangeText={setLastName}
-            autoCapitalize="words"
-          />
-
-          <Text style={[styles.label, { color: colors.text }]}>Prénom*</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-            placeholder="Maya"
-            placeholderTextColor={colors.textSecondary}
-            value={firstName}
-            onChangeText={setFirstName}
-            autoCapitalize="words"
-          />
-
-          <Text style={[styles.label, { color: colors.text }]}>Email*</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-            placeholder="votre@email.be"
-            placeholderTextColor={colors.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <Text style={[styles.label, { color: colors.text }]}>Mot de passe*</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-            placeholder="8-16 car, Maj, Min, Chiffre, Spécial"
-            placeholderTextColor={colors.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-
-          <Text style={[styles.label, { color: colors.text }]}>Photo de profil</Text>
-          <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.photoPlaceholder} />
-            ) : (
-              <View style={[styles.photoPlaceholder, { backgroundColor: colors.cardBackground }]}>
-                <Text style={[styles.photoIcon, { color: colors.textSecondary }]}>✎</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-      {loading ? (
-        <ActivityIndicator size="large" color={colors.tint} />
-      ) : (
+    <KeyboardAvoidingView 
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView>
         <TouchableOpacity 
-          style={[styles.registerButton, { backgroundColor: colors.tint }]} 
-          onPress={handleRegister} 
-          disabled={loading}
+          style={styles.backButton}
+          onPress={() => router.back()}
         >
-          <Text style={[styles.registerButtonText, { color: '#fff' }]}>Créer le compte</Text>
+          <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
         </TouchableOpacity>
-      )}
-      {error ? <Text style={[styles.error, { color: colors.dangerButton }]}>{error}</Text> : null}
-    </View>
-    </View>
-    </View>
+
+        <View style={styles.contentContainer}>
+          <Text style={[styles.title, { color: colors.tint }]}>Inscription</Text>
+          
+          <View style={styles.formContainer}>
+            <Text style={[styles.label, { color: colors.text }]}>Nom*</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
+              placeholder="Dupont"
+              placeholderTextColor={colors.textSecondary}
+              value={lastName}
+              onChangeText={setLastName}
+              autoCapitalize="words"
+            />
+
+            <Text style={[styles.label, { color: colors.text }]}>Prénom*</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
+              placeholder="Maya"
+              placeholderTextColor={colors.textSecondary}
+              value={firstName}
+              onChangeText={setFirstName}
+              autoCapitalize="words"
+            />
+
+            <Text style={[styles.label, { color: colors.text }]}>Email*</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
+              placeholder="votre@email.be"
+              placeholderTextColor={colors.textSecondary}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <Text style={[styles.label, { color: colors.text }]}>Mot de passe*</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
+              placeholder="8-16 car, Maj, Min, Chiffre, Spécial"
+              placeholderTextColor={colors.textSecondary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+
+            <Text style={[styles.label, { color: colors.text }]}>Photo de profil</Text>
+            <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
+              {imageUri ? (
+                <Image source={{ uri: imageUri }} style={styles.photoPlaceholder} />
+              ) : (
+                <View style={[styles.photoPlaceholder, { backgroundColor: colors.cardBackground }]}>
+                  <Text style={[styles.photoIcon, { color: colors.textSecondary }]}>✎</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.tint} />
+        ) : (
+          <TouchableOpacity 
+            style={[styles.registerButton, { backgroundColor: colors.tint }]} 
+            onPress={handleRegister} 
+            disabled={loading}
+          >
+            <Text style={[styles.registerButtonText, { color: '#fff' }]}>Créer le compte</Text>
+          </TouchableOpacity>
+        )}
+        {error ? <Text style={[styles.error, { color: colors.dangerButton }]}>{error}</Text> : null}
+      </View>
+      </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -235,7 +240,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#BBE1FA'
   },
   contentContainer: {
-    flex: 1,
     paddingTop: 100,
     paddingHorizontal: 20
   },
