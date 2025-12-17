@@ -19,8 +19,6 @@ export default function HomeScreen() {
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
   const [families, setFamilies] = useState<any[]>([]);
-  const [selectedFamilyIndex, setSelectedFamilyIndex] = useState(0);
-  const [showFamilyMenu, setShowFamilyMenu] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -88,23 +86,24 @@ export default function HomeScreen() {
     };
     const uid = currentUser.uid;
     
-    const currentFamily = families[selectedFamilyIndex];
-    if (!currentFamily) return;
+    const allMemberIds = families.flatMap(f => f.members || []);
+    const uniqueMemberIds = [...new Set(allMemberIds)].filter(id => id !== uid);
+    
+    let unsubMembers = () => {};
+    if (uniqueMemberIds.length > 0) {
+        const membersQuery = query(collection(db, 'users'), where('__name__', 'in', uniqueMemberIds));
+        unsubMembers = onSnapshot(membersQuery, (snapshot) => {
+            const members = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+            setFamilyMembers(members);
+        });
+    } else {
+        setFamilyMembers([]);
+    }
 
-    const membersQuery = query(
-        collection(db, 'users'),
-        where('familyIds', 'array-contains', currentFamily.id)
-    );
-    const unsubMembers = onSnapshot(membersQuery, (snapshot) => {
-        const members = snapshot.docs
-            .map(doc => ({ uid: doc.id, ...doc.data() }))
-            .filter((member) => member.uid !== uid);
-        setFamilyMembers(members);
-    });
-
+    const familyIds = families.map(f => f.id);
     const conversationsQuery = query(
         collection(db, 'conversations'),
-        where('familyId', '==', currentFamily.id),
+        where('familyId', 'in', familyIds),
         where('participants', 'array-contains', uid),
         orderBy('lastMessageTime', 'desc')
     );
@@ -135,7 +134,7 @@ export default function HomeScreen() {
         unsubMembers();
         unsubConversations();
     }
-  }, [families, selectedFamilyIndex]);
+  }, [families]);
 
   const handleNewMessage = () => {
     if (familyMembers.length === 0) {
@@ -149,10 +148,6 @@ export default function HomeScreen() {
         otherUserName: `${otherMember.firstName} ${otherMember.lastName || ''}`
       }
     });
-  };
-
-  const handleFamilyChange = async (index: number) => {
-    setSelectedFamilyIndex(index);
   };
 
   const handleLogout = async () => {
@@ -178,75 +173,6 @@ export default function HomeScreen() {
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.tint }]}>Accueil</Text>
-            
-            {/* Sélecteur de famille discret */}
-            {families.length > 1 && (
-              <View style={styles.familySelectorWrapper}>
-                <TouchableOpacity 
-                  style={[
-                    styles.familyButton, 
-                    { backgroundColor: showFamilyMenu ? colors.tint : colors.secondaryCardBackground }
-                  ]}
-                  onPress={() => setShowFamilyMenu(!showFamilyMenu)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.familyButtonText, 
-                    { color: showFamilyMenu ? '#fff' : colors.tint }
-                  ]}>
-                    {families[selectedFamilyIndex]?.name || families[selectedFamilyIndex]?.code || 'Famille'}
-                  </Text>
-                  <IconSymbol 
-                    name={showFamilyMenu ? "chevron.up" : "chevron.down"} 
-                    size={16} 
-                    color={showFamilyMenu ? '#fff' : colors.tint}
-                  />
-                </TouchableOpacity>
-                                {/* Overlay pour fermer le menu */}
-                                {showFamilyMenu && (
-                                  <TouchableOpacity 
-                                    style={styles.menuOverlay}
-                                    activeOpacity={1}
-                                    onPress={() => setShowFamilyMenu(false)}
-                                  />
-                                )}
-                
-                
-                {/* Menu déroulant */}
-                {showFamilyMenu && (
-                  <View style={[styles.familyDropdown, { backgroundColor: colors.cardBackground }]}>
-                    {families.map((family, index) => (
-                      <TouchableOpacity
-                        key={family.id}
-                        style={[
-                          styles.familyMenuItem,
-                          { borderBottomColor: colors.border },
-                          selectedFamilyIndex === index && { backgroundColor: colors.secondaryCardBackground },
-                          index === families.length - 1 && { borderBottomWidth: 0 }
-                        ]}
-                        onPress={() => {
-                          handleFamilyChange(index);
-                          setShowFamilyMenu(false);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.familyMenuItemContent}>
-                          <Text style={[styles.familyMenuTitle, { color: colors.text }]}>
-                            {family.name || `Famille ${index + 1}`}
-                          </Text>
-                          <Text style={[styles.familyMenuCode, { color: colors.tint }]}>
-                            {family.code}
-                          </Text>
-                        </View>
-                        {selectedFamilyIndex === index && (
-                          <IconSymbol name="checkmark" size={18} color={colors.tint} />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            )}
           </View>
 
           <View style={styles.welcomeSection}>
