@@ -43,6 +43,11 @@ export default function ConversationScreen() {
     typeof conversationId === 'string' ? conversationId : null
   );
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeSearchQuery, setActiveSearchQuery] = useState('');
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [matchingIndices, setMatchingIndices] = useState<number[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState<number | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const currentUser = auth.currentUser;
   const storage = getStorage();
@@ -175,6 +180,52 @@ export default function ConversationScreen() {
 
     return () => clearTimeout(timeoutId);
   }, [currentUser, currentConversationId, loading, messages]);
+
+
+
+  const executeSearch = () => {
+    const query = searchQuery.trim();
+    setActiveSearchQuery(query);
+
+    if (query === '') {
+        setMatchingIndices([]);
+        setCurrentMatchIndex(null);
+        return;
+    }
+
+    const lowercasedQuery = query.toLowerCase();
+    const indices = messages.reduce((acc, message, index) => {
+        if (message.text && message.text.toLowerCase().includes(lowercasedQuery)) {
+            acc.push(index);
+        }
+        return acc;
+    }, [] as number[]);
+
+    const reversedIndices = indices.reverse();
+    setMatchingIndices(reversedIndices);
+
+    if (reversedIndices.length > 0) {
+        setCurrentMatchIndex(0);
+        flatListRef.current?.scrollToIndex({ index: reversedIndices[0], animated: true, viewPosition: 0.5 });
+    } else {
+        setCurrentMatchIndex(null);
+        Alert.alert('Aucun résultat', 'Aucun message ne correspond à votre recherche.');
+    }
+  };
+
+  const navigateToNextMatch = () => {
+      if (currentMatchIndex === null || matchingIndices.length === 0) return;
+      const nextIndex = (currentMatchIndex + 1) % matchingIndices.length;
+      setCurrentMatchIndex(nextIndex);
+      flatListRef.current?.scrollToIndex({ index: matchingIndices[nextIndex], animated: true, viewPosition: 0.5 });
+  };
+
+  const navigateToPreviousMatch = () => {
+      if (currentMatchIndex === null || matchingIndices.length === 0) return;
+      const prevIndex = (currentMatchIndex - 1 + matchingIndices.length) % matchingIndices.length;
+      setCurrentMatchIndex(prevIndex);
+      flatListRef.current?.scrollToIndex({ index: matchingIndices[prevIndex], animated: true, viewPosition: 0.5 });
+  };
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -346,13 +397,15 @@ export default function ConversationScreen() {
     }
   };
 
-  const renderMessage = ({ item }: { item: any }) => {
+  const renderMessage = ({ item, index }: { item: any, index: number }) => {
     const isMe = item.senderId === currentUser?.uid;
+    const isHighlighted = currentMatchIndex !== null && matchingIndices[currentMatchIndex] === index;
     
     return (
       <View style={[
         styles.messageContainer, 
-        isMe ? { backgroundColor: colors.tint, borderBottomRightRadius: 4, alignSelf: 'flex-end' } : { backgroundColor: colors.cardBackground, borderBottomLeftRadius: 4, alignSelf: 'flex-start' }
+        isMe ? { backgroundColor: colors.tint, borderBottomRightRadius: 4, alignSelf: 'flex-end' } : { backgroundColor: colors.cardBackground, borderBottomLeftRadius: 4, alignSelf: 'flex-start' },
+        isHighlighted && styles.highlightedMessage
       ]}>
         {item.imageUrls && item.imageUrls.length > 0 && (
           <View style={styles.messageImagesContainer}>
@@ -452,14 +505,56 @@ export default function ConversationScreen() {
                 {otherUser ? `${otherUser.firstName} ${otherUser.lastName}` : (otherUserName || 'Co-parent')}
               </Text>
             </View>
-            <View style={styles.headerSpacer} />
+            <TouchableOpacity
+              onPress={() => {
+                setSearchVisible(!searchVisible);
+                if (searchVisible) {
+                  setSearchQuery('');
+                  setActiveSearchQuery('');
+                  setMatchingIndices([]);
+                  setCurrentMatchIndex(null);
+                }
+              }}
+              style={styles.searchButton}
+            >
+              <IconSymbol name="magnifyingglass" size={24} color={colors.tint} />
+            </TouchableOpacity>
           </View>
+
+          {searchVisible && (
+            <View style={[styles.searchContainer, { borderBottomColor: colors.border }]}>
+              <TextInput
+                style={[styles.searchInput, { backgroundColor: colors.cardBackground, color: colors.text }]}
+                placeholder="Rechercher..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholderTextColor={colors.textSecondary}
+                onSubmitEditing={executeSearch}
+              />
+              <TouchableOpacity onPress={executeSearch} style={styles.searchActionButton}>
+                <IconSymbol name="magnifyingglass" size={22} color={colors.tint} />
+              </TouchableOpacity>
+              {activeSearchQuery && matchingIndices.length > 0 && (
+                <>
+                  <Text style={[styles.searchCounter, { color: colors.textSecondary }]}>
+                    {currentMatchIndex !== null ? currentMatchIndex + 1 : 0}/{matchingIndices.length}
+                  </Text>
+                  <TouchableOpacity onPress={navigateToPreviousMatch} style={styles.searchNavButton}>
+                    <IconSymbol name="chevron.up" size={22} color={colors.tint} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={navigateToNextMatch} style={styles.searchNavButton}>
+                    <IconSymbol name="chevron.down" size={22} color={colors.tint} />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
 
           {/* Messages */}
           <FlatList
             ref={flatListRef}
             data={messages}
-            renderItem={renderMessage}
+            renderItem={({ item, index }) => renderMessage({ item, index })}
             keyExtractor={(item) => item.id}
             inverted
             contentContainerStyle={styles.messagesList}
@@ -613,9 +708,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     flex: 1,
-  },
-  headerSpacer: {
-    width: 44,
   },
   headerAvatar: {
     width: 40,
@@ -843,5 +935,37 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  highlightedMessage: {
+    borderColor: '#FFD700', // Gold color for highlight
+    borderWidth: 2,
+  },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderBottomWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 15,
+  },
+  searchButton: {
+    padding: 8,
+  },
+  searchActionButton: {
+    padding: 6,
+  },
+  searchNavButton: {
+    padding: 6,
+  },
+  searchCounter: {
+    fontSize: 14,
+    paddingHorizontal: 8,
   },
 });
