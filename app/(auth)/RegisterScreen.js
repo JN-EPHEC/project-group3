@@ -73,14 +73,14 @@ const RegisterScreen = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       const user = userCredential.user;
 
-      let photoURL = null;
+      let profileImage = null;
       if (imageUri) {
         try {
           const response = await fetch(imageUri);
           const blob = await response.blob();
           const storageRef = ref(storage, `users/${user.uid}/profile.jpg`);
           await uploadBytes(storageRef, blob);
-          photoURL = await getDownloadURL(storageRef);
+          profileImage = await getDownloadURL(storageRef);
         } catch (uploadError) {
           console.log('Erreur upload image: ' + uploadError.message);
         }
@@ -94,7 +94,7 @@ const RegisterScreen = () => {
         userType: userType || 'parent',
         createdAt: serverTimestamp(),
       };
-      if (photoURL) userDoc.photoURL = photoURL;
+      if (profileImage) userDoc.profileImage = profileImage;
 
       await setDoc(doc(db, 'users', user.uid), userDoc);
 
