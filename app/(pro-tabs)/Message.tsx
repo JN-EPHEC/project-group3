@@ -207,7 +207,8 @@ export default function ProMessageScreen() {
                         >
                           <Text style={styles.addButtonText}>+</Text>
                         </TouchableOpacity>
-                      )}          </View>
+                      )}
+                    </View>
         </View>
 
         <ScrollView 
