@@ -5,7 +5,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -53,7 +53,7 @@ export default function AddExpenseScreen() {
       }
     }
 
-    // Récupérer la devise et les limites de catégorie
+    // Récupérer la devise et les limites de catégorie (avec écoute temps réel pour les catégories)
     const fetchCurrency = async () => {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
@@ -84,32 +84,43 @@ export default function AddExpenseScreen() {
       
       // Load budget categories and limits
       const budgetRef = doc(db, 'budgets', targetFamilyId);
-      const budgetSnap = await getDoc(budgetRef);
-      if (budgetSnap.exists()) {
-        const budgetData = budgetSnap.data();
-        const rules = budgetData.categoryRules || budgetData.categoryLimits || {};
-        const limits: { [key: string]: number } = {};
-        const allow: { [key: string]: boolean } = {};
-        Object.entries(rules).forEach(([name, value]) => {
-          if (typeof value === 'number') {
-            limits[name] = value as number;
-            allow[name] = false;
-          } else {
-            const obj = value as any;
-            limits[name] = obj?.limit ?? 0;
-            allow[name] = !!obj?.allowOverLimit;
-          }
-        });
-        setCategoryLimits(limits);
-        setCategoryAllowOver(allow);
-        
-        // Merge default categories with budget categories
-        const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...Object.keys(rules)])];
-        setCategories(allCategories);
-      }
+      const unsubscribeBudget = onSnapshot(budgetRef, (budgetSnap) => {
+        if (budgetSnap.exists()) {
+          const budgetData = budgetSnap.data();
+          const rules = budgetData.categoryRules || budgetData.categoryLimits || {};
+          const limits: { [key: string]: number } = {};
+          const allow: { [key: string]: boolean } = {};
+          Object.entries(rules).forEach(([name, value]) => {
+            if (typeof value === 'number') {
+              limits[name] = value as number;
+              allow[name] = false;
+            } else {
+              const obj = value as any;
+              limits[name] = obj?.limit ?? 0;
+              allow[name] = !!obj?.allowOverLimit;
+            }
+          });
+          setCategoryLimits(limits);
+          setCategoryAllowOver(allow);
+          
+          // Merge default categories with budget categories
+          const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...Object.keys(rules)])];
+          setCategories(allCategories);
+        }
+      });
+
+      // Cleanup listener when effect re-runs or unmounts
+      return unsubscribeBudget;
     };
 
-    fetchCurrency();
+    let cleanup: undefined | (() => void);
+    fetchCurrency().then((fn) => {
+      if (typeof fn === 'function') cleanup = fn;
+    });
+
+    return () => {
+      if (cleanup) cleanup();
+    };
   }, [params]);
 
   const uploadReceiptImage = async (uri: string, familyId: string): Promise<string> => {

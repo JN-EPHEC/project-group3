@@ -9,6 +9,7 @@ import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch,
 import { auth, db, getUserFamily } from '../constants/firebase';
 
 const DEFAULT_CATEGORIES = ['Santé', 'Vêtements', 'École', 'Alimentation', 'Transport'];
+const DEFAULT_SEEDED_LIMIT = 100; // Montant par défaut pour les catégories nouvellement créées
 
 type CategoryRule = { name: string; limit: number; allowOverLimit: boolean };
 
@@ -17,6 +18,10 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
   const [loading, setLoading] = useState(true);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryLimit, setNewCategoryLimit] = useState(String(DEFAULT_SEEDED_LIMIT));
+  const [newAllowOverLimit, setNewAllowOverLimit] = useState(false);
 
   useEffect(() => {
     if (!familyId) return;
@@ -30,7 +35,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         if (!rules || Object.keys(rules).length === 0) {
           const seed: any = {};
           DEFAULT_CATEGORIES.forEach((name) => {
-            seed[name] = { limit: 0, allowOverLimit: false };
+            seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false };
           });
           await setDoc(budgetRef, { categoryRules: seed }, { merge: true });
         }
@@ -46,10 +51,10 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         // Créer le document avec les catégories par défaut
         const seed: any = {};
         DEFAULT_CATEGORIES.forEach((name) => {
-          seed[name] = { limit: 0, allowOverLimit: false };
+          seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false };
         });
         await setDoc(budgetRef, { categoryRules: seed });
-        setCategories(DEFAULT_CATEGORIES.map((name) => ({ name, limit: 0, allowOverLimit: false })));
+        setCategories(DEFAULT_CATEGORIES.map((name) => ({ name, limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false })));
       }
       setLoading(false);
     });
@@ -95,22 +100,99 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
     }
   };
 
+  const handleAddCategory = async () => {
+    if (!familyId) return;
+    const name = newCategoryName.trim();
+    if (!name) {
+      Alert.alert('Erreur', 'Le nom de la catégorie est requis');
+      return;
+    }
+    if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      Alert.alert('Info', 'Cette catégorie existe déjà');
+      return;
+    }
+    const limit = parseFloat(newCategoryLimit);
+    if (isNaN(limit) || limit < 0) {
+      Alert.alert('Erreur', 'Veuillez entrer un montant valide');
+      return;
+    }
+    try {
+      const budgetRef = doc(db, 'budgets', familyId);
+      await updateDoc(budgetRef, {
+        [`categoryRules.${name}`]: { limit, allowOverLimit: newAllowOverLimit },
+      });
+      setShowAddCategory(false);
+      setNewCategoryName('');
+      setNewCategoryLimit(String(DEFAULT_SEEDED_LIMIT));
+      setNewAllowOverLimit(false);
+    } catch (error) {
+      console.error('Error adding category:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter la catégorie');
+    }
+  };
+
   if (loading) {
     return <ActivityIndicator size="small" color={colors.tint} />;
   }
 
   if (categories.length === 0) {
     return (
-      <View style={[styles.emptyCard, { backgroundColor: colors.cardBackground }]}>
-        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-          Aucune catégorie créée. Les catégories apparaîtront ici lorsque vous ajouterez des dépenses.
-        </Text>
+      <View>
+        <View style={{ alignItems: 'flex-end', marginBottom: V_SPACING.small }}>
+          <TouchableOpacity onPress={() => setShowAddCategory(true)} style={styles.addButton}>
+            <IconSymbol name="plus" size={20} color={colors.tint} />
+          </TouchableOpacity>
+        </View>
+        <View style={[styles.emptyCard, { backgroundColor: colors.cardBackground }]}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Aucune catégorie créée. Ajoutez-en une pour commencer.
+          </Text>
+        </View>
+        {showAddCategory && (
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle catégorie</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                placeholder="Nom de la catégorie"
+                placeholderTextColor={colors.textSecondary}
+                value={newCategoryName}
+                onChangeText={setNewCategoryName}
+              />
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                placeholder="Plafond (ex: 100)"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+                value={newCategoryLimit}
+                onChangeText={setNewCategoryLimit}
+              />
+              <View style={styles.modalSwitchRow}>
+                <Text style={[styles.modalSwitchLabel, { color: colors.text }]}>Autoriser au-dessus du plafond</Text>
+                <Switch value={newAllowOverLimit} onValueChange={setNewAllowOverLimit} />
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowAddCategory(false)}>
+                  <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalButton, styles.modalPrimary]} onPress={handleAddCategory}>
+                  <Text style={[styles.modalButtonText, { color: '#000' }]}>Ajouter</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
       </View>
     );
   }
 
   return (
     <View>
+      <View style={{ alignItems: 'flex-end', marginBottom: V_SPACING.small }}>
+        <TouchableOpacity onPress={() => setShowAddCategory(true)} style={styles.addButton}>
+          <IconSymbol name="plus" size={20} color={colors.tint} />
+        </TouchableOpacity>
+      </View>
       {categories.map((cat) => (
         <View key={cat.name} style={[styles.categoryLimitCard, { backgroundColor: colors.cardBackground }]}>
           <View style={styles.categoryLimitInfo}>
@@ -170,6 +252,40 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
           </View>
         </View>
       ))}
+      {showAddCategory && (
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle catégorie</Text>
+            <TextInput
+              style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+              placeholder="Nom de la catégorie"
+              placeholderTextColor={colors.textSecondary}
+              value={newCategoryName}
+              onChangeText={setNewCategoryName}
+            />
+            <TextInput
+              style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+              placeholder="Plafond (ex: 100)"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="decimal-pad"
+              value={newCategoryLimit}
+              onChangeText={setNewCategoryLimit}
+            />
+            <View style={styles.modalSwitchRow}>
+              <Text style={[styles.modalSwitchLabel, { color: colors.text }]}>Autoriser au-dessus du plafond</Text>
+              <Switch value={newAllowOverLimit} onValueChange={setNewAllowOverLimit} />
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowAddCategory(false)}>
+                <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.modalPrimary]} onPress={handleAddCategory}>
+                <Text style={[styles.modalButtonText, { color: '#000' }]}>Ajouter</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -250,6 +366,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: V_SPACING.xlarge,
   },
+  addButton: {
+    width: hs(40),
+    height: hs(40),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   backButton: {
     width: hs(40),
     height: hs(40),
@@ -328,5 +450,61 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.regular,
     textAlign: 'center',
     lineHeight: vs(22),
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.large,
+  },
+  modalContent: {
+    width: '100%',
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.large,
+    gap: V_SPACING.small,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.large,
+    fontWeight: '700',
+    marginBottom: V_SPACING.small,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.small,
+    padding: SPACING.small,
+    fontSize: FONT_SIZES.medium,
+  },
+  modalSwitchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: V_SPACING.small,
+  },
+  modalSwitchLabel: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING.small,
+    marginTop: V_SPACING.medium,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: V_SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    alignItems: 'center',
+  },
+  modalPrimary: {
+    backgroundColor: '#fff',
+  },
+  modalButtonText: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
   },
 });
