@@ -577,3 +577,108 @@ export async function getProfessionalPhoto(uid) {
     return null;
   }
 }
+
+/**
+ * Upload a professional diploma document to Firebase Storage
+ * Stores in: professionals/{uid}/diploma
+ * Updates Firestore with the diploma URL
+ * 
+ * @param {string} uid - User ID
+ * @param {Blob} documentBlob - Document file blob/data
+ * @returns {Promise<Object>} { success: boolean, diplomaUrl: string, error?: any }
+ */
+export async function uploadProfessionalDiploma(uid, documentBlob) {
+  try {
+    if (!uid || !documentBlob) {
+      throw new Error('UID et document requis');
+    }
+
+    // Create storage reference
+    const diplomaRef = ref(storage, `professionals/${uid}/diploma`);
+    
+    // Upload file
+    const snapshot = await uploadBytes(diplomaRef, documentBlob);
+    console.log('[UploadDiploma] File uploaded:', snapshot.fullPath);
+    
+    // Get download URL
+    const diplomaUrl = await getDownloadURL(diplomaRef);
+    console.log('[UploadDiploma] Download URL:', diplomaUrl);
+    
+    // Update Firestore professionals document with diploma URL
+    const professionalDocRef = doc(db, 'professionals', uid);
+    await setDoc(professionalDocRef, { diplomaUrl }, { merge: true });
+    console.log('[UploadDiploma] Firestore updated with diplomaUrl');
+    
+    return {
+      success: true,
+      diplomaUrl
+    };
+  } catch (error) {
+    console.error('[UploadDiploma] Erreur:', error);
+    return {
+      success: false,
+      error: error.message || 'Erreur lors du téléchargement du diplôme'
+    };
+  }
+}
+
+/**
+ * Delete a professional diploma document
+ * Removes from Firebase Storage and clears Firestore reference
+ * 
+ * @param {string} uid - User ID
+ * @returns {Promise<Object>} { success: boolean, error?: any }
+ */
+export async function deleteProfessionalDiploma(uid) {
+  try {
+    if (!uid) {
+      throw new Error('UID requis');
+    }
+
+    // Delete from Storage
+    const diplomaRef = ref(storage, `professionals/${uid}/diploma`);
+    try {
+      await deleteObject(diplomaRef);
+      console.log('[DeleteDiploma] File deleted from storage');
+    } catch (err) {
+      // File might not exist, continue
+      if (err.code !== 'storage/object-not-found') {
+        throw err;
+      }
+    }
+    
+    // Update Firestore to remove diplomaUrl
+    const professionalDocRef = doc(db, 'professionals', uid);
+    await setDoc(professionalDocRef, { diplomaUrl: null }, { merge: true });
+    console.log('[DeleteDiploma] Firestore updated');
+    
+    return { success: true };
+  } catch (error) {
+    console.error('[DeleteDiploma] Erreur:', error);
+    return {
+      success: false,
+      error: error.message || 'Erreur lors de la suppression du diplôme'
+    };
+  }
+}
+
+/**
+ * Get professional diploma URL from Firestore
+ * 
+ * @param {string} uid - User ID
+ * @returns {Promise<string|null>} Diploma URL or null
+ */
+export async function getProfessionalDiploma(uid) {
+  try {
+    const professionalDocRef = doc(db, 'professionals', uid);
+    const snap = await getDoc(professionalDocRef);
+    
+    if (snap.exists()) {
+      return snap.data().diplomaUrl || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('[GetDiploma] Erreur:', error);
+    return null;
+  }
+}
