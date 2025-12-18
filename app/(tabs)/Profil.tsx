@@ -1,5 +1,4 @@
 import DeleteProfileModal from '@/components/DeleteProfileModal';
-import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
@@ -8,7 +7,8 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { arrayUnion, collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db, getUserFamilies, joinFamilyByCode, leaveFamilyById, signOut } from '../../constants/firebase';
 
 import ChildMedicalRecord, { ChildMedicalRecordData } from '@/components/ChildMedicalRecord';
@@ -589,16 +589,16 @@ export default function ProfilScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.safeArea}>
+      <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
           <ActivityIndicator size="large" color={colors.tint} />
         </View>
-      </ThemedView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ThemedView style={styles.safeArea}>
+    <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: colors.background }]}> 
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           {/* Header */}
@@ -1149,7 +1149,7 @@ export default function ProfilScreen() {
           </View>
         </SafeAreaView>
       </Modal>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 

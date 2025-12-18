@@ -463,18 +463,17 @@ export default function ProProfilScreen() {
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.tint }]}>Profil Professionnel</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              Cliquez sur l'icône crayon pour modifier vos informations
-            </Text>
-            {(!parentId || !professionalId) && (
-              <TouchableOpacity style={[styles.addRoleButton, { backgroundColor: colors.cardBackground }]} onPress={handleAddMissingRole}>
-                <IconSymbol name="person.badge.plus" size={18} color={colors.tint} />
-                <Text style={[styles.addRoleText, { color: colors.tint }]}>
-                  {!parentId ? 'Ajouter rôle Parent' : 'Ajouter rôle Pro'}
-                </Text>
-              </TouchableOpacity>
-            )}
+            <View style={styles.headerTop}>
+              <Text style={[styles.title, { color: colors.tint }]} numberOfLines={1} ellipsizeMode="tail">Profil </Text>
+              {(!parentId || !professionalId) && (
+                <TouchableOpacity style={[styles.addRoleButton, { backgroundColor: colors.cardBackground }]} onPress={handleAddMissingRole}>
+                  <IconSymbol name="person.badge.plus" size={18} color={colors.tint} />
+                  <Text style={[styles.addRoleText, { color: colors.tint }]}>
+                    {!parentId ? 'Ajouter rôle Parent' : 'Ajouter rôle Pro'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           <View style={styles.userInfoSection}>
@@ -1043,12 +1042,14 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 80 },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 28, fontWeight: '700', color: '#FFCEB0' },
+  header: { marginBottom: 16 },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { fontSize: 28, fontWeight: '700', color: '#FFCEB0', flex: 1, minWidth: 0, marginRight: 12 },
   headerSubtitle: { fontSize: 14, fontWeight: '400', marginTop: 6, opacity: 0.8 },
   addRoleButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
