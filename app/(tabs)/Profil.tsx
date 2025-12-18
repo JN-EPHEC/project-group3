@@ -8,9 +8,10 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, joinFamilyByCode, leaveFamilyById, signOut } from '../../constants/firebase';
 
+import ChildMedicalRecord, { ChildMedicalRecordData } from '@/components/ChildMedicalRecord';
 import * as ImagePicker from 'expo-image-picker';
 import { deleteObject, getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { Image } from 'react-native';
@@ -45,6 +46,35 @@ export default function ProfilScreen() {
   const [editFamilyName, setEditFamilyName] = useState('');
   const [isEditingFamilyName, setIsEditingFamilyName] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [medicalModalVisible, setMedicalModalVisible] = useState(false);
+  const [selectedChildForMedical, setSelectedChildForMedical] = useState<{ id: string; name: string } | null>(null);
+  const [savingMedical, setSavingMedical] = useState(false);
+
+  const currentFamilyId = families[selectedFamilyIndex]?.id;
+  const selectedChildFull = selectedChildForMedical
+    ? children.find((c) => c.id === selectedChildForMedical.id) || null
+    : null;
+
+  const handleConfirmMedicalRecord = async (updatedRecord: ChildMedicalRecordData) => {
+    if (!currentFamilyId || !selectedChildForMedical) return;
+    try {
+      setSavingMedical(true);
+      const newName = (updatedRecord?.general?.fullName || '').trim() || selectedChildForMedical.name;
+      const updatedChildren = children.map((c) =>
+        c.id === selectedChildForMedical.id ? { ...c, name: newName, medicalRecord: updatedRecord } : c
+      );
+      const familyDocRef = doc(db, 'families', currentFamilyId);
+      await updateDoc(familyDocRef, { children: updatedChildren });
+      setChildren(updatedChildren);
+      // Also update the selected child header name in modal
+      setSelectedChildForMedical(prev => (prev ? { ...prev, name: newName } : prev));
+    } catch (e) {
+      console.error('Error saving medical record:', e);
+      Alert.alert('Erreur', 'Impossible de sauvegarder la fiche médicale');
+    } finally {
+      setSavingMedical(false);
+    }
+  };
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -888,10 +918,14 @@ export default function ProfilScreen() {
                         </View>
                       ) : (
                         <>
-                          <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
+                          <TouchableOpacity
+                            onPress={() => { setSelectedChildForMedical(child); setMedicalModalVisible(true); }}
+                            style={{flexDirection: 'row', alignItems: 'center', flex: 1}}
+                            activeOpacity={0.8}
+                          >
                               <IconSymbol name="person.circle" size={30} color={colors.tint} />
                               <Text style={[styles.memberName, { color: colors.text }]}>{child.name}</Text>
-                          </View>
+                          </TouchableOpacity>
                           <View style={{flexDirection: 'row', alignItems: 'center', gap: 15, marginLeft: 10}}>
                             <TouchableOpacity onPress={() => { setEditingChildId(child.id); setEditingChildName(child.name); }} style={{ padding: 4 }}>
                                 <IconSymbol name="pencil" size={20} color={colors.tint} />
@@ -991,6 +1025,33 @@ export default function ProfilScreen() {
         onClose={() => setShowDeleteModal(false)}
         userId={user?.uid || ''}
       />
+
+      {/* Child Medical Record Modal */}
+      <Modal
+        visible={medicalModalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setMedicalModalVisible(false)}
+      >
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
+          <View style={{ paddingHorizontal: SPACING.large, paddingTop: vs(60) }}>
+            <TouchableOpacity onPress={() => setMedicalModalVisible(false)} style={{ marginBottom: V_SPACING.medium }}>
+              <IconSymbol name="chevron.left" size={hs(24)} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '700', marginBottom: V_SPACING.medium }}>
+              Fiche médicale {selectedChildForMedical ? `- ${selectedChildForMedical.name}` : ''}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <ChildMedicalRecord
+              childName={selectedChildForMedical?.name}
+              initialRecord={(selectedChildFull as any)?.medicalRecord}
+              onConfirm={handleConfirmMedicalRecord}
+              saving={savingMedical}
+            />
+          </View>
+        </SafeAreaView>
+      </Modal>
     </ThemedView>
   );
 }
