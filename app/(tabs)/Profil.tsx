@@ -6,7 +6,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { arrayUnion, collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, joinFamilyByCode, leaveFamilyById, signOut } from '../../constants/firebase';
@@ -42,6 +42,8 @@ export default function ProfilScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userRole, setUserRole] = useState('parent');
+  const [parentId, setParentId] = useState<string | null>(null);
+  const [professionalId, setProfessionalId] = useState<string | null>(null);
   const [familyName, setFamilyName] = useState('');
   const [editFamilyName, setEditFamilyName] = useState('');
   const [isEditingFamilyName, setIsEditingFamilyName] = useState(false);
@@ -79,6 +81,43 @@ export default function ProfilScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
+  const handleAddMissingRole = async () => {
+    const current = auth.currentUser;
+    if (!current) return;
+    const userRef = doc(db, 'users', current.uid);
+
+    const missingRole = parentId ? (professionalId ? null : 'professionnel') : 'parent';
+    if (!missingRole) {
+      Alert.alert('Info', 'Les deux rôles sont déjà actifs.');
+      return;
+    }
+
+    Alert.alert(
+      'Ajouter un rôle',
+      missingRole === 'professionnel'
+        ? 'Ajouter le rôle Professionnel à votre compte ?'
+        : 'Ajouter le rôle Parent à votre compte ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Continuer',
+          onPress: async () => {
+            try {
+              const payload = missingRole === 'professionnel'
+                ? { professional_id: current.uid, roles: arrayUnion('professionnel') }
+                : { parent_id: current.uid, roles: arrayUnion('parent') };
+              await updateDoc(userRef, payload);
+              Alert.alert('Succès', 'Rôle ajouté. Vous pouvez compléter les infos dans le profil correspondant.');
+            } catch (e) {
+              console.error('Error adding role', e);
+              Alert.alert('Erreur', 'Impossible d\'ajouter le rôle.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (currentUser) {
@@ -99,6 +138,8 @@ export default function ProfilScreen() {
           if (userData.userType) {
             setUserRole(userData.userType);
           }
+          setParentId(userData.parent_id ?? (userData.userType === 'parent' ? currentUser.uid : null));
+          setProfessionalId(userData.professional_id ?? (userData.userType === 'professionnel' ? currentUser.uid : null));
           if (userData.profileImage) {
             setProfileImage(userData.profileImage);
           }
@@ -563,6 +604,14 @@ export default function ProfilScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.tint }]}>Profil</Text>
+            {(!parentId || !professionalId) && (
+              <TouchableOpacity style={[styles.addRoleButton, { backgroundColor: colors.cardBackground }]} onPress={handleAddMissingRole}>
+                <IconSymbol name="person.badge.plus" size={18} color={colors.tint} />
+                <Text style={[styles.addRoleText, { color: colors.tint }]}>
+                  {!parentId ? 'Ajouter rôle Parent' : 'Ajouter rôle Professionnel'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.userInfoSection}>
@@ -1124,9 +1173,30 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: V_SPACING.regular,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   title: {
     fontSize: FONT_SIZES.huge,
+    fontWeight: '700',
+  },
+  addRoleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: hs(6),
+    paddingHorizontal: hs(10),
+    paddingVertical: vs(6),
+    borderRadius: BORDER_RADIUS.medium,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addRoleText: {
+    fontSize: FONT_SIZES.small,
     fontWeight: '700',
   },
   userInfoSection: {
