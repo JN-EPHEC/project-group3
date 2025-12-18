@@ -211,7 +211,8 @@ export default function MessageScreen() {
                         >
                           <Text style={styles.addButtonText}>+</Text>
                         </TouchableOpacity>
-                      )}          </View>
+                      )}
+                    </View>
         </View>
 
         <ScrollView 
