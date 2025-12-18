@@ -17,8 +17,10 @@ const MAPPING = {
   'house.fill': 'home',
   'magnifyingglass': 'search',
   'note.text': 'description',
-  // Medical record icon
-  'cross.case.fill': 'medical_services',
+  // Medical record icon (fallback widely available on Android)
+  'cross.case.fill': 'local-hospital',
+  // Document file icon alias for Android/web
+  'doc.text': 'description',
   'arrow.down.to.line': 'file_download',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
