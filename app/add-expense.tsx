@@ -8,7 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CURRENCIES, getCurrencySymbol } from '../constants/currencies';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
@@ -488,54 +488,64 @@ export default function AddExpenseScreen() {
         animationType="slide"
         onRequestClose={() => setShowAddCategory(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowAddCategory(false)}
+          />
           <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Nouvelle Catégorie
-            </Text>
-            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-              Cette catégorie devra être approuvée par l'autre parent
-            </Text>
-            <TextInput
-              style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-              placeholder="Nom de la catégorie"
-              placeholderTextColor={colors.textSecondary}
-              value={newCategory}
-              onChangeText={setNewCategory}
-            />
-            <TextInput
-              style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-              placeholder="Plafond (ex: 100)"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="decimal-pad"
-              value={newCategoryLimit}
-              onChangeText={setNewCategoryLimit}
-            />
-            <View style={styles.modalSwitchRow}>
-              <Text style={[styles.modalSwitchLabel, { color: colors.text }]}>Autoriser au-dessus du plafond</Text>
-              <Switch value={newCategoryAllowOver} onValueChange={setNewCategoryAllowOver} />
-            </View>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.cardBackground }]}
-                onPress={() => {
-                  setShowAddCategory(false);
-                  setNewCategory('');
-                }}
-              >
-                <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>
-                  Annuler
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: '#fff' }]}
-                onPress={handleAddCategory}
-              >
-                <Text style={[styles.modalButtonText, { color: '#000' }]}>Ajouter</Text>
-              </TouchableOpacity>
-            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Nouvelle Catégorie
+              </Text>
+              <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                Cette catégorie devra être approuvée par l'autre parent
+              </Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                placeholder="Nom de la catégorie"
+                placeholderTextColor={colors.textSecondary}
+                value={newCategory}
+                onChangeText={setNewCategory}
+              />
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                placeholder="Plafond (ex: 100)"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+                value={newCategoryLimit}
+                onChangeText={setNewCategoryLimit}
+              />
+              <View style={styles.modalSwitchRow}>
+                <Text style={[styles.modalSwitchLabel, { color: colors.text }]}>Autoriser au-dessus du plafond</Text>
+                <Switch value={newCategoryAllowOver} onValueChange={setNewCategoryAllowOver} />
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: colors.cardBackground }]}
+                  onPress={() => {
+                    setShowAddCategory(false);
+                    setNewCategory('');
+                  }}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>
+                    Annuler
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: '#fff' }]}
+                  onPress={handleAddCategory}
+                >
+                  <Text style={[styles.modalButtonText, { color: '#000' }]}>Ajouter</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={showCurrencyPicker} transparent={true} animationType="slide">
