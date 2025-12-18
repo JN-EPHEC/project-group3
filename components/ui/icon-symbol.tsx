@@ -17,6 +17,8 @@ const MAPPING = {
   'house.fill': 'home',
   'magnifyingglass': 'search',
   'note.text': 'description',
+  // Medical record icon
+  'cross.case.fill': 'medical_services',
   'arrow.down.to.line': 'file_download',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
