@@ -156,10 +156,26 @@ export default function ProfilScreen() {
                 lastName: doc.data().lastName || '',
               }));
               setFamilyMembers(membersDetails);
+              
+              // Mettre à jour le nombre de membres dans l'array families
+              setFamilies(prev => prev.map((f, idx) => 
+                idx === selectedFamilyIndex 
+                  ? { ...f, members: familyData.members }
+                  : f
+              ));
+              
               if (loading) setLoading(false);
             });
           } else {
             setFamilyMembers([]);
+            
+            // Mettre à jour le nombre de membres dans l'array families
+            setFamilies(prev => prev.map((f, idx) => 
+              idx === selectedFamilyIndex 
+                ? { ...f, members: [] }
+                : f
+            ));
+            
             if (loading) setLoading(false);
           }
         } else {
