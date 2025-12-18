@@ -198,18 +198,19 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
   };
 
   const SectionHeader = ({ title, id }: { title: string; id: NonNullable<typeof expandedSectionId> }) => (
-    <TouchableOpacity style={styles.sectionHeader} onPress={() => toggleSection(id)}>
+    <TouchableOpacity style={styles.sectionHeader} onPress={() => toggleSection(id)} activeOpacity={0.85}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <IconSymbol name={expandedSectionId === id ? 'chevron.down' : 'chevron.right'} size={18} color="#8CA3AF" />
+      <IconSymbol name={expandedSectionId === id ? 'chevron.up' : 'chevron.down'} size={18} color="#8CA3AF" />
     </TouchableOpacity>
   );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header - Modifier */}
+      {/* Header: Child name left, actions right */}
       <View style={styles.headerRow}>
+        <Text style={styles.childNameText}>{record.general.fullName || childName || 'Enfant'}</Text>
         {editMode ? (
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flexDirection: 'row', gap: 16 }}>
             <TouchableOpacity
               disabled={!!saving || submitting}
               onPress={() => {
@@ -218,7 +219,7 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                 setOriginalRecord(null);
               }}
             >
-              <Text style={[styles.editButtonText, { color: '#9CA3AF' }]}>Annuler</Text>
+              <Text style={[styles.editButtonText, { color: '#9CA3AF', fontStyle: 'normal' }]}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
               disabled={!!saving || submitting}
@@ -233,7 +234,7 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                 }
               }}
             >
-              <Text style={styles.editButtonText}>{saving || submitting ? 'Enregistrement...' : 'Confirmer'}</Text>
+              <Text style={[styles.editButtonText, { fontStyle: 'normal' }]}>{saving || submitting ? 'Enregistrement...' : 'Confirmer'}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -538,8 +539,13 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  childNameText: {
+    color: '#9CA3AF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   editButtonText: {
     color: '#4A90E2',
