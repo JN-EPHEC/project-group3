@@ -8,7 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CURRENCIES, getCurrencySymbol } from '../constants/currencies';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
@@ -31,6 +31,8 @@ export default function AddExpenseScreen() {
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategory, setNewCategory] = useState('');
+  const [newCategoryLimit, setNewCategoryLimit] = useState('100');
+  const [newCategoryAllowOver, setNewCategoryAllowOver] = useState(false);
   const [categoryLimits, setCategoryLimits] = useState<{ [key: string]: number }>({});
   const [categoryAllowOver, setCategoryAllowOver] = useState<{ [key: string]: boolean }>({});
   const [uploading, setUploading] = useState(false);
@@ -164,13 +166,54 @@ export default function AddExpenseScreen() {
     }
   };
 
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
+    if (!familyId) {
+      Alert.alert('Erreur', 'Aucune famille active');
+      return;
+    }
     const trimmed = newCategory.trim();
-    if (trimmed && !categories.includes(trimmed)) {
-      setCategories([...categories, trimmed]);
-      setCategory(trimmed);
+    if (!trimmed) {
+      Alert.alert('Erreur', 'Le nom de la catégorie est requis');
+      return;
+    }
+    if (categories.includes(trimmed)) {
+      Alert.alert('Info', 'Cette catégorie existe déjà');
+      return;
+    }
+    const limit = parseFloat(newCategoryLimit);
+    if (isNaN(limit) || limit < 0) {
+      Alert.alert('Erreur', 'Veuillez entrer un plafond valide');
+      return;
+    }
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      // Create pending category approval request
+      await addDoc(collection(db, 'categoryApprovals'), {
+        familyId,
+        categoryName: trimmed,
+        limit,
+        allowOverLimit: newCategoryAllowOver,
+        requestedBy: currentUser.uid,
+        status: 'PENDING',
+        createdAt: serverTimestamp(),
+      });
+
+      Alert.alert(
+        'Catégorie proposée',
+        'Votre proposition de nouvelle catégorie a été envoyée. L\'autre parent devra l\'approuver.',
+        [{ text: 'OK' }]
+      );
+      
       setNewCategory('');
+      setNewCategoryLimit('100');
+      setNewCategoryAllowOver(false);
       setShowAddCategory(false);
+    } catch (error) {
+      console.error('Error creating category approval:', error);
+      Alert.alert('Erreur', 'Impossible de proposer la catégorie');
     }
   };
 
@@ -450,6 +493,9 @@ export default function AddExpenseScreen() {
             <Text style={[styles.modalTitle, { color: colors.text }]}>
               Nouvelle Catégorie
             </Text>
+            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+              Cette catégorie devra être approuvée par l'autre parent
+            </Text>
             <TextInput
               style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
               placeholder="Nom de la catégorie"
@@ -457,6 +503,18 @@ export default function AddExpenseScreen() {
               value={newCategory}
               onChangeText={setNewCategory}
             />
+            <TextInput
+              style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+              placeholder="Plafond (ex: 100)"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="decimal-pad"
+              value={newCategoryLimit}
+              onChangeText={setNewCategoryLimit}
+            />
+            <View style={styles.modalSwitchRow}>
+              <Text style={[styles.modalSwitchLabel, { color: colors.text }]}>Autoriser au-dessus du plafond</Text>
+              <Switch value={newCategoryAllowOver} onValueChange={setNewCategoryAllowOver} />
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, { backgroundColor: colors.cardBackground }]}
@@ -671,13 +729,25 @@ const styles = StyleSheet.create({
   },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' },
-  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 20, textAlign: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 10, textAlign: 'center' },
+  modalSubtitle: { fontSize: 14, marginBottom: 20, textAlign: 'center', fontStyle: 'italic' },
   modalInput: {
     borderWidth: 1,
     borderRadius: BORDER_RADIUS.medium,
     padding: SPACING.regular,
     fontSize: FONT_SIZES.medium,
     marginBottom: V_SPACING.regular,
+  },
+  modalSwitchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: V_SPACING.regular,
+  },
+  modalSwitchLabel: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+    flex: 1,
   },
   modalButtons: {
     flexDirection: 'row',

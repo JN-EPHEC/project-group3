@@ -2,7 +2,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -225,28 +225,28 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.limitDisplay}>
-                <View>
+              <View>
+                <View style={styles.limitDisplay}>
                   <Text style={[styles.categoryLimitAmount, { color: colors.tint }]}>
                     {cat.limit.toFixed(2)} €
                   </Text>
-                  <View style={styles.ruleRow}>
-                    <Text style={[styles.ruleLabel, { color: colors.textSecondary }]}>Autoriser au-dessus du plafond</Text>
-                    <Switch
-                      value={cat.allowOverLimit}
-                      onValueChange={(val) => handleToggleAllow(cat.name, val)}
-                    />
-                  </View>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => {
+                      setEditingCategory(cat.name);
+                      setEditValue(cat.limit.toString());
+                    }}
+                  >
+                    <IconSymbol name="pencil" size={18} color={colors.tint} />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => {
-                    setEditingCategory(cat.name);
-                    setEditValue(cat.limit.toString());
-                  }}
-                >
-                  <IconSymbol name="pencil" size={18} color={colors.tint} />
-                </TouchableOpacity>
+                <View style={styles.ruleRow}>
+                  <Text style={[styles.ruleLabel, { color: colors.textSecondary }]}>Autoriser au-dessus du plafond</Text>
+                  <Switch
+                    value={cat.allowOverLimit}
+                    onValueChange={(val) => handleToggleAllow(cat.name, val)}
+                  />
+                </View>
               </View>
             )}
           </View>
@@ -292,8 +292,10 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
 
 export default function BudgetSettingsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [loading, setLoading] = useState(true);
   const [familyId, setFamilyId] = useState<string | null>(null);
+  const [familyName, setFamilyName] = useState<string | null>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -306,9 +308,20 @@ export default function BudgetSettingsScreen() {
       }
 
       try {
-        const userFamily = await getUserFamily(currentUser.uid);
-        if (userFamily?.id) {
-          setFamilyId(userFamily.id);
+        // Prioritize familyId from params (active family)
+        const paramFamilyId = params.familyId as string | undefined;
+        const paramFamilyName = params.familyName as string | undefined;
+        
+        if (paramFamilyId) {
+          setFamilyId(paramFamilyId);
+          setFamilyName(paramFamilyName || null);
+        } else {
+          // Fallback to user's first family if no param
+          const userFamily = await getUserFamily(currentUser.uid);
+          if (userFamily?.id) {
+            setFamilyId(userFamily.id);
+            setFamilyName(null);
+          }
         }
       } catch (error) {
         console.error('Error fetching family settings:', error);
@@ -318,7 +331,7 @@ export default function BudgetSettingsScreen() {
     };
 
     fetchFamilySettings();
-  }, [router]);
+  }, [router, params]);
 
   if (loading) {
     return (
@@ -338,7 +351,10 @@ export default function BudgetSettingsScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
               <IconSymbol name="chevron.left" size={24} color={colors.tint} />
             </TouchableOpacity>
-            <Text style={[styles.title, { color: colors.tint }]}>Paramètres Budget</Text>
+            <View style={styles.titleContainer}>
+              <Text style={[styles.title, { color: colors.tint }]}>Paramètres Budget</Text>
+              {familyName && <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{familyName}</Text>}
+            </View>
             <View style={{ width: 24 }} />
           </View>
 
@@ -378,7 +394,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  titleContainer: { flex: 1, alignItems: 'center' },
   title: { fontSize: FONT_SIZES.huge, fontWeight: '700' },
+  subtitle: { fontSize: FONT_SIZES.small, fontWeight: '600', marginTop: vs(2) },
   section: { marginBottom: V_SPACING.xxlarge },
   sectionTitle: { fontSize: FONT_SIZES.large, fontWeight: '700', marginBottom: V_SPACING.small },
   sectionDescription: { fontSize: FONT_SIZES.regular, marginBottom: V_SPACING.regular, lineHeight: vs(20) },
@@ -388,19 +406,18 @@ const styles = StyleSheet.create({
     marginBottom: V_SPACING.medium,
   },
   categoryLimitInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    gap: V_SPACING.small,
   },
   categoryLimitName: {
     fontSize: FONT_SIZES.medium,
     fontWeight: '600',
-    flex: 1,
   },
   limitDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.small,
+    justifyContent: 'space-between',
+    width: '100%',
   },
   categoryLimitAmount: {
     fontSize: FONT_SIZES.large,

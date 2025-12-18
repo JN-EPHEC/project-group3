@@ -5,7 +5,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { getCurrencySymbol } from '../../constants/currencies';
@@ -36,6 +36,7 @@ export default function DepensesScreen() {
   const [showFilterDatePicker, setShowFilterDatePicker] = useState(false);
   const [filterAmountMin, setFilterAmountMin] = useState('');
   const [filterAmountMax, setFilterAmountMax] = useState('');
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -78,6 +79,39 @@ export default function DepensesScreen() {
       unsubUser();
     };
   }, [router]);
+
+  // Listen to pending approvals count
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    getDoc(userDocRef).then((userDoc) => {
+      if (!userDoc.exists()) return;
+
+      const familyIds = userDoc.data().familyIds || [];
+      if (familyIds.length === 0) {
+        setPendingApprovalsCount(0);
+        return;
+      }
+
+      const approvalsRef = collection(db, 'categoryApprovals');
+      const q = query(
+        approvalsRef,
+        where('familyId', 'in', familyIds),
+        where('status', '==', 'PENDING')
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const count = snapshot.docs.filter(
+          (doc) => doc.data().requestedBy !== currentUser.uid
+        ).length;
+        setPendingApprovalsCount(count);
+      });
+
+      return () => unsubscribe();
+    });
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -251,7 +285,7 @@ export default function DepensesScreen() {
             <View style={styles.headerButtons}>
               <TouchableOpacity 
                 style={[styles.settingsButton, { backgroundColor: colors.secondaryCardBackground }]}
-                onPress={() => router.push('/budget-settings')}
+                onPress={() => router.push({ pathname: '/budget-settings', params: { familyId: activeFamily?.id, familyName: activeFamily?.name } })}
               >
                 <Text style={[styles.settingsButtonText, { color: colors.tint }]}>Paramètres</Text>
                 <IconSymbol name="gearshape.fill" size={20} color={colors.tint} />
@@ -308,7 +342,26 @@ export default function DepensesScreen() {
           {/* Budget Categories */}
           {categories.length > 0 && (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Budgets par catégorie</Text>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.tint }]}>Budgets par catégorie</Text>
+                <View style={styles.budgetActions}>
+                  {pendingApprovalsCount > 0 && (
+                    <TouchableOpacity
+                      style={[styles.approvalsButton, { backgroundColor: colors.dangerButton }]}
+                      onPress={() => router.push('/category-approvals')}
+                    >
+                      <IconSymbol name="bell.badge" size={16} color="#fff" />
+                      <Text style={styles.approvalsButtonText}>{pendingApprovalsCount}</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.settingsIconButton, { backgroundColor: colors.cardBackground }]}
+                    onPress={() => router.push({ pathname: '/budget-settings', params: { familyId: activeFamily?.id, familyName: activeFamily?.name } })}
+                  >
+                    <IconSymbol name="gearshape" size={18} color={colors.tint} />
+                  </TouchableOpacity>
+                </View>
+              </View>
               {categories.map((category: any, index: number) => {
                 const name = category?.name || String(category);
                 const limit = typeof category?.limit === 'number' ? category.limit : 0;
@@ -656,6 +709,44 @@ const styles = StyleSheet.create({
   summaryAmount: { fontSize: FONT_SIZES.xxlarge, fontWeight: '800' },
   section: { marginBottom: V_SPACING.xxlarge },
   sectionTitle: { fontSize: FONT_SIZES.xlarge, fontWeight: '600', marginBottom: V_SPACING.regular },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: V_SPACING.regular,
+  },
+  budgetActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.small,
+  },
+  settingsIconButton: {
+    padding: SPACING.small,
+    borderRadius: BORDER_RADIUS.medium,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  approvalsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.small,
+    paddingVertical: vs(6),
+    borderRadius: BORDER_RADIUS.medium,
+    gap: SPACING.tiny,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  approvalsButtonText: {
+    color: '#fff',
+    fontSize: FONT_SIZES.small,
+    fontWeight: '700',
+  },
   budgetCard: { borderRadius: BORDER_RADIUS.medium, padding: SPACING.regular, marginBottom: V_SPACING.medium },
   budgetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: V_SPACING.medium },
   budgetName: { fontSize: FONT_SIZES.medium, fontWeight: '600' },
