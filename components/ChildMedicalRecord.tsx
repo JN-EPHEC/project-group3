@@ -3,6 +3,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import React, { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -283,9 +284,19 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
     setDownloadingFileId(file.id);
     try {
       const safeName = sanitizeFileName(file.label || 'document');
-      const destination = `${FileSystem.documentDirectory || ''}${safeName}`;
+      const destination = `${FileSystem.cacheDirectory || ''}${safeName}`;
       await FileSystem.downloadAsync(file.url, destination);
-      Alert.alert('Téléchargé', `Fichier enregistré dans :\n${destination}`);
+      
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(destination, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Enregistrer le document',
+          UTI: 'public.item'
+        });
+      } else {
+        Alert.alert('Téléchargé', `Fichier téléchargé dans le cache temporaire.`);
+      }
     } catch (e) {
       console.error('Error downloading medical file', e);
       Alert.alert('Erreur', 'Téléchargement impossible.');
