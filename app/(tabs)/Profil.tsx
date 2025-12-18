@@ -835,7 +835,7 @@ export default function ProfilScreen() {
                           styles.familyTabMembers,
                           { color: selectedFamilyIndex === index ? 'rgba(255,255,255,0.8)' : colors.textSecondary }
                         ]}>
-                          {family.members?.length || 0} membre{(family.members?.length || 0) > 1 ? 's' : ''}
+                          {selectedFamilyIndex === index ? familyMembers.length : (family.members?.length || 0)} membre{(selectedFamilyIndex === index ? familyMembers.length : (family.members?.length || 0)) > 1 ? 's' : ''}
                         </Text>
                       </View>
                     </TouchableOpacity>
