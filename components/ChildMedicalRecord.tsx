@@ -1,4 +1,6 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -109,6 +111,8 @@ const MOCK_MEDICAL_RECORD: ChildMedicalRecordData = {
 
 // Component
 export default function ChildMedicalRecord({ childName, initialRecord, onConfirm, saving }: { childName?: string; initialRecord?: ChildMedicalRecordData; onConfirm?: (record: ChildMedicalRecordData) => Promise<void> | void; saving?: boolean }) {
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
   const [editMode, setEditMode] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<null | 'general' | 'contacts' | 'history' | 'current' | 'files'>(null);
   const computedInitialRecord = useMemo<ChildMedicalRecordData>(() => {
@@ -199,16 +203,16 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
 
   const SectionHeader = ({ title, id }: { title: string; id: NonNullable<typeof expandedSectionId> }) => (
     <TouchableOpacity style={styles.sectionHeader} onPress={() => toggleSection(id)} activeOpacity={0.85}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <IconSymbol name={expandedSectionId === id ? 'chevron.up' : 'chevron.down'} size={18} color="#8CA3AF" />
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+      <IconSymbol name={expandedSectionId === id ? 'chevron.up' : 'chevron.down'} size={18} color={colors.textSecondary} />
     </TouchableOpacity>
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
       {/* Header: Child name left, actions right */}
       <View style={styles.headerRow}>
-        <Text style={styles.childNameText}>{record.general.fullName || childName || 'Enfant'}</Text>
+        <Text style={[styles.childNameText, { color: colors.textSecondary }]}>{record.general.fullName || childName || 'Enfant'}</Text>
         {editMode ? (
           <View style={{ flexDirection: 'row', gap: 16 }}>
             <TouchableOpacity
@@ -219,7 +223,7 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                 setOriginalRecord(null);
               }}
             >
-              <Text style={[styles.editButtonText, { color: '#9CA3AF', fontStyle: 'normal' }]}>Annuler</Text>
+              <Text style={[styles.editButtonText, { color: colors.textSecondary, fontStyle: 'normal' }]}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
               disabled={!!saving || submitting}
@@ -234,26 +238,26 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                 }
               }}
             >
-              <Text style={[styles.editButtonText, { fontStyle: 'normal' }]}>{saving || submitting ? 'Enregistrement...' : 'Confirmer'}</Text>
+              <Text style={[styles.editButtonText, { color: colors.tint, fontStyle: 'normal' }]}>{saving || submitting ? 'Enregistrement...' : 'Confirmer'}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity onPress={() => { setOriginalRecord(record); setEditMode(true); }}>
-            <Text style={styles.editButtonText}>Modifier</Text>
+            <Text style={[styles.editButtonText, { color: colors.tint }]}>Modifier</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* 1. Informations générales */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
         <SectionHeader title="Informations générales" id="general" />
         {expandedSectionId === 'general' && (
           <View style={styles.sectionBody}>
             {editMode ? (
               <>
-                <LabeledInput label="Nom / Prénom" value={record.general.fullName} onChangeText={(t) => onChangeGeneral('fullName', t)} />
-                <LabeledInput label="Date de naissance" value={record.general.dateOfBirth} onChangeText={(t) => onChangeGeneral('dateOfBirth', t)} />
-                <LabeledInput label="Identifiant national" value={record.general.nationalRegistryId} onChangeText={(t) => onChangeGeneral('nationalRegistryId', t)} />
+                <LabeledInput label="Nom / Prénom" value={record.general.fullName} onChangeText={(t) => onChangeGeneral('fullName', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Date de naissance" value={record.general.dateOfBirth} onChangeText={(t) => onChangeGeneral('dateOfBirth', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Identifiant national" value={record.general.nationalRegistryId} onChangeText={(t) => onChangeGeneral('nationalRegistryId', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
                 <DualInputs
                   leftLabel="Taille (cm)"
                   leftValue={record.general.heightCm}
@@ -261,9 +265,13 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                   rightLabel="Poids (kg)"
                   rightValue={record.general.weightKg}
                   onRightChange={(t) => onChangeGeneral('weightKg', t)}
+                  placeholderColor={colors.textSecondary}
+                  inputBg={colors.background}
+                  inputText={colors.text}
+                  inputBorder={colors.border}
                 />
-                <LabeledInput label="Groupe sanguin" value={record.general.bloodType} onChangeText={(t) => onChangeGeneral('bloodType', t)} />
-                <LabeledInput label="Allergies connues (résumé)" value={record.general.knownAllergiesSummary} onChangeText={(t) => onChangeGeneral('knownAllergiesSummary', t)} />
+                <LabeledInput label="Groupe sanguin" value={record.general.bloodType} onChangeText={(t) => onChangeGeneral('bloodType', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Allergies connues (résumé)" value={record.general.knownAllergiesSummary} onChangeText={(t) => onChangeGeneral('knownAllergiesSummary', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
                 <DualInputs
                   leftLabel="Pointure"
                   leftValue={record.general.shoeSize}
@@ -271,19 +279,23 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                   rightLabel="Taille vêt." 
                   rightValue={record.general.clothingSize}
                   onRightChange={(t) => onChangeGeneral('clothingSize', t)}
+                  placeholderColor={colors.textSecondary}
+                  inputBg={colors.background}
+                  inputText={colors.text}
+                  inputBorder={colors.border}
                 />
               </>
             ) : (
               <>
-                <ReadRow label="Nom / Prénom" value={record.general.fullName} />
-                <ReadRow label="Date de naissance" value={record.general.dateOfBirth} />
-                <ReadRow label="Identifiant national" value={record.general.nationalRegistryId} />
-                <ReadRow label="Taille (cm)" value={record.general.heightCm} />
-                <ReadRow label="Poids (kg)" value={record.general.weightKg} />
-                <ReadRow label="Groupe sanguin" value={record.general.bloodType} />
-                <ReadRow label="Allergies connues" value={record.general.knownAllergiesSummary} />
-                <ReadRow label="Pointure" value={record.general.shoeSize} />
-                <ReadRow label="Taille vêt." value={record.general.clothingSize} />
+                <ReadRow label="Nom / Prénom" value={record.general.fullName} colors={colors} />
+                <ReadRow label="Date de naissance" value={record.general.dateOfBirth} colors={colors} />
+                <ReadRow label="Identifiant national" value={record.general.nationalRegistryId} colors={colors} />
+                <ReadRow label="Taille (cm)" value={record.general.heightCm} colors={colors} />
+                <ReadRow label="Poids (kg)" value={record.general.weightKg} colors={colors} />
+                <ReadRow label="Groupe sanguin" value={record.general.bloodType} colors={colors} />
+                <ReadRow label="Allergies connues" value={record.general.knownAllergiesSummary} colors={colors} />
+                <ReadRow label="Pointure" value={record.general.shoeSize} colors={colors} />
+                <ReadRow label="Taille vêt." value={record.general.clothingSize} colors={colors} />
               </>
             )}
           </View>
@@ -291,101 +303,101 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
       </View>
 
       {/* 2. Informations médicales */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
         <SectionHeader title="Informations médicales" id="contacts" />
         {expandedSectionId === 'contacts' && (
           <View style={styles.sectionBody}>
-            <Text style={styles.subTitle}>Médecin traitant</Text>
+            <Text style={[styles.subTitle, { color: colors.text }]}>Médecin traitant</Text>
             {editMode ? (
               <>
-                <LabeledInput label="Nom" value={record.contacts.primaryPhysician.name} onChangeText={(t) => onChangePrimaryPhysician('name', t)} />
-                <LabeledInput label="Téléphone" value={record.contacts.primaryPhysician.phone} onChangeText={(t) => onChangePrimaryPhysician('phone', t)} />
-                <LabeledInput label="Adresse" value={record.contacts.primaryPhysician.address || ''} onChangeText={(t) => onChangePrimaryPhysician('address', t)} />
+                <LabeledInput label="Nom" value={record.contacts.primaryPhysician.name} onChangeText={(t) => onChangePrimaryPhysician('name', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Téléphone" value={record.contacts.primaryPhysician.phone} onChangeText={(t) => onChangePrimaryPhysician('phone', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Adresse" value={record.contacts.primaryPhysician.address || ''} onChangeText={(t) => onChangePrimaryPhysician('address', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
               </>
             ) : (
               <>
-                <ReadRow label="Nom" value={record.contacts.primaryPhysician.name} />
-                <ReadRow label="Téléphone" value={record.contacts.primaryPhysician.phone} />
-                <ReadRow label="Adresse" value={record.contacts.primaryPhysician.address || '—'} />
+                <ReadRow label="Nom" value={record.contacts.primaryPhysician.name} colors={colors} />
+                <ReadRow label="Téléphone" value={record.contacts.primaryPhysician.phone} colors={colors} />
+                <ReadRow label="Adresse" value={record.contacts.primaryPhysician.address || '—'} colors={colors} />
               </>
             )}
 
-            <Text style={[styles.subTitle, { marginTop: 12 }]}>Spécialiste</Text>
+            <Text style={[styles.subTitle, { marginTop: 12, color: colors.text }]}>Spécialiste</Text>
             {editMode ? (
               <>
-                <LabeledInput label="Nom" value={record.contacts.specialist?.name || ''} onChangeText={(t) => onChangeSpecialist('name', t)} />
-                <LabeledInput label="Type" value={record.contacts.specialist?.type || ''} onChangeText={(t) => onChangeSpecialist('type', t)} />
-                <LabeledInput label="Téléphone" value={record.contacts.specialist?.phone || ''} onChangeText={(t) => onChangeSpecialist('phone', t)} />
+                <LabeledInput label="Nom" value={record.contacts.specialist?.name || ''} onChangeText={(t) => onChangeSpecialist('name', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Type" value={record.contacts.specialist?.type || ''} onChangeText={(t) => onChangeSpecialist('type', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Téléphone" value={record.contacts.specialist?.phone || ''} onChangeText={(t) => onChangeSpecialist('phone', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
               </>
             ) : (
               <>
-                <ReadRow label="Nom" value={record.contacts.specialist?.name || '—'} />
-                <ReadRow label="Type" value={record.contacts.specialist?.type || '—'} />
-                <ReadRow label="Téléphone" value={record.contacts.specialist?.phone || '—'} />
+                <ReadRow label="Nom" value={record.contacts.specialist?.name || '—'} colors={colors} />
+                <ReadRow label="Type" value={record.contacts.specialist?.type || '—'} colors={colors} />
+                <ReadRow label="Téléphone" value={record.contacts.specialist?.phone || '—'} colors={colors} />
               </>
             )}
 
-            <Text style={[styles.subTitle, { marginTop: 12 }]}>Hôpital de référence</Text>
+            <Text style={[styles.subTitle, { marginTop: 12, color: colors.text }]}>Hôpital de référence</Text>
             {editMode ? (
-              <LabeledInput label="Hôpital" value={record.contacts.referenceHospital || ''} onChangeText={(t) => setRecord(prev => ({ ...prev, contacts: { ...prev.contacts, referenceHospital: t } }))} />
+              <LabeledInput label="Hôpital" value={record.contacts.referenceHospital || ''} onChangeText={(t) => setRecord(prev => ({ ...prev, contacts: { ...prev.contacts, referenceHospital: t } }))} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
             ) : (
-              <ReadRow label="Hôpital" value={record.contacts.referenceHospital || '—'} />
+              <ReadRow label="Hôpital" value={record.contacts.referenceHospital || '—'} colors={colors} />
             )}
           </View>
         )}
       </View>
 
       {/* 3. Santé et antécédents */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
         <SectionHeader title="Santé et antécédents" id="history" />
         {expandedSectionId === 'history' && (
           <View style={styles.sectionBody}>
-            <Text style={styles.subTitle}>Allergies</Text>
+            <Text style={[styles.subTitle, { color: colors.text }]}>Allergies</Text>
             {record.history.allergies.map((a, idx) => (
-              <ReadRow key={`alg-${idx}`} label={a.name} value={`Sévérité: ${a.severity}`}/>
+              <ReadRow key={`alg-${idx}`} label={a.name} value={`Sévérité: ${a.severity}`} colors={colors} />
             ))}
             {editMode && (
               <View style={styles.addRow}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                   placeholder="Allergie"
-                  placeholderTextColor="#8CA3AF"
+                  placeholderTextColor={colors.textSecondary}
                   value={newAllergyName}
                   onChangeText={setNewAllergyName}
                 />
                 <TextInput
-                  style={[styles.input, { flexBasis: '40%' }]}
+                  style={[styles.input, { flexBasis: '40%', backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                   placeholder="Sévérité (Faible/Modérée/Sévère)"
-                  placeholderTextColor="#8CA3AF"
+                  placeholderTextColor={colors.textSecondary}
                   value={newAllergySeverity}
                   onChangeText={(t) => setNewAllergySeverity((t as SeverityLevel) || 'Faible')}
                 />
-                <TouchableOpacity style={styles.addButton} onPress={addAllergy}>
-                  <Text style={styles.addButtonText}>Ajouter</Text>
+                <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.tint }]} onPress={addAllergy}>
+                  <Text style={[styles.addButtonText, { color: '#fff' }]}>Ajouter</Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            <Text style={[styles.subTitle, { marginTop: 12 }]}>Maladies / Conditions</Text>
+            <Text style={[styles.subTitle, { marginTop: 12, color: colors.text }]}>Maladies / Conditions</Text>
             {record.history.diseases.map((d, idx) => (
-              <ReadRow key={`dis-${idx}`} label={`Condition #${idx + 1}`} value={d}/>
+              <ReadRow key={`dis-${idx}`} label={`Condition #${idx + 1}`} value={d} colors={colors} />
             ))}
 
-            <Text style={[styles.subTitle, { marginTop: 12 }]}>Antécédents médicaux</Text>
+            <Text style={[styles.subTitle, { marginTop: 12, color: colors.text }]}>Antécédents médicaux</Text>
             {record.history.medicalHistory.map((h, idx) => (
-              <ReadRow key={`hist-${idx}`} label={`Entrée #${idx + 1}`} value={h}/>
+              <ReadRow key={`hist-${idx}`} label={`Entrée #${idx + 1}`} value={h} colors={colors} />
             ))}
             {editMode && (
               <View style={styles.addRow}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                   placeholder="Ajouter un antécédent"
-                  placeholderTextColor="#8CA3AF"
+                  placeholderTextColor={colors.textSecondary}
                   value={newHistoryEntry}
                   onChangeText={setNewHistoryEntry}
                 />
-                <TouchableOpacity style={styles.addButton} onPress={addHistoryEntry}>
-                  <Text style={styles.addButtonText}>Ajouter</Text>
+                <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.tint }]} onPress={addHistoryEntry}>
+                  <Text style={[styles.addButtonText, { color: '#fff' }]}>Ajouter</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -394,27 +406,27 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
       </View>
 
       {/* 4. Suivi médical courant */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
         <SectionHeader title="Suivi médical courant" id="current" />
         {expandedSectionId === 'current' && (
           <View style={styles.sectionBody}>
-            <Text style={styles.subTitle}>Traitements en cours</Text>
+            <Text style={[styles.subTitle, { color: colors.text }]}>Traitements en cours</Text>
             {record.currentTracking.treatments.map((t, idx) => (
               editMode ? (
                 <View key={`trt-${idx}`} style={styles.dualRow}>
-                  <TextInput style={[styles.input, styles.flexItem]} value={t.medicineName} onChangeText={(val) => {
+                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={t.medicineName} onChangeText={(val) => {
                     setRecord(prev => ({
                       ...prev,
                       currentTracking: { ...prev.currentTracking, treatments: prev.currentTracking.treatments.map((item, i) => i === idx ? { ...item, medicineName: val } : item) }
                     }));
                   }} />
-                  <TextInput style={[styles.input, styles.flexItem]} value={t.dosage} onChangeText={(val) => {
+                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={t.dosage} onChangeText={(val) => {
                     setRecord(prev => ({
                       ...prev,
                       currentTracking: { ...prev.currentTracking, treatments: prev.currentTracking.treatments.map((item, i) => i === idx ? { ...item, dosage: val } : item) }
                     }));
                   }} />
-                  <TextInput style={[styles.input, styles.flexItem]} value={t.duration} onChangeText={(val) => {
+                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={t.duration} onChangeText={(val) => {
                     setRecord(prev => ({
                       ...prev,
                       currentTracking: { ...prev.currentTracking, treatments: prev.currentTracking.treatments.map((item, i) => i === idx ? { ...item, duration: val } : item) }
@@ -422,21 +434,21 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                   }} />
                 </View>
               ) : (
-                <ReadRow key={`trt-${idx}`} label={t.medicineName} value={`${t.dosage} • ${t.duration}`} />
+                <ReadRow key={`trt-${idx}`} label={t.medicineName} value={`${t.dosage} • ${t.duration}`} colors={colors} />
               )
             ))}
 
-            <Text style={[styles.subTitle, { marginTop: 12 }]}>Historique des visites</Text>
+            <Text style={[styles.subTitle, { marginTop: 12, color: colors.text }]}>Historique des visites</Text>
             {record.currentTracking.visits.map((v, idx) => (
               editMode ? (
                 <View key={`vis-${idx}`} style={styles.dualRow}>
-                  <TextInput style={[styles.input, styles.flexItem]} value={v.date} onChangeText={(val) => {
+                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={v.date} onChangeText={(val) => {
                     setRecord(prev => ({
                       ...prev,
                       currentTracking: { ...prev.currentTracking, visits: prev.currentTracking.visits.map((item, i) => i === idx ? { ...item, date: val } : item) }
                     }));
                   }} />
-                  <TextInput style={[styles.input, styles.flexItem]} value={v.notes || ''} onChangeText={(val) => {
+                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={v.notes || ''} onChangeText={(val) => {
                     setRecord(prev => ({
                       ...prev,
                       currentTracking: { ...prev.currentTracking, visits: prev.currentTracking.visits.map((item, i) => i === idx ? { ...item, notes: val } : item) }
@@ -444,7 +456,7 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                   }} />
                 </View>
               ) : (
-                <ReadRow key={`vis-${idx}`} label={v.date} value={v.notes || '—'} />
+                <ReadRow key={`vis-${idx}`} label={v.date} value={v.notes || '—'} colors={colors} />
               )
             ))}
           </View>
@@ -452,17 +464,17 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
       </View>
 
       {/* 5. Fichiers/documents médicaux */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
         <SectionHeader title="Fichiers / documents médicaux" id="files" />
         {expandedSectionId === 'files' && (
           <View style={styles.sectionBody}>
             {record.files.map((f) => (
               <View key={f.id} style={styles.fileRow}>
-                <IconSymbol name="doc.text" size={18} color="#4A90E2" />
-                <Text style={styles.fileLabel}>{f.label}</Text>
+                <IconSymbol name="doc.text" size={18} color={colors.tint} />
+                <Text style={[styles.fileLabel, { color: colors.text }]}>{f.label}</Text>
                 <View style={{ flex: 1 }} />
                 <TouchableOpacity onPress={() => {/* Could implement file view */}}>
-                  <IconSymbol name="eye" size={18} color="#8CA3AF" />
+                  <IconSymbol name="eye" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -473,24 +485,24 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
   );
 }
 
-function ReadRow({ label, value }: { label: string; value: string }) {
+function ReadRow({ label, value, colors }: { label: string; value: string; colors: typeof Colors.light }) {
   return (
-    <View style={styles.readRow}>
-      <Text style={styles.readLabel}>{label}</Text>
-      <Text style={styles.readValue}>{value}</Text>
+    <View style={[styles.readRow, { borderBottomColor: colors.border }]}>
+      <Text style={[styles.readLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.readValue, { color: colors.text }]}>{value}</Text>
     </View>
   );
 }
 
-function LabeledInput({ label, value, onChangeText }: { label: string; value: string; onChangeText: (t: string) => void }) {
+function LabeledInput({ label, value, onChangeText, placeholderColor, inputBg, inputText, inputBorder }: { label: string; value: string; onChangeText: (t: string) => void; placeholderColor: string; inputBg: string; inputText: string; inputBorder: string }) {
   return (
     <View style={styles.inputRow}>
-      <Text style={styles.readLabel}>{label}</Text>
+      <Text style={[styles.readLabel]}>{label}</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { backgroundColor: inputBg, color: inputText, borderColor: inputBorder }]}
         value={value}
         onChangeText={onChangeText}
-        placeholderTextColor="#8CA3AF"
+        placeholderTextColor={placeholderColor}
       />
     </View>
   );
@@ -503,7 +515,11 @@ function DualInputs(
     onLeftChange,
     rightLabel,
     rightValue,
-    onRightChange
+    onRightChange,
+    placeholderColor,
+    inputBg,
+    inputText,
+    inputBorder
   }:
   {
     leftLabel: string;
@@ -512,17 +528,21 @@ function DualInputs(
     rightLabel: string;
     rightValue: string;
     onRightChange: (t: string) => void;
+    placeholderColor: string;
+    inputBg: string;
+    inputText: string;
+    inputBorder: string;
   }
 ) {
   return (
     <View style={styles.dualRow}>
       <View style={styles.dualItem}>
-        <Text style={styles.readLabel}>{leftLabel}</Text>
-        <TextInput style={styles.input} value={leftValue} onChangeText={onLeftChange} placeholderTextColor="#8CA3AF" />
+        <Text style={[styles.readLabel]}>{leftLabel}</Text>
+        <TextInput style={[styles.input, { backgroundColor: inputBg, color: inputText, borderColor: inputBorder }]} value={leftValue} onChangeText={onLeftChange} placeholderTextColor={placeholderColor} />
       </View>
       <View style={styles.dualItem}>
-        <Text style={styles.readLabel}>{rightLabel}</Text>
-        <TextInput style={styles.input} value={rightValue} onChangeText={onRightChange} placeholderTextColor="#8CA3AF" />
+        <Text style={[styles.readLabel]}>{rightLabel}</Text>
+        <TextInput style={[styles.input, { backgroundColor: inputBg, color: inputText, borderColor: inputBorder }]} value={rightValue} onChangeText={onRightChange} placeholderTextColor={placeholderColor} />
       </View>
     </View>
   );
@@ -531,7 +551,6 @@ function DualInputs(
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
   },
   content: {
     padding: 16,
@@ -543,21 +562,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   childNameText: {
-    color: '#9CA3AF',
     fontSize: 16,
     fontWeight: '600',
   },
   editButtonText: {
-    color: '#4A90E2',
     fontStyle: 'italic',
     fontSize: 16,
   },
   card: {
-    backgroundColor: '#1A1A1A',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#222',
     marginBottom: 12,
   },
   sectionHeader: {
@@ -566,7 +581,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -574,7 +588,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   subTitle: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 6,
@@ -583,17 +596,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '#222',
     paddingVertical: 8,
     gap: 8,
   },
   readLabel: {
-    color: '#9CA3AF',
     fontSize: 13,
     flexBasis: '45%',
   },
   readValue: {
-    color: '#FFFFFF',
     fontSize: 13,
     flexBasis: '55%',
     textAlign: 'right',
@@ -602,10 +612,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#0F0F0F',
-    color: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#222',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -629,13 +636,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   addButton: {
-    backgroundColor: '#4A90E2',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
   },
   addButtonText: {
-    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -645,10 +650,8 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#222',
   },
   fileLabel: {
-    color: '#FFFFFF',
     fontSize: 13,
   },
 });
