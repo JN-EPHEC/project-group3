@@ -522,6 +522,17 @@ export default function AideScreen() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookedSlots, setBookedSlots] = useState<any[]>([]);
 
+  const deriveDayKeyFromDate = (date: Date, availability?: AvailabilitySchedule | any) => {
+    const dayIndex = date.getDay(); // 0 = Sunday
+    const frenchKeys = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+    const englishKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const keys = availability ? Object.keys(availability) : [];
+    const matchFrench = keys.find(k => k.toLowerCase() === frenchKeys[dayIndex]);
+    if (matchFrench) return matchFrench as keyof AvailabilitySchedule;
+    const matchEnglish = keys.find(k => k.toLowerCase() === englishKeys[dayIndex]);
+    return (matchEnglish as keyof AvailabilitySchedule) || null;
+  };
+
   // Load professionals from Firebase on mount
   useEffect(() => {
     const loadProfessionals = async () => {
