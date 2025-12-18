@@ -1,3 +1,4 @@
+import DeleteProfileModal from '@/components/DeleteProfileModal';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs } from '@/constants/responsive';
@@ -43,6 +44,7 @@ export default function ProfilScreen() {
   const [familyName, setFamilyName] = useState('');
   const [editFamilyName, setEditFamilyName] = useState('');
   const [isEditingFamilyName, setIsEditingFamilyName] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -971,8 +973,24 @@ export default function ProfilScreen() {
             <Text style={styles.logoutText}>Se déconnecter</Text>
           </TouchableOpacity>
 
+          {/* Delete Profile Button */}
+          <TouchableOpacity 
+            style={[styles.deleteProfileButton, { backgroundColor: '#C0392B' }]} 
+            onPress={() => setShowDeleteModal(true)}
+          >
+            <IconSymbol name="trash.fill" size={20} color="#fff" />
+            <Text style={styles.deleteProfileText}>Supprimer mon profil</Text>
+          </TouchableOpacity>
+
         </View>
       </ScrollView>
+
+      {/* Delete Profile Modal */}
+      <DeleteProfileModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        userId={user?.uid || ''}
+      />
     </ThemedView>
   );
 }
@@ -1192,6 +1210,27 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   logoutText: {
+    marginLeft: SPACING.small,
+    fontWeight: '700',
+    fontSize: FONT_SIZES.medium,
+    color: '#fff',
+  },
+  deleteProfileButton: {
+    borderRadius: BORDER_RADIUS.large,
+    paddingVertical: V_SPACING.regular,
+    paddingHorizontal: SPACING.large,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: V_SPACING.small,
+    marginBottom: SAFE_BOTTOM_SPACING,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: vs(4) },
+    shadowRadius: hs(10),
+    elevation: 3,
+  },
+  deleteProfileText: {
     marginLeft: SPACING.small,
     fontWeight: '700',
     fontSize: FONT_SIZES.medium,

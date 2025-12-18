@@ -1,3 +1,4 @@
+import DeleteProfileModal from '@/components/DeleteProfileModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRouter } from 'expo-router';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -85,6 +86,7 @@ export default function ProProfilScreen() {
   const [tempProfessionalType, setTempProfessionalType] = useState<ProfessionalType>('');
   const [isSaving, setIsSaving] = useState(false);
   const [selectedDay, setSelectedDay] = useState<keyof AvailabilitySchedule>('lundi');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -454,8 +456,24 @@ export default function ProProfilScreen() {
             <IconSymbol name="arrow.right.square" size={20} color="#fff" />
             <Text style={styles.logoutText}>Se déconnecter</Text>
           </TouchableOpacity>
+
+          {/* Delete Profile Button */}
+          <TouchableOpacity 
+            style={[styles.deleteProfileButton]} 
+            onPress={() => setShowDeleteModal(true)}
+          >
+            <IconSymbol name="trash.fill" size={20} color="#fff" />
+            <Text style={styles.deleteProfileText}>Supprimer mon profil</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Delete Profile Modal */}
+      <DeleteProfileModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        userId={auth.currentUser?.uid || ''}
+      />
 
       {/* Edit Modal */}
       <Modal
@@ -755,6 +773,8 @@ const styles = StyleSheet.create({
   slotTimeText: { fontSize: 15, fontWeight: '500' },
   logoutButton: { backgroundColor: '#FF6B6B', borderRadius: 20, paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 3 },
   logoutText: { color: '#fff', fontSize: 16, fontWeight: '700', marginLeft: 10 },
+  deleteProfileButton: { backgroundColor: '#C0392B', borderRadius: 20, paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 3 },
+  deleteProfileText: { color: '#fff', fontSize: 16, fontWeight: '700', marginLeft: 10 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', maxHeight: '80%', borderRadius: 20, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
