@@ -1,3 +1,4 @@
+import RoleSwitcher from '@/components/RoleSwitcher';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
@@ -8,6 +9,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } f
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, signOut } from '../../constants/firebase';
+import { setActiveSessionRole } from '../../constants/sessionManager';
 
 const PRO_COLOR = '#FFCEB0'; // Professional accent color (salmon/peach)
 const PRO_SECONDARY = '#FFCEB0'; // Secondary accent
@@ -84,6 +86,8 @@ export default function ProHomeScreen() {
   const [clientFamilies, setClientFamilies] = useState<ClientFamily[]>([]);
   const [clientContacts, setClientContacts] = useState<ClientContact[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [activeRole, setActiveRole] = useState<'parent' | 'professionnel'>('professionnel');
+  const [dualRole, setDualRole] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -98,7 +102,13 @@ export default function ProHomeScreen() {
 
     const unsubUser = onSnapshot(doc(db, 'users', uid), (doc) => {
       if (doc.exists()) {
-        setFirstName(doc.data().firstName || 'Utilisateur');
+        const data = doc.data();
+        setFirstName(data.firstName || 'Utilisateur');
+        const hasParent = !!(data.parent_id ?? (data.userType === 'parent'));
+        const hasPro = !!(data.professional_id ?? (data.userType === 'professionnel'));
+        setDualRole(hasParent && hasPro);
+        const role = data.userType === 'parent' ? 'parent' : 'professionnel';
+        setActiveRole(role);
       }
     });
 
@@ -333,6 +343,12 @@ export default function ProHomeScreen() {
     router.replace('/(auth)/LoginScreen' as any);
   };
 
+  const handleToggleRole = async (nextRole: 'parent' | 'professionnel') => {
+    setActiveRole(nextRole);
+    await setActiveSessionRole(nextRole);
+    router.replace(nextRole === 'professionnel' ? '/(pro-tabs)' : '/(tabs)');
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -355,6 +371,9 @@ export default function ProHomeScreen() {
               <Text style={[styles.title, { color: PRO_COLOR }]}>Dashboard Professionnel</Text>
               <Text style={[styles.greeting, { color: colors.textSecondary }]}>Bonjour {firstName}</Text>
             </View>
+            {dualRole && (
+              <RoleSwitcher activeRole={activeRole} onToggle={handleToggleRole} />
+            )}
           </View>
 
           {/* Overview Stats Cards */}

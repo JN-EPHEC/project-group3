@@ -1,3 +1,4 @@
+import RoleSwitcher from '@/components/RoleSwitcher';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs, wp } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
@@ -8,6 +9,7 @@ import { collection, doc, getDoc, onSnapshot, orderBy, query, where } from 'fire
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, signOut } from '../../constants/firebase';
+import { setActiveSessionRole } from '../../constants/sessionManager';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -19,6 +21,8 @@ export default function HomeScreen() {
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
   const [families, setFamilies] = useState<any[]>([]);
+  const [activeRole, setActiveRole] = useState<'parent' | 'professionnel'>('parent');
+  const [dualRole, setDualRole] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -33,7 +37,13 @@ export default function HomeScreen() {
 
     const unsubUser = onSnapshot(doc(db, 'users', uid), (doc) => {
       if (doc.exists()) {
-        setFirstName(doc.data().firstName || 'Utilisateur');
+        const data = doc.data();
+        setFirstName(data.firstName || 'Utilisateur');
+        const hasParent = !!(data.parent_id ?? (data.userType === 'parent'));
+        const hasPro = !!(data.professional_id ?? (data.userType === 'professionnel'));
+        setDualRole(hasParent && hasPro);
+        const role = data.userType === 'professionnel' ? 'professionnel' : 'parent';
+        setActiveRole(role);
       }
     });
 
@@ -155,6 +165,12 @@ export default function HomeScreen() {
     router.replace('/(auth)/LoginScreen' as any);
   };
 
+  const handleToggleRole = async (nextRole: 'parent' | 'professionnel') => {
+    setActiveRole(nextRole);
+    await setActiveSessionRole(nextRole);
+    router.replace(nextRole === 'professionnel' ? '/(pro-tabs)' : '/(tabs)');
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -173,6 +189,9 @@ export default function HomeScreen() {
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.tint }]}>Accueil</Text>
+            {dualRole && (
+              <RoleSwitcher activeRole={activeRole} onToggle={handleToggleRole} />
+            )}
           </View>
 
           <View style={styles.welcomeSection}>

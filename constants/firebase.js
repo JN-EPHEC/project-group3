@@ -50,17 +50,37 @@ export async function signIn(email, password) {
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
   if (!snap.exists()) {
-    await setDoc(userRef, { email, roles: [], familyIds: [] });
+    await setDoc(userRef, {
+      email,
+      roles: [],
+      familyIds: [],
+      parent_id: null,
+      professional_id: null,
+    });
   }
 
   const updated = await getDoc(userRef);
   const data = updated.data() || {};
+
+  // Normalize legacy userType into explicit ids
+  const parentId = data.parent_id ?? (data.userType === 'parent' ? uid : null);
+  const professionalId = data.professional_id ?? (data.userType === 'professionnel' ? uid : null);
+
+  // Backfill missing ids once
+  if (data.parent_id === undefined || data.professional_id === undefined) {
+    await updateDoc(userRef, {
+      parent_id: parentId,
+      professional_id: professionalId,
+    });
+  }
+
   // Support pour ancienne structure (familyId) et nouvelle (familyIds)
   let familyIds = data.familyIds || [];
   if (data.familyId && !familyIds.includes(data.familyId)) {
     familyIds = [data.familyId, ...familyIds];
   }
-  return { user: res.user, roles: data.roles || [], familyIds };
+  const dualRole = !!parentId && !!professionalId;
+  return { user: res.user, roles: data.roles || [], familyIds, parentId, professionalId, dualRole };
 }
 
 /**
@@ -72,9 +92,23 @@ export async function signUp(email, password, role = 'parent') {
   const uid = res.user.uid;
 
   const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, { email, roles: [role], familyIds: [] });
+  await setDoc(userRef, {
+    email,
+    roles: [role],
+    familyIds: [],
+    parent_id: role === 'parent' ? uid : null,
+    professional_id: role === 'professionnel' ? uid : null,
+    userType: role,
+  });
 
-  return { user: res.user, roles: [role], familyIds: [] };
+  return {
+    user: res.user,
+    roles: [role],
+    familyIds: [],
+    parentId: role === 'parent' ? uid : null,
+    professionalId: role === 'professionnel' ? uid : null,
+    dualRole: false,
+  };
 }
 
 /**

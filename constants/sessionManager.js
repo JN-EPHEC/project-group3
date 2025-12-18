@@ -26,7 +26,10 @@ const TOKEN_VERSION = '1.0';
  * @property {string} token - Token JWT-like
  * @property {number} tokenCreatedAt - Timestamp création token
  * @property {number} lastActivityAt - Timestamp dernière activité
- * @property {'parent' | 'professionnel'} userType - Type d'utilisateur
+ * @property {'parent' | 'professionnel'} userType - Type d'utilisateur actif (mode courant)
+ * @property {string | null} [parentId]
+ * @property {string | null} [professionalId]
+ * @property {boolean} [dualRole]
  * @property {string[]} [roles] - Rôles utilisateur
  * @property {string[]} [familyIds] - IDs des familles
  * @property {number} expiresAt - Timestamp expiration session
@@ -57,6 +60,10 @@ export async function createAndPersistSession(user, userType = 'parent') {
     const now = Date.now();
     const expiresAt = now + INACTIVITY_THRESHOLD;
 
+    const parentId = userData.parent_id ?? (userData.userType === 'parent' ? user.uid : null);
+    const professionalId = userData.professional_id ?? (userData.userType === 'professionnel' ? user.uid : null);
+    const dualRole = !!parentId && !!professionalId;
+
     // Créer l'objet session
     const session = {
       uid: user.uid,
@@ -65,6 +72,9 @@ export async function createAndPersistSession(user, userType = 'parent') {
       tokenCreatedAt: now,
       lastActivityAt: now,
       userType,
+      parentId,
+      professionalId,
+      dualRole,
       roles: userData.roles || [],
       familyIds: userData.familyIds || [],
       expiresAt
@@ -193,6 +203,23 @@ export async function validateAndRefreshSession() {
   } catch (error) {
     console.error('[Session] Erreur lors de la validation de session:', error);
     return false;
+  }
+}
+
+/**
+ * Met à jour le rôle actif dans la session persistée (parent/professionnel)
+ * @param {'parent'|'professionnel'} role
+ */
+export async function setActiveSessionRole(role) {
+  try {
+    const session = await getPersistedSession();
+    if (!session) return null;
+    const updated = { ...session, userType: role };
+    await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch (error) {
+    console.error('[Session] Erreur lors du changement de rôle actif:', error);
+    return null;
   }
 }
 
