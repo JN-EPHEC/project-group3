@@ -2,23 +2,17 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CURRENCIES, getCurrencySymbol } from '../constants/currencies';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
-const CATEGORIES = [
-  'Alimentation',
-  'Transport',
-  'Santé',
-  'Éducation',
-  'Loisirs',
-  'Vêtements',
-  'Logement',
-  'Autre'
-];
+const DEFAULT_CATEGORIES = ['Vêtement', 'Santé', 'Sport'];
 
 export default function AddExpenseScreen() {
   const router = useRouter();
@@ -31,6 +25,14 @@ export default function AddExpenseScreen() {
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [productImage, setProductImage] = useState<string | null>(null);
   const [barcode, setBarcode] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+  const [categoryLimits, setCategoryLimits] = useState<{ [key: string]: number }>({});
+  const [uploading, setUploading] = useState(false);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -48,7 +50,7 @@ export default function AddExpenseScreen() {
       }
     }
 
-    // Récupérer la devise de la famille
+    // Récupérer la devise et les limites de catégorie
     const fetchCurrency = async () => {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
@@ -61,11 +63,79 @@ export default function AddExpenseScreen() {
           const currencyCode = familySnap.data().currency || 'EUR';
           setCurrency(currencyCode);
         }
+        
+        // Load budget categories and limits
+        const budgetRef = doc(db, 'budgets', userFamily.id);
+        const budgetSnap = await getDoc(budgetRef);
+        if (budgetSnap.exists()) {
+          const budgetData = budgetSnap.data();
+          const budgetCategories = budgetData.categories || [];
+          const limits: { [key: string]: number } = {};
+          budgetCategories.forEach((cat: any) => {
+            limits[cat.name] = cat.limit || 0;
+          });
+          setCategoryLimits(limits);
+          
+          // Merge default categories with budget categories
+          const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...budgetCategories.map((c: any) => c.name)])];
+          setCategories(allCategories);
+        }
       }
     };
 
     fetchCurrency();
   }, [params]);
+
+  const uploadReceiptImage = async (uri: string, familyId: string): Promise<string> => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const storage = getStorage();
+    const filename = `receipts/${familyId}/${Date.now()}.jpg`;
+    const storageRef = ref(storage, filename);
+    await uploadBytes(storageRef, blob);
+    return await getDownloadURL(storageRef);
+  };
+
+  const handlePickFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission refusée', 'Accès à la galerie requis');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.length > 0) {
+      setReceiptImage(result.assets[0].uri);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission refusée', 'Accès à la caméra requis');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.length > 0) {
+      setReceiptImage(result.assets[0].uri);
+    }
+  };
+
+  const handleAddCategory = () => {
+    const trimmed = newCategory.trim();
+    if (trimmed && !categories.includes(trimmed)) {
+      setCategories([...categories, trimmed]);
+      setCategory(trimmed);
+      setNewCategory('');
+      setShowAddCategory(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!description.trim() || !amount.trim()) {
@@ -93,6 +163,22 @@ export default function AddExpenseScreen() {
         return;
       }
 
+      // Upload receipt if provided
+      let receiptUrl = null;
+      if (receiptImage) {
+        setUploading(true);
+        try {
+          receiptUrl = await uploadReceiptImage(receiptImage, userFamily.id);
+        } catch (error) {
+          console.error('Error uploading receipt:', error);
+        }
+        setUploading(false);
+      }
+
+      // Check category limit for approval logic
+      const categoryLimit = categoryLimits[category];
+      const requiresApproval = categoryLimit && amountNumber > categoryLimit;
+
       await addDoc(collection(db, 'expenses'), {
         description: description.trim(),
         amount: amountNumber,
@@ -100,9 +186,11 @@ export default function AddExpenseScreen() {
         currency,
         familyId: userFamily.id,
         paidBy: currentUser.uid,
-        date: serverTimestamp(),
+        date: Timestamp.fromDate(selectedDate),
         productImage: productImage || null,
         barcode: barcode || null,
+        receiptImage: receiptUrl,
+        approvalStatus: requiresApproval ? 'PENDING_APPROVAL' : 'APPROVED',
         createdAt: serverTimestamp()
       });
 
@@ -183,7 +271,7 @@ export default function AddExpenseScreen() {
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.text }]}>Catégorie *</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesScroll}>
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <TouchableOpacity
                     key={cat}
                     style={[
@@ -202,7 +290,55 @@ export default function AddExpenseScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
+                <TouchableOpacity
+                  style={[styles.categoryChip, { backgroundColor: colors.secondaryCardBackground }]}
+                  onPress={() => setShowAddCategory(true)}
+                >
+                  <IconSymbol name="plus" size={16} color={colors.tint} />
+                  <Text style={[styles.categoryChipText, { color: colors.tint }]}>Ajouter</Text>
+                </TouchableOpacity>
               </ScrollView>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Date *</Text>
+              <TouchableOpacity
+                style={[styles.input, { backgroundColor: colors.cardBackground, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={[{ color: colors.text }]}>
+                  {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                </Text>
+                <IconSymbol name="calendar" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>Ticket de caisse / Photo de l'achat</Text>
+              {receiptImage && (
+                <View style={[styles.receiptPreview, { backgroundColor: colors.cardBackground }]}>
+                  <Image source={{ uri: receiptImage }} style={styles.receiptImage} />
+                  <TouchableOpacity onPress={() => setReceiptImage(null)} style={styles.removeReceiptButton}>
+                    <IconSymbol name="xmark.circle.fill" size={24} color={colors.dangerButton} />
+                  </TouchableOpacity>
+                </View>
+              )}
+              <View style={styles.receiptButtons}>
+                <TouchableOpacity
+                  style={[styles.receiptButton, { backgroundColor: colors.cardBackground }]}
+                  onPress={handlePickFromGallery}
+                >
+                  <IconSymbol name="photo" size={20} color={colors.tint} />
+                  <Text style={[styles.receiptButtonText, { color: colors.text }]}>Galerie</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.receiptButton, { backgroundColor: colors.cardBackground }]}
+                  onPress={handleTakePhoto}
+                >
+                  <IconSymbol name="camera" size={20} color={colors.tint} />
+                  <Text style={[styles.receiptButtonText, { color: colors.text }]}>Caméra</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {barcode && (
@@ -215,20 +351,83 @@ export default function AddExpenseScreen() {
             )}
           </View>
 
-          {/* Submit Button */}
-          <TouchableOpacity
-            style={[styles.submitButton, { backgroundColor: colors.primaryButton }]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>Ajouter la dépense</Text>
-            )}
-          </TouchableOpacity>
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.cancelButton, { backgroundColor: colors.cardBackground }]}
+              onPress={() => router.back()}
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.submitButton, { backgroundColor: '#fff' }]}
+              onPress={handleSubmit}
+              disabled={loading || uploading}
+            >
+              {loading || uploading ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <Text style={[styles.submitButtonText, { color: '#000' }]}>Enregistrer</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
+
+      {/* Date Picker Modal */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display="default"
+          onChange={(event, date) => {
+            setShowDatePicker(false);
+            if (date) setSelectedDate(date);
+          }}
+        />
+      )}
+
+      {/* Add Category Modal */}
+      <Modal
+        visible={showAddCategory}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddCategory(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Nouvelle Catégorie
+            </Text>
+            <TextInput
+              style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+              placeholder="Nom de la catégorie"
+              placeholderTextColor={colors.textSecondary}
+              value={newCategory}
+              onChangeText={setNewCategory}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.cardBackground }]}
+                onPress={() => {
+                  setShowAddCategory(false);
+                  setNewCategory('');
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>
+                  Annuler
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonPrimary, { backgroundColor: '#fff' }]}
+                onPress={handleAddCategory}
+              >
+                <Text style={[styles.modalButtonText, { color: '#000' }]}>Ajouter</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={showCurrencyPicker} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
@@ -352,9 +551,100 @@ const styles = StyleSheet.create({
   },
   currencyButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.regular, borderRadius: BORDER_RADIUS.medium, gap: 4 },
   currencyButtonText: { fontSize: FONT_SIZES.medium, fontWeight: '600' },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    gap: SPACING.small,
+  },
+  datePickerText: {
+    fontSize: FONT_SIZES.medium,
+    flex: 1,
+  },
+  receiptButtons: {
+    flexDirection: 'row',
+    gap: SPACING.small,
+    marginTop: V_SPACING.small,
+  },
+  receiptButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    gap: SPACING.small,
+  },
+  receiptButtonText: {
+    fontSize: FONT_SIZES.regular,
+    fontWeight: '600',
+  },
+  receiptPreview: {
+    marginTop: V_SPACING.small,
+    borderRadius: BORDER_RADIUS.medium,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  receiptImage: {
+    width: '100%',
+    height: hs(200),
+    resizeMode: 'cover',
+  },
+  removeReceiptButton: {
+    position: 'absolute',
+    top: SPACING.small,
+    right: SPACING.small,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: BORDER_RADIUS.full,
+    width: hs(30),
+    height: hs(30),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: SPACING.small,
+  },
+  cancelButton: {
+    flex: 1,
+    borderRadius: BORDER_RADIUS.large,
+    paddingVertical: V_SPACING.regular,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  cancelButtonText: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+  },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' },
   modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 20, textAlign: 'center' },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.regular,
+    fontSize: FONT_SIZES.medium,
+    marginBottom: V_SPACING.regular,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING.small,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: V_SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    alignItems: 'center',
+  },
+  modalButtonPrimary: {
+    backgroundColor: '#007AFF',
+  },
+  modalButtonText: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+  },
   currencyList: { maxHeight: 400 },
   currencyItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
   currencyItemText: { fontSize: 16 },

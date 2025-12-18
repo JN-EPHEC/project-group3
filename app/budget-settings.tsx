@@ -3,11 +3,137 @@ import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constan
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CURRENCIES } from '../constants/currencies';
 import { auth, db, getUserFamily } from '../constants/firebase';
+
+function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; colors: any }) {
+  const [categories, setCategories] = useState<{ name: string; limit: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  useEffect(() => {
+    if (!familyId) return;
+
+    const budgetRef = doc(db, 'budgets', familyId);
+    const unsubscribe = onSnapshot(budgetRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const categoryLimits = data.categoryLimits || {};
+        const categoryArray = Object.entries(categoryLimits).map(([name, limit]) => ({
+          name,
+          limit: limit as number,
+        }));
+        setCategories(categoryArray);
+      } else {
+        // Créer le document s'il n'existe pas
+        await setDoc(budgetRef, { categoryLimits: {} });
+        setCategories([]);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [familyId]);
+
+  const handleUpdateLimit = async (categoryName: string, newLimit: string) => {
+    if (!familyId) return;
+    
+    const limit = parseFloat(newLimit);
+    if (isNaN(limit) || limit < 0) {
+      Alert.alert('Erreur', 'Veuillez entrer un montant valide');
+      return;
+    }
+
+    try {
+      const budgetRef = doc(db, 'budgets', familyId);
+      const docSnap = await getDoc(budgetRef);
+      const currentLimits = docSnap.exists() ? docSnap.data().categoryLimits || {} : {};
+      
+      await updateDoc(budgetRef, {
+        [`categoryLimits.${categoryName}`]: limit,
+      });
+      
+      setEditingCategory(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error updating limit:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la limite');
+    }
+  };
+
+  if (loading) {
+    return <ActivityIndicator size="small" color={colors.tint} />;
+  }
+
+  if (categories.length === 0) {
+    return (
+      <View style={[styles.emptyCard, { backgroundColor: colors.cardBackground }]}>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          Aucune catégorie créée. Les catégories apparaîtront ici lorsque vous ajouterez des dépenses.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {categories.map((cat) => (
+        <View key={cat.name} style={[styles.categoryLimitCard, { backgroundColor: colors.cardBackground }]}>
+          <View style={styles.categoryLimitInfo}>
+            <Text style={[styles.categoryLimitName, { color: colors.text }]}>{cat.name}</Text>
+            {editingCategory === cat.name ? (
+              <View style={styles.editLimitContainer}>
+                <TextInput
+                  style={[styles.editLimitInput, { color: colors.text, borderColor: colors.border }]}
+                  value={editValue}
+                  onChangeText={setEditValue}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textSecondary}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={[styles.saveButton, { backgroundColor: colors.tint }]}
+                  onPress={() => handleUpdateLimit(cat.name, editValue)}
+                >
+                  <IconSymbol name="checkmark" size={20} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.cancelButton, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
+                  onPress={() => {
+                    setEditingCategory(null);
+                    setEditValue('');
+                  }}
+                >
+                  <IconSymbol name="xmark" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.limitDisplay}>
+                <Text style={[styles.categoryLimitAmount, { color: colors.tint }]}>
+                  {cat.limit.toFixed(2)} €
+                </Text>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => {
+                    setEditingCategory(cat.name);
+                    setEditValue(cat.limit.toString());
+                  }}
+                >
+                  <IconSymbol name="pencil" size={18} color={colors.tint} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 export default function BudgetSettingsScreen() {
   const router = useRouter();
@@ -129,6 +255,15 @@ export default function BudgetSettingsScreen() {
             ))}
           </View>
 
+          {/* Category Limits Section */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Limites par Catégorie</Text>
+            <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
+              Définissez un montant maximum pour chaque catégorie. Les dépenses dépassant cette limite nécessiteront une approbation.
+            </Text>
+            <CategoryLimitsManager familyId={familyId} colors={colors} />
+          </View>
+
           {saving && (
             <View style={styles.savingIndicator}>
               <ActivityIndicator size="small" color={colors.tint} />
@@ -203,5 +338,64 @@ const styles = StyleSheet.create({
   },
   savingText: {
     fontSize: 14,
+  },
+  categoryLimitCard: {
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.regular,
+    marginBottom: V_SPACING.medium,
+  },
+  categoryLimitInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  categoryLimitName: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+    flex: 1,
+  },
+  limitDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.small,
+  },
+  categoryLimitAmount: {
+    fontSize: FONT_SIZES.large,
+    fontWeight: '700',
+  },
+  editButton: {
+    padding: SPACING.small,
+  },
+  editLimitContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.small,
+  },
+  editLimitInput: {
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.small,
+    padding: SPACING.small,
+    fontSize: FONT_SIZES.medium,
+    width: hs(100),
+    textAlign: 'right',
+  },
+  saveButton: {
+    padding: SPACING.small,
+    borderRadius: BORDER_RADIUS.small,
+  },
+  cancelButton: {
+    padding: SPACING.small,
+    borderRadius: BORDER_RADIUS.small,
+    borderWidth: 1,
+  },
+  emptyCard: {
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.large,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: FONT_SIZES.regular,
+    textAlign: 'center',
+    lineHeight: vs(22),
   },
 });
