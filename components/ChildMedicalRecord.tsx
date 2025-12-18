@@ -1,5 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // Types
@@ -108,10 +108,22 @@ const MOCK_MEDICAL_RECORD: ChildMedicalRecordData = {
 };
 
 // Component
-export default function ChildMedicalRecord() {
+export default function ChildMedicalRecord({ childName, initialRecord, onConfirm, saving }: { childName?: string; initialRecord?: ChildMedicalRecordData; onConfirm?: (record: ChildMedicalRecordData) => Promise<void> | void; saving?: boolean }) {
   const [editMode, setEditMode] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<null | 'general' | 'contacts' | 'history' | 'current' | 'files'>(null);
-  const [record, setRecord] = useState<ChildMedicalRecordData>(MOCK_MEDICAL_RECORD);
+  const computedInitialRecord = useMemo<ChildMedicalRecordData>(() => {
+    if (initialRecord) return initialRecord;
+    return {
+      ...MOCK_MEDICAL_RECORD,
+      general: {
+        ...MOCK_MEDICAL_RECORD.general,
+        fullName: childName || MOCK_MEDICAL_RECORD.general.fullName,
+      },
+    };
+  }, [childName, initialRecord]);
+  const [record, setRecord] = useState<ChildMedicalRecordData>(computedInitialRecord);
+  const [submitting, setSubmitting] = useState(false);
+  const [originalRecord, setOriginalRecord] = useState<ChildMedicalRecordData | null>(null);
 
   // Temp inputs for adding entries in history
   const [newHistoryEntry, setNewHistoryEntry] = useState('');
@@ -196,9 +208,39 @@ export default function ChildMedicalRecord() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header - Modifier */}
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => setEditMode(m => !m)}>
-          <Text style={styles.editButtonText}>Modifier</Text>
-        </TouchableOpacity>
+        {editMode ? (
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity
+              disabled={!!saving || submitting}
+              onPress={() => {
+                if (originalRecord) setRecord(originalRecord);
+                setEditMode(false);
+                setOriginalRecord(null);
+              }}
+            >
+              <Text style={[styles.editButtonText, { color: '#9CA3AF' }]}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              disabled={!!saving || submitting}
+              onPress={async () => {
+                try {
+                  setSubmitting(true);
+                  await onConfirm?.(record);
+                  setEditMode(false);
+                  setOriginalRecord(null);
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+            >
+              <Text style={styles.editButtonText}>{saving || submitting ? 'Enregistrement...' : 'Confirmer'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity onPress={() => { setOriginalRecord(record); setEditMode(true); }}>
+            <Text style={styles.editButtonText}>Modifier</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 1. Informations générales */}
