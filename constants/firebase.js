@@ -1,22 +1,24 @@
 import { initializeApp } from 'firebase/app';
 import {
-  createUserWithEmailAndPassword,
-  signOut as fbSignOut,
-  getAuth,
-  signInWithEmailAndPassword
+    createUserWithEmailAndPassword,
+    deleteUser as fbDeleteUser,
+    signOut as fbSignOut,
+    getAuth,
+    signInWithEmailAndPassword
 } from 'firebase/auth';
 import {
-  addDoc,
-  arrayUnion,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  getFirestore,
-  query,
-  setDoc,
-  updateDoc,
-  where
+    addDoc,
+    arrayUnion,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    getFirestore,
+    query,
+    setDoc,
+    updateDoc,
+    where
 } from 'firebase/firestore';
 
 import firebaseConfig from './firebaseenv.js';
@@ -248,4 +250,217 @@ export async function getFamilyCurrency(uid) {
   const familySnap = await getDoc(familyRef);
   
   return familySnap.exists() ? (familySnap.data().currency || 'EUR') : 'EUR';
+}
+
+/**
+ * Supprimer complètement le profil utilisateur (parent ou professionnel)
+ * Supprime:
+ * - Compte Firebase Authentication
+ * - Document utilisateur Firestore
+ * - Données familiales associées (si dernier membre)
+ * - Conversations où l'utilisateur participe
+ * - Événements créés par l'utilisateur
+ * 
+ * @param {string} uid - User ID à supprimer
+ * @returns {Promise<Object>} { success: boolean, deletedData: Object }
+ */
+export async function deleteUserProfile(uid) {
+  try {
+    console.log('[DeleteProfile] Début suppression pour:', uid);
+    
+    const deletedData = {
+      userDocDeleted: false,
+      conversationsDeleted: 0,
+      eventsDeleted: 0,
+      familiesLeft: [],
+      authDeleted: false
+    };
+
+    // 1. Récupérer les données utilisateur
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+    
+    if (!userSnap.exists()) {
+      throw new Error('Utilisateur non trouvé');
+    }
+
+    const userData = userSnap.data();
+    const userType = userData.userType || 'parent';
+    const familyIds = userData.familyIds || [];
+
+    // 2. Supprimer les conversations de l'utilisateur
+    console.log('[DeleteProfile] Suppression des conversations...');
+    const conversationsQuery = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', uid)
+    );
+    const conversationsSnap = await getDocs(conversationsQuery);
+    
+    for (const convDoc of conversationsSnap.docs) {
+      await deleteDoc(doc(db, 'conversations', convDoc.id));
+      deletedData.conversationsDeleted++;
+    }
+
+    // 3. Supprimer/adapter les événements de l'utilisateur
+    console.log('[DeleteProfile] Suppression des événements...');
+    const eventsQuery = query(
+      collection(db, 'events'),
+      where('userId', '==', uid)
+    );
+    const eventsSnap = await getDocs(eventsQuery);
+    
+    for (const eventDoc of eventsSnap.docs) {
+      await deleteDoc(doc(db, 'events', eventDoc.id));
+      deletedData.eventsDeleted++;
+    }
+
+    // 4. Gérer les familles
+    console.log('[DeleteProfile] Gestion des familles...');
+    for (const familyId of familyIds) {
+      const familyRef = doc(db, 'families', familyId);
+      const familySnap = await getDoc(familyRef);
+      
+      if (familySnap.exists()) {
+        const familyData = familySnap.data();
+        const members = familyData.members || [];
+        const updatedMembers = members.filter(m => m !== uid);
+        
+        if (updatedMembers.length === 0) {
+          // Si l'utilisateur était le seul membre, supprimer la famille
+          console.log('[DeleteProfile] Suppression de la famille (plus de membres):', familyId);
+          await deleteDoc(familyRef);
+        } else {
+          // Sinon, mettre à jour la liste des membres
+          await updateDoc(familyRef, { members: updatedMembers });
+          deletedData.familiesLeft.push(familyId);
+        }
+      }
+    }
+
+    // 5. Supprimer le document utilisateur Firestore
+    console.log('[DeleteProfile] Suppression du document utilisateur...');
+    await deleteDoc(userRef);
+    deletedData.userDocDeleted = true;
+
+    // 6. Supprimer le compte Firebase Authentication
+    console.log('[DeleteProfile] Suppression du compte Firebase Auth...');
+    const currentUser = auth.currentUser;
+    if (currentUser && currentUser.uid === uid) {
+      await fbDeleteUser(currentUser);
+      deletedData.authDeleted = true;
+      console.log('[DeleteProfile] Compte Firebase Auth supprimé');
+    }
+
+    // 7. Effacer la session persistée
+    console.log('[DeleteProfile] Effacement de la session...');
+    try {
+      const { clearSession } = await import('./sessionManager.js');
+      await clearSession();
+    } catch (error) {
+      console.warn('[DeleteProfile] Session non effacée (peut ne pas être chargée):', error);
+    }
+
+    console.log('[DeleteProfile] Suppression complète terminée pour:', uid, deletedData);
+    return {
+      success: true,
+      message: `Profil ${userType} supprimé avec succès`,
+      deletedData
+    };
+
+  } catch (error) {
+    console.error('[DeleteProfile] Erreur lors de la suppression du profil:', error);
+    return {
+      success: false,
+      message: error.message || 'Erreur lors de la suppression du profil',
+      error
+    };
+  }
+}
+
+/**
+ * Vérifier les données qui seront supprimées (sans les supprimer)
+ * Utile pour afficher un résumé avant confirmation
+ * 
+ * @param {string} uid - User ID à vérifier
+ * @returns {Promise<Object>} Résumé des données à supprimer
+ */
+export async function getDeleteProfileSummary(uid) {
+  try {
+    const summary = {
+      userFound: false,
+      userType: null,
+      email: null,
+      familiesCount: 0,
+      conversationsCount: 0,
+      eventsCount: 0,
+      willDeleteFamilies: [],
+      willKeepFamilies: []
+    };
+
+    // Récupérer les données utilisateur
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+    
+    if (!userSnap.exists()) {
+      return summary;
+    }
+
+    summary.userFound = true;
+    const userData = userSnap.data();
+    summary.userType = userData.userType || 'parent';
+    summary.email = userData.email;
+    summary.familiesCount = userData.familyIds?.length || 0;
+
+    // Compter les conversations
+    const conversationsQuery = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', uid)
+    );
+    const conversationsSnap = await getDocs(conversationsQuery);
+    summary.conversationsCount = conversationsSnap.size;
+
+    // Compter les événements
+    const eventsQuery = query(
+      collection(db, 'events'),
+      where('userId', '==', uid)
+    );
+    const eventsSnap = await getDocs(eventsQuery);
+    summary.eventsCount = eventsSnap.size;
+
+    // Vérifier les familles
+    const familyIds = userData.familyIds || [];
+    for (const familyId of familyIds) {
+      const familyRef = doc(db, 'families', familyId);
+      const familySnap = await getDoc(familyRef);
+      
+      if (familySnap.exists()) {
+        const familyData = familySnap.data();
+        const members = familyData.members || [];
+        
+        if (members.length === 1 && members[0] === uid) {
+          // Sera supprimée
+          summary.willDeleteFamilies.push({
+            id: familyId,
+            name: familyData.name || `Famille ${familyId.substring(0, 6)}`,
+            memberCount: members.length
+          });
+        } else {
+          // Restera, utilisateur sera juste retiré
+          summary.willKeepFamilies.push({
+            id: familyId,
+            name: familyData.name || `Famille ${familyId.substring(0, 6)}`,
+            memberCount: members.length
+          });
+        }
+      }
+    }
+
+    return summary;
+  } catch (error) {
+    console.error('[DeleteProfileSummary] Erreur:', error);
+    return {
+      userFound: false,
+      error
+    };
+  }
 }
