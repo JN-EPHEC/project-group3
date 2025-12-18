@@ -4,7 +4,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
 
@@ -522,6 +522,19 @@ export default function AideScreen() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookedSlots, setBookedSlots] = useState<any[]>([]);
 
+  const weeksForBooking = useMemo(() => {
+    const days: Date[] = Array.from({ length: 180 }, (_, index) => {
+      const d = new Date();
+      d.setDate(d.getDate() + index);
+      return d;
+    });
+    const weeks: Date[][] = [];
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7));
+    }
+    return weeks;
+  }, []);
+
   const deriveDayKeyFromDate = (date: Date, availability?: AvailabilitySchedule | any) => {
     const dayIndex = date.getDay(); // 0 = Sunday
     const frenchKeys = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
@@ -950,99 +963,58 @@ export default function AideScreen() {
 
             {selectedProfessionalForBooking && (
               <>
-                {/* Date selector */}
+                {/* Date selector in weekly rows */}
                 <View style={{ marginBottom: V_SPACING.large }}>
                   <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600', marginBottom: V_SPACING.small }}>
                     Sélectionner une date
                   </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: V_SPACING.medium }}>
-                    {[...Array(14)].map((_, index) => {
-                      const date = new Date();
-                      date.setDate(date.getDate() + index);
-                      const isSelected = selectedDateForBooking?.toDateString() === date.toDateString();
-                      
-                      return (
-                        <TouchableOpacity
-                          key={index}
-                          onPress={() => setSelectedDateForBooking(date)}
-                          style={{
-                            paddingVertical: vs(12),
-                            paddingHorizontal: hs(16),
-                            marginRight: SPACING.medium,
-                            borderRadius: BORDER_RADIUS.medium,
-                            backgroundColor: isSelected ? '#FFCEB0' : colors.cardBackground,
-                            borderWidth: isSelected ? 2 : 1,
-                            borderColor: isSelected ? '#FFCEB0' : colors.border,
-                            minWidth: hs(80),
-                            alignItems: 'center'
-                          }}
-                        >
-                          <Text style={{ color: isSelected ? '#FFFFFF' : colors.textSecondary, fontSize: FONT_SIZES.tiny, fontWeight: '600' }}>
-                            {date.toLocaleDateString('fr-FR', { weekday: 'short' })}
-                          </Text>
-                          <Text style={{ color: isSelected ? '#FFFFFF' : colors.text, fontSize: FONT_SIZES.medium, fontWeight: '700', marginTop: vs(4) }}>
-                            {date.getDate()}
-                          </Text>
-                          <Text style={{ color: isSelected ? '#FFFFFF' : colors.textSecondary, fontSize: FONT_SIZES.tiny, marginTop: vs(2) }}>
-                            {date.toLocaleDateString('fr-FR', { month: 'short' })}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: vs(7 * 20 + 80) }}>
+                    {weeksForBooking.map((week, wIdx) => (
+                      <View key={wIdx} style={{ flexDirection: 'row', marginBottom: V_SPACING.small }}>
+                        {week.map((date, idx) => {
+                          const isSelected = selectedDateForBooking?.toDateString() === date.toDateString();
+                          const dayKey = deriveDayKeyFromDate(date, selectedProfessionalForBooking?.availability);
+                          const dayData = dayKey ? (selectedProfessionalForBooking?.availability as any)?.[dayKey] : undefined;
+                          const isOpen = dayData && typeof dayData === 'object' ? dayData.isOpen : false;
 
-                {/* Day selector tabs */}
-                <View style={{ marginBottom: V_SPACING.large }}>
-                  <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600', marginBottom: V_SPACING.small }}>
-                    Jour de la semaine
-                  </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: V_SPACING.medium }}>
-                    {Object.entries(selectedProfessionalForBooking.availability || {}).map(([dayKey, dayData]) => {
-                      const dayLabels: { [key: string]: string } = {
-                        'monday': 'Lun',
-                        'tuesday': 'Mar',
-                        'wednesday': 'Mer',
-                        'thursday': 'Jeu',
-                        'friday': 'Ven',
-                        'saturday': 'Sam',
-                        'sunday': 'Dim'
-                      };
-
-                      const dayData_ = dayData as DayAvailability | string;
-                      const isOpen = typeof dayData_ === 'object' ? dayData_.isOpen : false;
-                      const isSelected = selectedDayForBooking === dayKey;
-
-                      return (
-                        <TouchableOpacity
-                          key={dayKey}
-                          onPress={() => {
-                            if (isOpen) {
-                              setSelectedDayForBooking(dayKey as keyof AvailabilitySchedule);
-                              setSelectedSlotForBooking(null);
-                            }
-                          }}
-                          disabled={!isOpen}
-                          style={{
-                            paddingVertical: vs(8),
-                            paddingHorizontal: hs(16),
-                            marginRight: SPACING.medium,
-                            borderRadius: BORDER_RADIUS.medium,
-                            backgroundColor: isSelected ? '#FFCEB0' : isOpen ? colors.cardBackground : colors.textTertiary,
-                            opacity: isOpen ? 1 : 0.5,
-                            borderWidth: isSelected ? 2 : 0,
-                            borderColor: '#FFCEB0'
-                          }}
-                        >
-                          <Text style={{ color: isSelected ? '#FFCEB0' : colors.text, fontSize: FONT_SIZES.small, fontWeight: '600' }}>
-                            {dayLabels[dayKey] || dayKey}
-                          </Text>
-                          <Text style={{ color: isSelected ? '#FFCEB0' : colors.textSecondary, fontSize: FONT_SIZES.tiny, marginTop: vs(2) }}>
-                            {isOpen ? 'Ouvert' : 'Fermé'}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+                          return (
+                            <TouchableOpacity
+                              key={idx}
+                              disabled={!isOpen}
+                              onPress={() => {
+                                if (!isOpen) return;
+                                const derivedDay = deriveDayKeyFromDate(date, selectedProfessionalForBooking?.availability);
+                                setSelectedDateForBooking(date);
+                                setSelectedDayForBooking(derivedDay);
+                                setSelectedSlotForBooking(null);
+                              }}
+                              style={{
+                                flex: 1,
+                                paddingVertical: vs(10),
+                                paddingHorizontal: hs(8),
+                                marginRight: idx < week.length - 1 ? SPACING.small : 0,
+                                borderRadius: BORDER_RADIUS.medium,
+                                backgroundColor: isSelected ? '#FFCEB0' : isOpen ? colors.cardBackground : colors.textTertiary,
+                                borderWidth: isSelected ? 2 : 1,
+                                borderColor: isSelected ? '#FFCEB0' : colors.border,
+                                alignItems: 'center',
+                                opacity: isOpen ? 1 : 0.4,
+                              }}
+                            >
+                              <Text style={{ color: isSelected ? '#FFFFFF' : colors.textSecondary, fontSize: FONT_SIZES.tiny, fontWeight: '600' }}>
+                                {date.toLocaleDateString('fr-FR', { weekday: 'short' })}
+                              </Text>
+                              <Text style={{ color: isSelected ? '#FFFFFF' : colors.text, fontSize: FONT_SIZES.medium, fontWeight: '700', marginTop: vs(2) }}>
+                                {date.getDate()}
+                              </Text>
+                              <Text style={{ color: isSelected ? '#FFFFFF' : colors.textSecondary, fontSize: FONT_SIZES.tiny, marginTop: vs(1) }}>
+                                {date.toLocaleDateString('fr-FR', { month: 'short' })}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    ))}
                   </ScrollView>
                 </View>
 
