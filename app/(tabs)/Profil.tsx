@@ -6,7 +6,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, joinFamilyByCode, leaveFamilyById, signOut } from '../../constants/firebase';
@@ -49,6 +49,7 @@ export default function ProfilScreen() {
   const [medicalModalVisible, setMedicalModalVisible] = useState(false);
   const [selectedChildForMedical, setSelectedChildForMedical] = useState<{ id: string; name: string } | null>(null);
   const [savingMedical, setSavingMedical] = useState(false);
+  const [familyMemberCounts, setFamilyMemberCounts] = useState<{ [familyId: string]: number }>({});
 
   const currentFamilyId = families[selectedFamilyIndex]?.id;
   const selectedChildFull = selectedChildForMedical
@@ -121,6 +122,40 @@ export default function ProfilScreen() {
     }
   }, [router]);
 
+  // Écouter toutes les familles pour mettre à jour le nombre de membres actifs en temps réel
+  useEffect(() => {
+    if (families.length === 0) return;
+
+    const unsubscribers: (() => void)[] = [];
+
+    families.forEach((family) => {
+      const familyDocRef = doc(db, 'families', family.id);
+      const unsubscribe = onSnapshot(familyDocRef, async (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const familyData = docSnapshot.data();
+          const memberIds = familyData.members || [];
+          
+          if (memberIds.length === 0) {
+            setFamilyMemberCounts(prev => ({ ...prev, [family.id]: 0 }));
+            return;
+          }
+          
+          // Compter seulement les membres qui ont encore un compte actif
+          const membersQuery = query(collection(db, 'users'), where('__name__', 'in', memberIds));
+          const membersSnapshot = await getDocs(membersQuery);
+          const activeMemberCount = membersSnapshot.docs.length;
+          
+          setFamilyMemberCounts(prev => ({ ...prev, [family.id]: activeMemberCount }));
+        }
+      });
+      unsubscribers.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribers.forEach(unsub => unsub());
+    };
+  }, [families.map(f => f.id).join(',')]);
+
   useEffect(() => {
     if (families.length === 0 && !loading) {
         setChildren([]);
@@ -156,26 +191,10 @@ export default function ProfilScreen() {
                 lastName: doc.data().lastName || '',
               }));
               setFamilyMembers(membersDetails);
-              
-              // Mettre à jour le nombre de membres dans l'array families
-              setFamilies(prev => prev.map((f, idx) => 
-                idx === selectedFamilyIndex 
-                  ? { ...f, members: familyData.members }
-                  : f
-              ));
-              
               if (loading) setLoading(false);
             });
           } else {
             setFamilyMembers([]);
-            
-            // Mettre à jour le nombre de membres dans l'array families
-            setFamilies(prev => prev.map((f, idx) => 
-              idx === selectedFamilyIndex 
-                ? { ...f, members: [] }
-                : f
-            ));
-            
             if (loading) setLoading(false);
           }
         } else {
@@ -851,7 +870,7 @@ export default function ProfilScreen() {
                           styles.familyTabMembers,
                           { color: selectedFamilyIndex === index ? 'rgba(255,255,255,0.8)' : colors.textSecondary }
                         ]}>
-                          {selectedFamilyIndex === index ? familyMembers.length : (family.members?.length || 0)} membre{(selectedFamilyIndex === index ? familyMembers.length : (family.members?.length || 0)) > 1 ? 's' : ''}
+                          {familyMemberCounts[family.id] ?? (family.members?.length || 0)} membre{(familyMemberCounts[family.id] ?? (family.members?.length || 0)) > 1 ? 's' : ''}
                         </Text>
                       </View>
                     </TouchableOpacity>
