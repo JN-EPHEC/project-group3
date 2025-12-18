@@ -181,8 +181,13 @@ export default function DepensesScreen() {
         if (budgetDoc.exists()) {
           const data = budgetDoc.data();
           const rules = data.categoryRules || data.categoryLimits || {};
-          const names = Object.keys(rules);
-          setCategories(names);
+          const categoryArray = Object.entries(rules).map(([name, value]: any) => {
+            if (typeof value === 'number') {
+              return { name, limit: value, allowOverLimit: false };
+            }
+            return { name, limit: value?.limit ?? 0, allowOverLimit: !!value?.allowOverLimit };
+          });
+          setCategories(categoryArray);
         } else {
           setCategories([]);
         }
@@ -305,16 +310,19 @@ export default function DepensesScreen() {
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.tint }]}>Budgets par catégorie</Text>
               {categories.map((category: any, index: number) => {
-                const spent = getCategorySpent(category.name);
-                const percentage = (spent / category.limit) * 100;
-                const isOverBudget = spent > category.limit;
+                const name = category?.name || String(category);
+                const limit = typeof category?.limit === 'number' ? category.limit : 0;
+                const noLimit = !isFinite(limit) || limit <= 0;
+                const spent = getCategorySpent(name);
+                const percentage = !noLimit && limit > 0 ? (spent / limit) * 100 : 0;
+                const isOverBudget = !noLimit && spent > limit;
 
                 return (
                   <View key={index} style={[styles.budgetCard, { backgroundColor: colors.cardBackground }]}>
                     <View style={styles.budgetHeader}>
-                      <Text style={[styles.budgetName, { color: colors.text }]}>{category.name}</Text>
+                      <Text style={[styles.budgetName, { color: colors.text }]}>{name}</Text>
                       <Text style={[styles.budgetAmount, { color: colors.textSecondary }, isOverBudget && styles.overBudget]}>
-                        {spent.toFixed(2)} {currency} / {category.limit.toFixed(2)} {currency}
+                        {spent.toFixed(2)} {currency} {noLimit ? '— Aucun plafond défini' : `/ ${limit.toFixed(2)} ${currency}`}
                       </Text>
                     </View>
                     <View style={[styles.progressBarContainer, { backgroundColor: colors.border }]}>
