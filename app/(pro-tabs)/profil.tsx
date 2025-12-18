@@ -718,7 +718,7 @@ export default function ProProfilScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#fff' },
   scrollView: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 80 },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { marginBottom: 16 },
   title: { fontSize: 28, fontWeight: '700', color: '#FFCEB0' },
