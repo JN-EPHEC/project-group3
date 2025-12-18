@@ -29,6 +29,7 @@ export default function DepensesScreen() {
   const [balance, setBalance] = useState(0);
   const [showAllExpenses, setShowAllExpenses] = useState(false);
   const [sortBy, setSortBy] = useState<'date' | 'category' | 'amount'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [filterDate, setFilterDate] = useState<Date | null>(null);
@@ -138,15 +139,18 @@ export default function DepensesScreen() {
         let expensesList = expensesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         // Trier les dépenses selon le critère sélectionné
+        const dir = sortOrder === 'asc' ? 1 : -1;
         expensesList.sort((a: any, b: any) => {
           if (sortBy === 'date') {
             const dateA = a.date?.toDate ? a.date.toDate().getTime() : 0;
             const dateB = b.date?.toDate ? b.date.toDate().getTime() : 0;
-            return dateB - dateA; // Plus récent en premier
+            return (dateA - dateB) * dir;
           } else if (sortBy === 'category') {
-            return (a.category || '').localeCompare(b.category || '');
+            const cmp = (a.category || '').localeCompare(b.category || '');
+            return cmp * dir;
           } else if (sortBy === 'amount') {
-            return (b.amount || 0) - (a.amount || 0); // Plus grand montant en premier
+            const diff = (a.amount || 0) - (b.amount || 0);
+            return diff * dir;
           }
           return 0;
         });
@@ -193,7 +197,7 @@ export default function DepensesScreen() {
       unsubBudgets();
       unsubFamily();
     };
-  }, [user, families, selectedFamilyIndex, sortBy]); // Re-charger quand le tri change
+  }, [user, families, selectedFamilyIndex, sortBy, sortOrder]); // Re-charger quand le tri change
 
   const getCategoryBudget = (categoryName: string) => {
     const category = categories.find((c: any) => c.name === categoryName);
@@ -346,6 +350,31 @@ export default function DepensesScreen() {
             {/* Sort Menu */}
             {showSortMenu && (
               <View style={[styles.sortMenu, { backgroundColor: colors.cardBackground }]}>
+                <View style={styles.sortOrderRow}>
+                  <Text style={[styles.sortOrderLabel, { color: colors.textSecondary }]}>Ordre</Text>
+                  <View style={styles.sortOrderButtons}>
+                    <TouchableOpacity
+                      style={[
+                        styles.sortOrderButton,
+                        { backgroundColor: sortOrder === 'asc' ? colors.tint : colors.secondaryCardBackground }
+                      ]}
+                      onPress={() => setSortOrder('asc')}
+                    >
+                      <IconSymbol name="arrow.up" size={16} color={sortOrder === 'asc' ? '#fff' : colors.text} />
+                      <Text style={[styles.sortOrderButtonText, { color: sortOrder === 'asc' ? '#fff' : colors.text }]}>Croissant</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.sortOrderButton,
+                        { backgroundColor: sortOrder === 'desc' ? colors.tint : colors.secondaryCardBackground }
+                      ]}
+                      onPress={() => setSortOrder('desc')}
+                    >
+                      <IconSymbol name="arrow.down" size={16} color={sortOrder === 'desc' ? '#fff' : colors.text} />
+                      <Text style={[styles.sortOrderButtonText, { color: sortOrder === 'desc' ? '#fff' : colors.text }]}>Décroissant</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
                 <TouchableOpacity
                   style={styles.sortOption}
                   onPress={() => {
@@ -653,6 +682,35 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: vs(2) },
     shadowRadius: hs(4),
     elevation: 3,
+  },
+  sortOrderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: V_SPACING.small,
+    paddingHorizontal: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    marginBottom: V_SPACING.small,
+  },
+  sortOrderLabel: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+  },
+  sortOrderButtons: {
+    flexDirection: 'row',
+    gap: SPACING.small,
+  },
+  sortOrderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.tiny,
+    paddingHorizontal: SPACING.regular,
+    paddingVertical: vs(6),
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  sortOrderButtonText: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
   },
   sortOption: {
     flexDirection: 'row',
