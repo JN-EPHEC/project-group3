@@ -20,14 +20,22 @@ import {
     updateDoc,
     where
 } from 'firebase/firestore';
+import {
+    deleteObject,
+    getDownloadURL,
+    getStorage,
+    ref,
+    uploadBytes
+} from 'firebase/storage';
 
 import firebaseConfig from './firebaseenv.js';
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
-export { auth, db };
+export { auth, db, storage };
 
 // Helpers to allow same account to be used on both interfaces (parent / professionnel)
 
@@ -462,5 +470,110 @@ export async function getDeleteProfileSummary(uid) {
       userFound: false,
       error
     };
+  }
+}
+
+/**
+ * Upload a professional profile photo to Firebase Storage
+ * Stores in: professionals/{uid}/profile-photo
+ * Updates Firestore with the photo URL
+ * 
+ * @param {string} uid - User ID
+ * @param {Blob} imageBlob - Image file blob/data
+ * @returns {Promise<Object>} { success: boolean, photoUrl: string, error?: any }
+ */
+export async function uploadProfessionalPhoto(uid, imageBlob) {
+  try {
+    if (!uid || !imageBlob) {
+      throw new Error('UID et image requises');
+    }
+
+    // Create storage reference
+    const photoRef = ref(storage, `professionals/${uid}/profile-photo`);
+    
+    // Upload file
+    const snapshot = await uploadBytes(photoRef, imageBlob);
+    console.log('[UploadPhoto] File uploaded:', snapshot.fullPath);
+    
+    // Get download URL
+    const photoUrl = await getDownloadURL(photoRef);
+    console.log('[UploadPhoto] Download URL:', photoUrl);
+    
+    // Update Firestore professionals document with photo URL
+    const professionalDocRef = doc(db, 'professionals', uid);
+    await setDoc(professionalDocRef, { photoUrl }, { merge: true });
+    console.log('[UploadPhoto] Firestore updated with photoUrl');
+    
+    return {
+      success: true,
+      photoUrl
+    };
+  } catch (error) {
+    console.error('[UploadPhoto] Erreur:', error);
+    return {
+      success: false,
+      error: error.message || 'Erreur lors du téléchargement de la photo'
+    };
+  }
+}
+
+/**
+ * Delete a professional profile photo
+ * Removes from Firebase Storage and clears Firestore reference
+ * 
+ * @param {string} uid - User ID
+ * @returns {Promise<Object>} { success: boolean, error?: any }
+ */
+export async function deleteProfessionalPhoto(uid) {
+  try {
+    if (!uid) {
+      throw new Error('UID requis');
+    }
+
+    // Delete from Storage
+    const photoRef = ref(storage, `professionals/${uid}/profile-photo`);
+    try {
+      await deleteObject(photoRef);
+      console.log('[DeletePhoto] File deleted from storage');
+    } catch (err) {
+      // File might not exist, continue
+      if (err.code !== 'storage/object-not-found') {
+        throw err;
+      }
+    }
+    
+    // Update Firestore to remove photoUrl
+    const professionalDocRef = doc(db, 'professionals', uid);
+    await setDoc(professionalDocRef, { photoUrl: null }, { merge: true });
+    console.log('[DeletePhoto] Firestore updated');
+    
+    return { success: true };
+  } catch (error) {
+    console.error('[DeletePhoto] Erreur:', error);
+    return {
+      success: false,
+      error: error.message || 'Erreur lors de la suppression de la photo'
+    };
+  }
+}
+
+/**
+ * Get professional photo URL from Firestore
+ * 
+ * @param {string} uid - User ID
+ * @returns {Promise<string|null>} Photo URL or null
+ */
+export async function getProfessionalPhoto(uid) {
+  try {
+    const professionalDocRef = doc(db, 'professionals', uid);
+    const snap = await getDoc(professionalDocRef);
+    
+    if (snap.exists()) {
+      return snap.data().photoUrl || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('[GetPhoto] Erreur:', error);
+    return null;
   }
 }

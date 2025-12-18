@@ -1,10 +1,11 @@
 import DeleteProfileModal from '@/components/DeleteProfileModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
-import { auth, db, signOut } from '../../constants/firebase';
+import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
+import { auth, db, deleteProfessionalPhoto, signOut, uploadProfessionalPhoto } from '../../constants/firebase';
 import { Colors } from '../../constants/theme';
 
 type ProfessionalType = 'avocat' | 'psychologue' | '';
@@ -64,6 +65,8 @@ export default function ProProfilScreen() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(true);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
   // Professional-specific fields
   const [professionalType, setProfessionalType] = useState<ProfessionalType>('');
@@ -115,6 +118,7 @@ export default function ProProfilScreen() {
             setPhone(profData.phone || '');
             setSpecialty(profData.specialty || '');
             setDescription(profData.description || '');
+            setPhotoUrl(profData.photoUrl || null);
             
             // Handle availability - support both old (string) and new (object) format
             if (profData.availability) {
@@ -151,6 +155,91 @@ export default function ProProfilScreen() {
     } catch (error) {
       console.error('Error signing out:', error);
     }
+  };
+
+  const handleUploadPhoto = async () => {
+    try {
+      // Request permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Erreur', 'Accès à la galerie refusé');
+        return;
+      }
+
+      // Open image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setIsUploadingPhoto(true);
+        const asset = result.assets[0];
+        
+        // Convert URI to blob
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        
+        // Upload to Firebase
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          throw new Error('Utilisateur non connecté');
+        }
+
+        const uploadResult = await uploadProfessionalPhoto(currentUser.uid, blob);
+        
+        if (uploadResult.success) {
+          setPhotoUrl(uploadResult.photoUrl);
+          Alert.alert('Succès', 'Photo de profil mise à jour');
+        } else {
+          Alert.alert('Erreur', uploadResult.error || 'Impossible de télécharger la photo');
+        }
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      Alert.alert('Erreur', 'Erreur lors du téléchargement de la photo');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleDeletePhoto = async () => {
+    Alert.alert(
+      'Supprimer la photo',
+      'Êtes-vous sûr de vouloir supprimer votre photo de profil ?',
+      [
+        { text: 'Annuler', onPress: () => {} },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsUploadingPhoto(true);
+              const currentUser = auth.currentUser;
+              if (!currentUser) {
+                throw new Error('Utilisateur non connecté');
+              }
+
+              const deleteResult = await deleteProfessionalPhoto(currentUser.uid);
+              
+              if (deleteResult.success) {
+                setPhotoUrl(null);
+                Alert.alert('Succès', 'Photo de profil supprimée');
+              } else {
+                Alert.alert('Erreur', deleteResult.error || 'Impossible de supprimer la photo');
+              }
+            } catch (error) {
+              console.error('Delete error:', error);
+              Alert.alert('Erreur', 'Erreur lors de la suppression de la photo');
+            } finally {
+              setIsUploadingPhoto(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const openEditModal = (field: 'name' | 'contact' | 'description' | 'availability' | 'type') => {
@@ -276,8 +365,37 @@ export default function ProProfilScreen() {
           </View>
 
           <View style={styles.avatarSection}>
-            <View style={[styles.avatarCircle, { backgroundColor: colors.secondaryCardBackground }]}>
-              <IconSymbol name="person.fill" size={60} color={colors.tint} />
+            {photoUrl ? (
+              <Image 
+                source={{ uri: photoUrl }} 
+                style={[styles.avatarCircle, { borderRadius: 60 }]}
+              />
+            ) : (
+              <View style={[styles.avatarCircle, { backgroundColor: colors.secondaryCardBackground }]}>
+                <IconSymbol name="person.fill" size={60} color={colors.tint} />
+              </View>
+            )}
+            <View style={styles.photoButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.photoButton, { backgroundColor: colors.tint }]}
+                onPress={handleUploadPhoto}
+                disabled={isUploadingPhoto}
+              >
+                {isUploadingPhoto ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <IconSymbol name="camera.fill" size={16} color="#fff" />
+                )}
+              </TouchableOpacity>
+              {photoUrl && (
+                <TouchableOpacity 
+                  style={[styles.photoButton, { backgroundColor: '#FF6B6B' }]}
+                  onPress={handleDeletePhoto}
+                  disabled={isUploadingPhoto}
+                >
+                  <IconSymbol name="trash.fill" size={16} color="#fff" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -747,6 +865,8 @@ const styles = StyleSheet.create({
   warningText: { fontSize: 14, fontWeight: '500', marginTop: 8, lineHeight: 20 },
   avatarSection: { alignItems: 'center', marginBottom: 32 },
   avatarCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#FFF5EE', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 4 },
+  photoButtonsContainer: { flexDirection: 'row', gap: 12, marginTop: 12 },
+  photoButton: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4, elevation: 2 },
   section: { marginBottom: 28 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   sectionTitle: { fontSize: 22, fontWeight: '600' },
