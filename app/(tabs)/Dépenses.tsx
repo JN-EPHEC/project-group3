@@ -12,6 +12,7 @@ import { auth, db, getUserFamilies } from '../../constants/firebase';
 
 export default function DepensesScreen() {
   const router = useRouter();
+  const [activeFamily, setActiveFamily] = useState<any | null>(null);
   const [firstName, setFirstName] = useState('');
   const [expenses, setExpenses] = useState<any[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
@@ -74,9 +75,10 @@ export default function DepensesScreen() {
   useEffect(() => {
     if (!user) return;
     const uid = user.uid;
-    const activeFamily = families[selectedFamilyIndex];
+    const activeFam = families[selectedFamilyIndex];
+    setActiveFamily(activeFam || null);
 
-    if (!activeFamily) {
+    if (!activeFam) {
       setExpenses([]);
       setCategories([]);
       return;
@@ -93,7 +95,7 @@ export default function DepensesScreen() {
     let unsubFamily = () => {};
 
     try {
-      const familyId = activeFamily.id;
+      const familyId = activeFam.id;
 
       // Currency listener for active family
       const familyRef = doc(db, 'families', familyId);
@@ -226,7 +228,7 @@ export default function DepensesScreen() {
           {/* Sélecteur de famille */}
           {families.length > 0 && (
             <View style={styles.familySelector}>
-              <Text style={[styles.familySelectorLabel, { color: colors.textSecondary }]}>Famille active</Text>
+              <Text style={[styles.familySelectorLabel, { color: colors.textSecondary }]}>Famille active: {activeFamily?.name || families[selectedFamilyIndex]?.name || `Famille ${selectedFamilyIndex + 1}`}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.familyChipsContainer}>
                 {families.map((family, index) => (
                   <TouchableOpacity
@@ -412,7 +414,7 @@ export default function DepensesScreen() {
                 {/* Add Expense Button */}
                 <TouchableOpacity
                   style={[styles.addExpenseButton, { backgroundColor: colors.cardBackground }]}
-                  onPress={() => router.push('/add-expense')}
+                  onPress={() => router.push({ pathname: '/add-expense', params: { familyId: activeFamily?.id, familyName: activeFamily?.name } })}
                 >
                   <IconSymbol name="plus" size={20} color={colors.tint} />
                   <Text style={[styles.addExpenseButtonText, { color: colors.tint }]}>Nouvelle dépense</Text>
@@ -426,7 +428,7 @@ export default function DepensesScreen() {
                 {/* Add Expense Button */}
                 <TouchableOpacity
                   style={[styles.addExpenseButton, { backgroundColor: colors.cardBackground }]}
-                  onPress={() => router.push('/add-expense')}
+                  onPress={() => router.push({ pathname: '/add-expense', params: { familyId: activeFamily?.id, familyName: activeFamily?.name } })}
                 >
                   <IconSymbol name="plus" size={20} color={colors.tint} />
                   <Text style={[styles.addExpenseButtonText, { color: colors.tint }]}>Nouvelle dépense</Text>

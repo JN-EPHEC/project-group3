@@ -33,6 +33,8 @@ export default function AddExpenseScreen() {
   const [newCategory, setNewCategory] = useState('');
   const [categoryLimits, setCategoryLimits] = useState<{ [key: string]: number }>({});
   const [uploading, setUploading] = useState(false);
+  const [familyId, setFamilyId] = useState<string | null>(null);
+  const [familyName, setFamilyName] = useState<string | null>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -55,31 +57,45 @@ export default function AddExpenseScreen() {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
 
-      const userFamily = await getUserFamily(currentUser.uid);
-      if (userFamily?.id) {
-        const familyRef = doc(db, 'families', userFamily.id);
-        const familySnap = await getDoc(familyRef);
-        if (familySnap.exists()) {
-          const currencyCode = familySnap.data().currency || 'EUR';
-          setCurrency(currencyCode);
-        }
+      const routeFamilyId = params.familyId as string | undefined;
+      const routeFamilyName = params.familyName as string | undefined;
+
+      let targetFamilyId: string | null = routeFamilyId || null;
+      let targetFamilyName: string | null = routeFamilyName || null;
+
+      if (!targetFamilyId) {
+        const userFamily = await getUserFamily(currentUser.uid);
+        targetFamilyId = userFamily?.id || null;
+        targetFamilyName = userFamily?.name || null;
+      }
+
+      if (!targetFamilyId) return;
+
+      setFamilyId(targetFamilyId);
+      setFamilyName(targetFamilyName || null);
+
+      const familyRef = doc(db, 'families', targetFamilyId);
+      const familySnap = await getDoc(familyRef);
+      if (familySnap.exists()) {
+        const currencyCode = familySnap.data().currency || 'EUR';
+        setCurrency(currencyCode);
+      }
+      
+      // Load budget categories and limits
+      const budgetRef = doc(db, 'budgets', targetFamilyId);
+      const budgetSnap = await getDoc(budgetRef);
+      if (budgetSnap.exists()) {
+        const budgetData = budgetSnap.data();
+        const budgetCategories = budgetData.categories || [];
+        const limits: { [key: string]: number } = {};
+        budgetCategories.forEach((cat: any) => {
+          limits[cat.name] = cat.limit || 0;
+        });
+        setCategoryLimits(limits);
         
-        // Load budget categories and limits
-        const budgetRef = doc(db, 'budgets', userFamily.id);
-        const budgetSnap = await getDoc(budgetRef);
-        if (budgetSnap.exists()) {
-          const budgetData = budgetSnap.data();
-          const budgetCategories = budgetData.categories || [];
-          const limits: { [key: string]: number } = {};
-          budgetCategories.forEach((cat: any) => {
-            limits[cat.name] = cat.limit || 0;
-          });
-          setCategoryLimits(limits);
-          
-          // Merge default categories with budget categories
-          const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...budgetCategories.map((c: any) => c.name)])];
-          setCategories(allCategories);
-        }
+        // Merge default categories with budget categories
+        const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...budgetCategories.map((c: any) => c.name)])];
+        setCategories(allCategories);
       }
     };
 
@@ -157,8 +173,14 @@ export default function AddExpenseScreen() {
         return;
       }
 
-      const userFamily = await getUserFamily(currentUser.uid);
-      if (!userFamily?.id) {
+      let targetFamilyId = familyId;
+      if (!targetFamilyId) {
+        const userFamily = await getUserFamily(currentUser.uid);
+        targetFamilyId = userFamily?.id || null;
+        if (!familyName && userFamily?.name) setFamilyName(userFamily.name);
+      }
+
+      if (!targetFamilyId) {
         Alert.alert('Erreur', 'Aucune famille trouvée');
         return;
       }
@@ -168,7 +190,7 @@ export default function AddExpenseScreen() {
       if (receiptImage) {
         setUploading(true);
         try {
-          receiptUrl = await uploadReceiptImage(receiptImage, userFamily.id);
+          receiptUrl = await uploadReceiptImage(receiptImage, targetFamilyId);
         } catch (error) {
           console.error('Error uploading receipt:', error);
         }
@@ -184,7 +206,7 @@ export default function AddExpenseScreen() {
         amount: amountNumber,
         category,
         currency,
-        familyId: userFamily.id,
+        familyId: targetFamilyId,
         paidBy: currentUser.uid,
         date: Timestamp.fromDate(selectedDate),
         productImage: productImage || null,
