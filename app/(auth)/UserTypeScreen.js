@@ -25,10 +25,11 @@ const UserTypeScreen = () => {
   };
 
   const handleUserTypeSelection = (type) => {
-    router.push({
-      pathname: 'RegisterScreen',
-      params: { userType: type }
-    });
+    if (type === 'parent') {
+      router.push('RegisterScreenParent');
+    } else {
+      router.push('RegisterScreenProfessional');
+    }
   };
 
   return (
