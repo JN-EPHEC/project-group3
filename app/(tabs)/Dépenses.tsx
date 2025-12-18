@@ -2,11 +2,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { getCurrencySymbol } from '../../constants/currencies';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
 
@@ -29,6 +30,11 @@ export default function DepensesScreen() {
   const [showAllExpenses, setShowAllExpenses] = useState(false);
   const [sortBy, setSortBy] = useState<'date' | 'category' | 'amount'>('date');
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [filterDate, setFilterDate] = useState<Date | null>(null);
+  const [showFilterDatePicker, setShowFilterDatePicker] = useState(false);
+  const [filterAmountMin, setFilterAmountMin] = useState('');
+  const [filterAmountMax, setFilterAmountMax] = useState('');
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -169,7 +175,10 @@ export default function DepensesScreen() {
       const budgetDocRef = doc(db, 'budgets', familyId);
       unsubBudgets = onSnapshot(budgetDocRef, (budgetDoc) => {
         if (budgetDoc.exists()) {
-          setCategories(budgetDoc.data().categories || []);
+          const data = budgetDoc.data();
+          const rules = data.categoryRules || data.categoryLimits || {};
+          const names = Object.keys(rules);
+          setCategories(names);
         } else {
           setCategories([]);
         }
@@ -196,6 +205,22 @@ export default function DepensesScreen() {
       .filter((exp: any) => exp.category === categoryName)
       .reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
   };
+
+  const filteredExpenses = expenses.filter((exp: any) => {
+    if (filterCategory && exp.category !== filterCategory) return false;
+    if (filterDate) {
+      const expDate = exp.date?.toDate ? exp.date.toDate() : null;
+      if (!expDate) return false;
+      const sameDay = expDate.toDateString() === filterDate.toDateString();
+      if (!sameDay) return false;
+    }
+    const amount = exp.amount || 0;
+    const min = filterAmountMin ? parseFloat(filterAmountMin) : null;
+    const max = filterAmountMax ? parseFloat(filterAmountMax) : null;
+    if (min !== null && !isNaN(min) && amount < min) return false;
+    if (max !== null && !isNaN(max) && amount > max) return false;
+    return true;
+  });
 
   if (loading) {
     return (
@@ -360,9 +385,102 @@ export default function DepensesScreen() {
               </View>
             )}
 
-            {expenses.length > 0 ? (
+            {/* Filtres détaillés */}
+            <View style={[styles.filterPanel, { backgroundColor: colors.secondaryCardBackground }]}>
+              {/* Catégorie */}
+              <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Catégorie</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChips}>
+                <TouchableOpacity
+                  style={[styles.filterChip, { backgroundColor: !filterCategory ? colors.tint : colors.cardBackground }]}
+                  onPress={() => setFilterCategory(null)}
+                >
+                  <Text style={[styles.filterChipText, { color: !filterCategory ? '#fff' : colors.text }]}>Toutes</Text>
+                </TouchableOpacity>
+                {categories.map((cat: any) => (
+                  <TouchableOpacity
+                    key={cat.name || cat}
+                    style={[styles.filterChip, { backgroundColor: filterCategory === (cat.name || cat) ? colors.tint : colors.cardBackground }]}
+                    onPress={() => setFilterCategory(cat.name || cat)}
+                  >
+                    <Text style={[styles.filterChipText, { color: filterCategory === (cat.name || cat) ? '#fff' : colors.text }]}>
+                      {cat.name || cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Date précise */}
+              <View style={styles.filterRow}>
+                <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Date précise</Text>
+                <TouchableOpacity
+                  style={[styles.dateButton, { backgroundColor: colors.cardBackground }]}
+                  onPress={() => setShowFilterDatePicker(true)}
+                >
+                  <IconSymbol name="calendar" size={18} color={colors.text} />
+                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
+                    {filterDate ? filterDate.toLocaleDateString('fr-FR') : 'Choisir une date'}
+                  </Text>
+                </TouchableOpacity>
+                {filterDate && (
+                  <TouchableOpacity onPress={() => setFilterDate(null)}>
+                    <Text style={[styles.clearText, { color: colors.dangerButton }]}>Effacer</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Montant min / max */}
+              <View style={styles.filterRow}>
+                <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Montant (€)</Text>
+                <View style={styles.amountInputs}>
+                  <TextInput
+                    style={[styles.amountInput, { backgroundColor: colors.cardBackground, color: colors.text, borderColor: colors.border }]}
+                    placeholder="Min"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="decimal-pad"
+                    value={filterAmountMin}
+                    onChangeText={setFilterAmountMin}
+                  />
+                  <Text style={[styles.toText, { color: colors.textSecondary }]}>à</Text>
+                  <TextInput
+                    style={[styles.amountInput, { backgroundColor: colors.cardBackground, color: colors.text, borderColor: colors.border }]}
+                    placeholder="Max"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="decimal-pad"
+                    value={filterAmountMax}
+                    onChangeText={setFilterAmountMax}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.resetFiltersButton, { backgroundColor: colors.cardBackground }]}
+                onPress={() => {
+                  setFilterCategory(null);
+                  setFilterDate(null);
+                  setFilterAmountMin('');
+                  setFilterAmountMax('');
+                }}
+              >
+                <IconSymbol name="arrow.counterclockwise" size={16} color={colors.textSecondary} />
+                <Text style={[styles.resetFiltersText, { color: colors.textSecondary }]}>Réinitialiser les filtres</Text>
+              </TouchableOpacity>
+            </View>
+
+            {showFilterDatePicker && (
+              <DateTimePicker
+                value={filterDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, date) => {
+                  setShowFilterDatePicker(false);
+                  if (date) setFilterDate(date);
+                }}
+              />
+            )}
+
+            {filteredExpenses.length > 0 ? (
               <>
-                {(showAllExpenses ? expenses : expenses.slice(0, 4)).map((expense: any) => {
+                {(showAllExpenses ? filteredExpenses : filteredExpenses.slice(0, 4)).map((expense: any) => {
                   const payer = familyMembersData[expense.paidBy];
                   const payerName = payer ? `${payer.firstName} ${payer.lastName}` : 'Membre';
                   const payerInitials = payer ? `${payer.firstName.charAt(0)}${payer.lastName.charAt(0)}` : 'M';
@@ -395,13 +513,13 @@ export default function DepensesScreen() {
                 })}
 
                 {/* Voir plus / Voir moins button */}
-                {expenses.length > 4 && (
+                {filteredExpenses.length > 4 && (
                   <TouchableOpacity
                     style={[styles.seeMoreButton, { backgroundColor: colors.cardBackground }]}
                     onPress={() => setShowAllExpenses(!showAllExpenses)}
                   >
                     <Text style={[styles.seeMoreButtonText, { color: colors.tint }]}>
-                      {showAllExpenses ? 'Voir moins' : `Voir plus (${expenses.length - 4})`}
+                      {showAllExpenses ? 'Voir moins' : `Voir plus (${filteredExpenses.length - 4})`}
                     </Text>
                     <IconSymbol 
                       name={showAllExpenses ? 'chevron.up' : 'chevron.down'} 
@@ -423,7 +541,7 @@ export default function DepensesScreen() {
             ) : (
               <>
                 <View style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}>
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucune dépense enregistrée</Text>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucune dépense trouvée</Text>
                 </View>
                 {/* Add Expense Button */}
                 <TouchableOpacity
@@ -577,6 +695,79 @@ const styles = StyleSheet.create({
   },
   addExpenseButtonText: {
     fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+  },
+  filterPanel: {
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.regular,
+    marginBottom: V_SPACING.medium,
+    gap: V_SPACING.small,
+  },
+  filterLabel: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+  },
+  filterChips: {
+    gap: SPACING.small,
+  },
+  filterChip: {
+    paddingHorizontal: SPACING.regular,
+    paddingVertical: vs(8),
+    borderRadius: BORDER_RADIUS.large,
+  },
+  filterChipText: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.small,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.tiny,
+    paddingHorizontal: SPACING.regular,
+    paddingVertical: vs(8),
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  dateButtonText: {
+    fontSize: FONT_SIZES.regular,
+    fontWeight: '600',
+  },
+  clearText: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+  },
+  amountInputs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.small,
+    flex: 1,
+  },
+  amountInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.small,
+    fontSize: FONT_SIZES.regular,
+  },
+  toText: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+  },
+  resetFiltersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.tiny,
+    alignSelf: 'flex-start',
+    paddingHorizontal: SPACING.regular,
+    paddingVertical: vs(8),
+    borderRadius: BORDER_RADIUS.medium,
+  },
+  resetFiltersText: {
+    fontSize: FONT_SIZES.small,
     fontWeight: '600',
   },
   expenseCard: { borderRadius: BORDER_RADIUS.large, padding: SPACING.regular, marginBottom: V_SPACING.medium, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: vs(2) }, shadowRadius: hs(8), elevation: 2 },

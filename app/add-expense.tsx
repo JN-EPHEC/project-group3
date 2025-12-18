@@ -32,6 +32,7 @@ export default function AddExpenseScreen() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategory, setNewCategory] = useState('');
   const [categoryLimits, setCategoryLimits] = useState<{ [key: string]: number }>({});
+  const [categoryAllowOver, setCategoryAllowOver] = useState<{ [key: string]: boolean }>({});
   const [uploading, setUploading] = useState(false);
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [familyName, setFamilyName] = useState<string | null>(null);
@@ -86,15 +87,24 @@ export default function AddExpenseScreen() {
       const budgetSnap = await getDoc(budgetRef);
       if (budgetSnap.exists()) {
         const budgetData = budgetSnap.data();
-        const budgetCategories = budgetData.categories || [];
+        const rules = budgetData.categoryRules || budgetData.categoryLimits || {};
         const limits: { [key: string]: number } = {};
-        budgetCategories.forEach((cat: any) => {
-          limits[cat.name] = cat.limit || 0;
+        const allow: { [key: string]: boolean } = {};
+        Object.entries(rules).forEach(([name, value]) => {
+          if (typeof value === 'number') {
+            limits[name] = value as number;
+            allow[name] = false;
+          } else {
+            const obj = value as any;
+            limits[name] = obj?.limit ?? 0;
+            allow[name] = !!obj?.allowOverLimit;
+          }
         });
         setCategoryLimits(limits);
+        setCategoryAllowOver(allow);
         
         // Merge default categories with budget categories
-        const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...budgetCategories.map((c: any) => c.name)])];
+        const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...Object.keys(rules)])];
         setCategories(allCategories);
       }
     };
@@ -197,9 +207,17 @@ export default function AddExpenseScreen() {
         setUploading(false);
       }
 
-      // Check category limit for approval logic
+      // Check category limit and rule
       const categoryLimit = categoryLimits[category];
-      const requiresApproval = categoryLimit && amountNumber > categoryLimit;
+      const allowOver = categoryAllowOver[category] ?? false;
+
+      if (categoryLimit !== undefined && !allowOver && amountNumber > categoryLimit) {
+        Alert.alert('Limite dépassée', "Cette catégorie n'autorise pas les dépenses au-delà du plafond.");
+        setLoading(false);
+        return;
+      }
+
+      const requiresApproval = categoryLimit !== undefined && allowOver && amountNumber > categoryLimit;
 
       await addDoc(collection(db, 'expenses'), {
         description: description.trim(),

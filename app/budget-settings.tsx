@@ -5,12 +5,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { doc, getDoc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { CURRENCIES } from '../constants/currencies';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
 function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; colors: any }) {
-  const [categories, setCategories] = useState<{ name: string; limit: number }[]>([]);
+  const [categories, setCategories] = useState<{ name: string; limit: number; allowOverLimit: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -22,58 +21,23 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
     const unsubscribe = onSnapshot(budgetRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const categoryLimits = data.categoryLimits || {};
-        const categoryArray = Object.entries(categoryLimits).map(([name, limit]) => ({
-          name,
-          limit: limit as number,
-        }));
+        const rules = data.categoryRules || data.categoryLimits || {};
+        const categoryArray = Object.entries(rules).map(([name, value]) => {
+          if (typeof value === 'number') {
+            return { name, limit: value as number, allowOverLimit: false };
+          }
+          const obj = value as any;
+          return { name, limit: obj?.limit ?? 0, allowOverLimit: !!obj?.allowOverLimit };
+        });
         setCategories(categoryArray);
-      } else {
-        // Créer le document s'il n'existe pas
-        await setDoc(budgetRef, { categoryLimits: {} });
-        setCategories([]);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [familyId]);
-
-  const handleUpdateLimit = async (categoryName: string, newLimit: string) => {
-    if (!familyId) return;
-    
-    const limit = parseFloat(newLimit);
-    if (isNaN(limit) || limit < 0) {
-      Alert.alert('Erreur', 'Veuillez entrer un montant valide');
-      return;
-    }
-
-    try {
-      const budgetRef = doc(db, 'budgets', familyId);
-      const docSnap = await getDoc(budgetRef);
-      const currentLimits = docSnap.exists() ? docSnap.data().categoryLimits || {} : {};
-      
-      await updateDoc(budgetRef, {
-        [`categoryLimits.${categoryName}`]: limit,
+        [`categoryRules.${categoryName}`]: { limit, allowOverLimit: allow },
       });
-      
-      setEditingCategory(null);
-      setEditValue('');
     } catch (error) {
-      console.error('Error updating limit:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour la limite');
+      console.error('Error updating rule:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la règle');
     }
   };
 
-  if (loading) {
-    return <ActivityIndicator size="small" color={colors.tint} />;
-  }
-
-  if (categories.length === 0) {
-    return (
-      <View style={[styles.emptyCard, { backgroundColor: colors.cardBackground }]}>
-        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-          Aucune catégorie créée. Les catégories apparaîtront ici lorsque vous ajouterez des dépenses.
         </Text>
       </View>
     );
@@ -114,9 +78,18 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
               </View>
             ) : (
               <View style={styles.limitDisplay}>
-                <Text style={[styles.categoryLimitAmount, { color: colors.tint }]}>
-                  {cat.limit.toFixed(2)} €
-                </Text>
+                <View>
+                  <Text style={[styles.categoryLimitAmount, { color: colors.tint }]}>
+                    {cat.limit.toFixed(2)} €
+                  </Text>
+                  <View style={styles.ruleRow}>
+                    <Text style={[styles.ruleLabel, { color: colors.textSecondary }]}>Autoriser au-dessus du plafond</Text>
+                    <Switch
+                      value={cat.allowOverLimit}
+                      onValueChange={(val) => handleToggleAllow(cat.name, val)}
+                    />
+                  </View>
+                </View>
                 <TouchableOpacity
                   style={styles.editButton}
                   onPress={() => {
@@ -138,9 +111,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
 export default function BudgetSettingsScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [familyId, setFamilyId] = useState<string | null>(null);
-  const [selectedCurrency, setSelectedCurrency] = useState('EUR');
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -156,13 +127,7 @@ export default function BudgetSettingsScreen() {
         const userFamily = await getUserFamily(currentUser.uid);
         if (userFamily?.id) {
           setFamilyId(userFamily.id);
-          const familyRef = doc(db, 'families', userFamily.id);
-          const familySnap = await getDoc(familyRef);
-          
-          if (familySnap.exists()) {
-            const data = familySnap.data();
-            setSelectedCurrency(data.currency || 'EUR');
-          }
+          // Famille active récupérée, aucune devise à gérer désormais
         }
       } catch (error) {
         console.error("Error fetching family settings:", error);
@@ -173,23 +138,6 @@ export default function BudgetSettingsScreen() {
 
     fetchFamilySettings();
   }, [router]);
-
-  const handleSaveCurrency = async (currencyCode: string) => {
-    if (!familyId) return;
-    
-    setSaving(true);
-    try {
-      const familyRef = doc(db, 'families', familyId);
-      await updateDoc(familyRef, { currency: currencyCode });
-      setSelectedCurrency(currencyCode);
-      Alert.alert('Succès', 'La devise a été mise à jour pour toute la famille');
-    } catch (error) {
-      console.error("Error updating currency:", error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour la devise');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -299,46 +247,6 @@ const styles = StyleSheet.create({
   section: { marginBottom: V_SPACING.xxlarge },
   sectionTitle: { fontSize: FONT_SIZES.large, fontWeight: '700', marginBottom: V_SPACING.small },
   sectionDescription: { fontSize: FONT_SIZES.regular, marginBottom: V_SPACING.regular, lineHeight: vs(20) },
-  currencyCard: {
-    borderRadius: BORDER_RADIUS.medium,
-    padding: SPACING.regular,
-    marginBottom: V_SPACING.medium,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  currencyInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  currencySymbol: {
-    fontSize: FONT_SIZES.massive,
-    fontWeight: '700',
-    width: hs(50),
-    textAlign: 'center',
-  },
-  currencyDetails: {
-    marginLeft: SPACING.regular,
-  },
-  currencyName: {
-    fontSize: FONT_SIZES.medium,
-    fontWeight: '600',
-    marginBottom: vs(2),
-  },
-  currencyCode: {
-    fontSize: 14,
-  },
-  savingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingVertical: 16,
-  },
-  savingText: {
-    fontSize: 14,
-  },
   categoryLimitCard: {
     borderRadius: BORDER_RADIUS.medium,
     padding: SPACING.regular,
@@ -362,6 +270,16 @@ const styles = StyleSheet.create({
   categoryLimitAmount: {
     fontSize: FONT_SIZES.large,
     fontWeight: '700',
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.small,
+    marginTop: vs(4),
+  },
+  ruleLabel: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
   },
   editButton: {
     padding: SPACING.small,
