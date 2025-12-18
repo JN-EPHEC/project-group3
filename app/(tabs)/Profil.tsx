@@ -1034,7 +1034,7 @@ export default function ProfilScreen() {
         onRequestClose={() => setMedicalModalVisible(false)}
       >
         <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
-          <View style={{ paddingHorizontal: SPACING.large, paddingTop: vs(60) }}>
+          <View style={{ paddingHorizontal: SPACING.large, paddingTop: V_SPACING.small }}>
             <TouchableOpacity onPress={() => setMedicalModalVisible(false)} style={{ marginBottom: V_SPACING.medium }}>
               <IconSymbol name="chevron.left" size={hs(24)} color={colors.text} />
             </TouchableOpacity>
