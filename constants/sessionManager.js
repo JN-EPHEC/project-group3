@@ -42,8 +42,15 @@ export async function createAndPersistSession(user, userType = 'parent') {
   try {
     // Récupérer les données utilisateur depuis Firestore
     const userDocRef = doc(db, 'users', user.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+    let userData = {};
+    
+    try {
+      const userDocSnap = await getDoc(userDocRef);
+      userData = userDocSnap.exists() ? userDocSnap.data() : {};
+    } catch (firestoreError) {
+      console.warn('[Session] Impossible de récupérer les données utilisateur Firestore:', firestoreError?.message);
+      // Continuer avec des données vides
+    }
 
     // Générer un token
     const token = generateToken(user.uid);
@@ -63,22 +70,28 @@ export async function createAndPersistSession(user, userType = 'parent') {
       expiresAt
     };
 
-    // Persister en AsyncStorage
+    // Persister en AsyncStorage (critique)
     await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
 
-    // Mettre à jour le timestamp de dernière connexion dans Firestore
-    await updateDoc(userDocRef, {
-      lastLoginAt: new Date(),
-      lastActivityAt: new Date()
-    });
+    // Mettre à jour le timestamp de dernière connexion dans Firestore (optionnel)
+    try {
+      await updateDoc(userDocRef, {
+        lastLoginAt: new Date(),
+        lastActivityAt: new Date()
+      });
+    } catch (firestoreError) {
+      console.warn('[Session] Mise à jour Firestore échouée lors de la création (non-bloquant):', firestoreError?.message);
+      // Ne pas bloquer - la session est déjà en AsyncStorage
+    }
 
     console.log('[Session] Session créée et persistée pour:', user.email);
     return session;
   } catch (error) {
-    console.error('[Session] Erreur lors de la création de session:', error);
+    console.error('[Session] Erreur critique lors de la création de session:', error);
     throw error;
   }
 }
+
 
 /**
  * Récupérer la session persistée
@@ -140,12 +153,18 @@ export async function updateSessionActivity(session) {
     // Persister la session mise à jour
     await AsyncStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedSession));
 
-    // Mettre à jour Firestore
+    // Mettre à jour Firestore (optionnel - ne pas bloquer si erreur)
     if (session.uid) {
-      const userDocRef = doc(db, 'users', session.uid);
-      await updateDoc(userDocRef, {
-        lastActivityAt: new Date()
-      });
+      try {
+        const userDocRef = doc(db, 'users', session.uid);
+        await updateDoc(userDocRef, {
+          lastActivityAt: new Date()
+        });
+      } catch (firestoreError) {
+        // Log l'erreur mais ne pas bloquer la session
+        // La session est déjà persistée en AsyncStorage
+        console.warn('[Session] Mise à jour Firestore échouée (non-bloquant):', firestoreError?.message);
+      }
     }
 
     return updatedSession;
