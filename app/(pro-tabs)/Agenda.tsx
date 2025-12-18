@@ -48,6 +48,19 @@ export default function ProAgendaScreen() {
   const flatListRef = React.useRef<FlatList>(null);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+
+  const formatDateWithCapitalizedMonth = (date: Date, options: Intl.DateTimeFormatOptions) => {
+    const parts = new Intl.DateTimeFormat('fr-FR', options).formatToParts(date);
+    let result = '';
+    for (const part of parts) {
+      if (part.type === 'month') {
+        result += part.value.charAt(0).toUpperCase() + part.value.slice(1);
+      } else {
+        result += part.value;
+      }
+    }
+    return result;
+  };
   
   // Appointment states
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -403,7 +416,7 @@ export default function ProAgendaScreen() {
     const groupedEvents: { [key: string]: any[] } = {};
     events.forEach(event => {
       if (!event.date?.toDate) return;
-      const eventDate = event.date.toDate().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const eventDate = formatDateWithCapitalizedMonth(event.date.toDate(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       if (!groupedEvents[eventDate]) {
         groupedEvents[eventDate] = [];
       }
@@ -479,7 +492,7 @@ export default function ProAgendaScreen() {
               <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'<'}</Text>
             </TouchableOpacity>
             <Text style={[styles.monthText, { color: colors.text }]}>
-              {currentWeek.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+              {formatDateWithCapitalizedMonth(currentWeek, { month: 'long', year: 'numeric' })}
             </Text>
             <TouchableOpacity onPress={() => changeWeek(1)}>
               <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'>'}</Text>
@@ -500,7 +513,7 @@ export default function ProAgendaScreen() {
         </View>
         <View style={styles.eventsSection}>
           <Text style={[styles.eventsSectionTitle, { color: colors.textSecondary }]}>
-            {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {formatDateWithCapitalizedMonth(selectedDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </Text>
           {getEventsForSelectedDate().length > 0 ? (
             getEventsForSelectedDate().map((event: any) => (
@@ -664,7 +677,7 @@ export default function ProAgendaScreen() {
                     <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'<'}</Text>
                   </TouchableOpacity>
                   <Text style={[styles.monthText, { color: colors.text }]}>
-                    {currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                    {formatDateWithCapitalizedMonth(currentMonth, { month: 'long', year: 'numeric' })}
                   </Text>
                   <TouchableOpacity onPress={() => changeMonth(1)}>
                     <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'>'}</Text>
@@ -724,7 +737,7 @@ export default function ProAgendaScreen() {
               {/* Selected Date Events */}
               <View style={styles.eventsSection}>
                 <Text style={[styles.eventsSectionTitle, { color: colors.textSecondary }]}>
-                  {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  {formatDateWithCapitalizedMonth(selectedDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </Text>
 
                 {selectedDateEvents.length > 0 ? (
@@ -788,21 +801,20 @@ export default function ProAgendaScreen() {
                       setSelectedAppointment(appointment);
                       setAppointmentModalVisible(true);
                     }}
-                    style={[styles.appointmentCard, { backgroundColor: colors.cardBackground }]}
-                  >
+                    style={[styles.appointmentCard, { backgroundColor: colors.cardBackground }]}>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.eventTitle, { color: colors.text, fontWeight: '600' }]}>
                         {appointment.parentName || 'Parent'}
                       </Text>
                       <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(4) }]}>
-                        📅 {appointment.selectedDate 
-                          ? (appointment.selectedDate instanceof Date 
+                      Date: {appointment.selectedDate 
+                          ? formatDateWithCapitalizedMonth((appointment.selectedDate instanceof Date 
                             ? appointment.selectedDate 
-                            : appointment.selectedDate.toDate()).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                            : appointment.selectedDate.toDate()), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
                           : appointment.selectedDay}
                       </Text>
                       <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(2) }]}>
-                        🕐 {appointment.selectedTimeSlot?.start} - {appointment.selectedTimeSlot?.end}
+                        Time: {appointment.selectedTimeSlot?.start} - {appointment.selectedTimeSlot?.end}
                       </Text>
                       <Text style={[styles.eventTime, { color: colors.textTertiary, marginTop: vs(4), fontSize: FONT_SIZES.tiny }]}>
                         Reçu le {new Date(appointment.createdAt?.toDate?.() || appointment.createdAt).toLocaleDateString('fr-FR')}
@@ -834,14 +846,14 @@ export default function ProAgendaScreen() {
                         {appointment.parentName || 'Parent'}
                       </Text>
                       <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(4) }]}>
-                        📅 {appointment.selectedDate 
-                          ? (appointment.selectedDate instanceof Date 
+                      Date: {appointment.selectedDate 
+                          ? formatDateWithCapitalizedMonth((appointment.selectedDate instanceof Date 
                             ? appointment.selectedDate 
-                            : appointment.selectedDate.toDate()).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                            : appointment.selectedDate.toDate()), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
                           : appointment.selectedDay}
                       </Text>
                       <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(2) }]}>
-                        🕐 {appointment.selectedTimeSlot?.start} - {appointment.selectedTimeSlot?.end}
+                        Time: {appointment.selectedTimeSlot?.start} - {appointment.selectedTimeSlot?.end}
                       </Text>
                       <Text style={[styles.eventTime, { color: colors.textTertiary, marginTop: vs(4), fontSize: FONT_SIZES.tiny }]}>
                         ✅ Confirmé
@@ -897,14 +909,14 @@ export default function ProAgendaScreen() {
                   </Text>
                   <View>
                     <Text style={[styles.eventLocation, { color: colors.text }]}>
-                      📅 {selectedAppointment.selectedDate 
-                        ? (selectedAppointment.selectedDate instanceof Date 
+                      Date: {selectedAppointment.selectedDate 
+                        ? formatDateWithCapitalizedMonth((selectedAppointment.selectedDate instanceof Date 
                           ? selectedAppointment.selectedDate 
-                          : selectedAppointment.selectedDate.toDate()).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                          : selectedAppointment.selectedDate.toDate()), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
                         : selectedAppointment.selectedDay}
                     </Text>
                     <Text style={[styles.eventLocation, { color: colors.text, marginTop: vs(4) }]}>
-                      🕐 {selectedAppointment.selectedTimeSlot?.start} - {selectedAppointment.selectedTimeSlot?.end}
+                      Time: {selectedAppointment.selectedTimeSlot?.start} - {selectedAppointment.selectedTimeSlot?.end}
                     </Text>
                   </View>
 

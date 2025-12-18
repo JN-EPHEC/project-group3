@@ -26,6 +26,19 @@ export default function AgendaScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
+  const formatDateWithCapitalizedMonth = (date: Date, options: Intl.DateTimeFormatOptions) => {
+    const parts = new Intl.DateTimeFormat('fr-FR', options).formatToParts(date);
+    let result = '';
+    for (const part of parts) {
+      if (part.type === 'month') {
+        result += part.value.charAt(0).toUpperCase() + part.value.slice(1);
+      } else {
+        result += part.value;
+      }
+    }
+    return result;
+  };
+  
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -246,7 +259,7 @@ export default function AgendaScreen() {
     const groupedEvents: { [key: string]: any[] } = {};
     events.forEach(event => {
       if (!event.date?.toDate) return;
-      const eventDate = event.date.toDate().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const eventDate = formatDateWithCapitalizedMonth(event.date.toDate(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       if (!groupedEvents[eventDate]) {
         groupedEvents[eventDate] = [];
       }
@@ -322,7 +335,7 @@ export default function AgendaScreen() {
               <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'<'}</Text>
             </TouchableOpacity>
             <Text style={[styles.monthText, { color: colors.text }]}>
-              {currentWeek.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+              {formatDateWithCapitalizedMonth(currentWeek, { month: 'long', year: 'numeric' })}
             </Text>
             <TouchableOpacity onPress={() => changeWeek(1)}>
               <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'>'}</Text>
@@ -343,7 +356,7 @@ export default function AgendaScreen() {
         </View>
         <View style={styles.eventsSection}>
           <Text style={[styles.eventsSectionTitle, { color: colors.textSecondary }]}>
-            {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {formatDateWithCapitalizedMonth(selectedDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </Text>
           {getEventsForSelectedDate().length > 0 ? (
             getEventsForSelectedDate().map((event: any) => (
@@ -469,7 +482,7 @@ export default function AgendaScreen() {
                     <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'<'}</Text>
                   </TouchableOpacity>
                   <Text style={[styles.monthText, { color: colors.text }]}>
-                    {currentMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                    {formatDateWithCapitalizedMonth(currentMonth, { month: 'long', year: 'numeric' })}
                   </Text>
                   <TouchableOpacity onPress={() => changeMonth(1)}>
                     <Text style={[styles.navButton, { color: colors.textSecondary }]}>{'>'}</Text>
@@ -529,7 +542,7 @@ export default function AgendaScreen() {
               {/* Selected Date Events */}
               <View style={styles.eventsSection}>
                 <Text style={[styles.eventsSectionTitle, { color: colors.textSecondary }]}>
-                  {selectedDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  {formatDateWithCapitalizedMonth(selectedDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                 </Text>
 
                 {selectedDateEvents.length > 0 ? (
