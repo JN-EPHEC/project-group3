@@ -1434,13 +1434,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: V_SPACING.medium,
+    paddingHorizontal: SPACING.small,
     borderRadius: BORDER_RADIUS.large,
     gap: SPACING.small,
+    minHeight: vs(50),
   },
   familyActionButtonText: {
     color: '#fff',
-    fontSize: FONT_SIZES.regular,
+    fontSize: FONT_SIZES.small,
     fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'center',
   },
   modalOverlay: {
     marginVertical: V_SPACING.medium,
