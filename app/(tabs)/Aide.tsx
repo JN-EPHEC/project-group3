@@ -5,7 +5,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
 
 // Type definitions
@@ -42,6 +42,7 @@ interface Professional {
   email: string;
   description: string;
   availability: AvailabilitySchedule;
+  photoUrl?: string;
 }
 
 // Helper function to load professionals from Firebase
@@ -63,6 +64,7 @@ async function loadProfessionalsFromFirebase(): Promise<Professional[]> {
           phone: data.phone || 'Non renseigné',
           email: data.email || '',
           description: data.description || 'Aucune description disponible',
+          photoUrl: data.photoUrl || undefined,
           availability: data.availability || {
             lundi: '9h - 18h',
             mardi: '9h - 18h',
@@ -242,23 +244,35 @@ function ProfessionalCard({
             borderBottomColor: colors.border
           }}
         >
-          <View
-            style={{
-              width: hs(50),
-              height: hs(50),
-              borderRadius: BORDER_RADIUS.medium,
-              backgroundColor: colors.border,
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginRight: SPACING.large
-            }}
-          >
-            <IconSymbol
-              name={professional.type === 'avocat' ? 'doc.text' : 'person.fill'}
-              size={hs(24)}
-              color={colors.tint}
+          {professional.photoUrl ? (
+            <Image
+              source={{ uri: professional.photoUrl }}
+              style={{
+                width: hs(50),
+                height: hs(50),
+                borderRadius: BORDER_RADIUS.medium,
+                marginRight: SPACING.large
+              }}
             />
-          </View>
+          ) : (
+            <View
+              style={{
+                width: hs(50),
+                height: hs(50),
+                borderRadius: BORDER_RADIUS.medium,
+                backgroundColor: colors.border,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginRight: SPACING.large
+              }}
+            >
+              <IconSymbol
+                name={professional.type === 'avocat' ? 'doc.text' : 'person.fill'}
+                size={hs(24)}
+                color={colors.tint}
+              />
+            </View>
+          )}
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '600' }}>
               {professional.name}
@@ -439,22 +453,33 @@ function ProfessionalCard({
         marginBottom: V_SPACING.medium
       }}
     >
-      <View
-        style={{
-          width: hs(40),
-          height: hs(40),
-          borderRadius: BORDER_RADIUS.medium,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: colors.border
-        }}
-      >
-        <IconSymbol
-          name={professional.type === 'avocat' ? 'doc.text' : 'person.fill'}
-          size={hs(20)}
-          color={colors.tint}
+      {professional.photoUrl ? (
+        <Image
+          source={{ uri: professional.photoUrl }}
+          style={{
+            width: hs(40),
+            height: hs(40),
+            borderRadius: BORDER_RADIUS.medium
+          }}
         />
-      </View>
+      ) : (
+        <View
+          style={{
+            width: hs(40),
+            height: hs(40),
+            borderRadius: BORDER_RADIUS.medium,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: colors.border
+          }}
+        >
+          <IconSymbol
+            name={professional.type === 'avocat' ? 'doc.text' : 'person.fill'}
+            size={hs(20)}
+            color={colors.tint}
+          />
+        </View>
+      )}
       <View style={{ flex: 1 }}>
         <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600' }}>
           {professional.name}
