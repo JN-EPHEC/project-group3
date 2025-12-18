@@ -2,7 +2,7 @@ import DeleteProfileModal from '@/components/DeleteProfileModal';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { arrayUnion, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { auth, db, deleteProfessionalPhoto, signOut, uploadProfessionalPhoto } from '../../constants/firebase';
@@ -137,6 +137,42 @@ export default function ProProfilScreen() {
       ]
     );
   };
+
+  const handleAddMissingRole = async () => {
+    const current = auth.currentUser;
+    if (!current) return;
+    const userRef = doc(db, 'users', current.uid);
+    const missingRole = parentId ? (professionalId ? null : 'professionnel') : 'parent';
+    if (!missingRole) {
+      Alert.alert('Info', 'Les deux rôles sont déjà actifs.');
+      return;
+    }
+
+    Alert.alert(
+      'Ajouter un rôle',
+      missingRole === 'professionnel'
+        ? 'Ajouter le rôle Professionnel à votre compte ?'
+        : 'Ajouter le rôle Parent à votre compte ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Continuer',
+          onPress: async () => {
+            try {
+              const payload = missingRole === 'professionnel'
+                ? { professional_id: current.uid, roles: arrayUnion('professionnel') }
+                : { parent_id: current.uid, roles: arrayUnion('parent') };
+              await updateDoc(userRef, payload);
+              Alert.alert('Succès', 'Rôle ajouté. Complétez le profil associé.');
+            } catch (e) {
+              console.error('Error adding role', e);
+              Alert.alert('Erreur', 'Impossible d\'ajouter le rôle.');
+            }
+          },
+        },
+      ]
+    );
+  };
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -145,6 +181,8 @@ export default function ProProfilScreen() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [diplomaUrl, setDiplomaUrl] = useState<string | null>(null);
   const [isUploadingDiploma, setIsUploadingDiploma] = useState(false);
+  const [parentId, setParentId] = useState<string | null>(null);
+  const [professionalId, setProfessionalId] = useState<string | null>(null);
   
   // Professional-specific fields
   const [professionalType, setProfessionalType] = useState<ProfessionalType>('');
@@ -184,6 +222,8 @@ export default function ProProfilScreen() {
             const userData = userDocSnap.data();
             setFirstName(userData.firstName || 'Professionnel');
             setLastName(userData.lastName || '');
+            setParentId(userData.parent_id ?? (userData.userType === 'parent' ? uid : null));
+            setProfessionalId(userData.professional_id ?? (userData.userType === 'professionnel' ? uid : null));
           }
           
           // Get professional profile
@@ -427,6 +467,14 @@ export default function ProProfilScreen() {
             <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
               Cliquez sur l'icône crayon pour modifier vos informations
             </Text>
+            {(!parentId || !professionalId) && (
+              <TouchableOpacity style={[styles.addRoleButton, { backgroundColor: colors.cardBackground }]} onPress={handleAddMissingRole}>
+                <IconSymbol name="person.badge.plus" size={18} color={colors.tint} />
+                <Text style={[styles.addRoleText, { color: colors.tint }]}>
+                  {!parentId ? 'Ajouter rôle Parent' : 'Ajouter rôle Pro'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.userInfoSection}>
@@ -995,9 +1043,23 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 80 },
   containerCentered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { marginBottom: 16 },
+  header: { marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 28, fontWeight: '700', color: '#FFCEB0' },
   headerSubtitle: { fontSize: 14, fontWeight: '400', marginTop: 6, opacity: 0.8 },
+  addRoleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addRoleText: { fontWeight: '700' },
   userInfoSection: { marginBottom: 24 },
   name: { fontSize: 24, fontWeight: '600', color: '#111' },
   subtitle: { fontSize: 16, fontWeight: '500', marginTop: 4 },
