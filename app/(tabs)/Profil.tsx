@@ -918,14 +918,24 @@ export default function ProfilScreen() {
                         </View>
                       ) : (
                         <>
-                          <TouchableOpacity
-                            onPress={() => { setSelectedChildForMedical(child); setMedicalModalVisible(true); }}
-                            style={{flexDirection: 'row', alignItems: 'center', flex: 1}}
-                            activeOpacity={0.8}
-                          >
+                          <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
                               <IconSymbol name="person.circle" size={30} color={colors.tint} />
-                              <Text style={[styles.memberName, { color: colors.text }]}>{child.name}</Text>
-                          </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => { setSelectedChildForMedical(child); setMedicalModalVisible(true); }}
+                                style={{ marginLeft: SPACING.regular }}
+                                accessibilityLabel="Ouvrir la fiche médicale"
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <Text style={[styles.memberName, { color: colors.text }]}>{child.name}</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => { setSelectedChildForMedical(child); setMedicalModalVisible(true); }}
+                                style={{ padding: 6, marginLeft: 8 }}
+                                accessibilityLabel="Fiche médicale"
+                              >
+                                <IconSymbol name="cross.case.fill" size={22} color="#34C759" />
+                              </TouchableOpacity>
+                          </View>
                           <View style={{flexDirection: 'row', alignItems: 'center', gap: 15, marginLeft: 10}}>
                             <TouchableOpacity onPress={() => { setEditingChildId(child.id); setEditingChildName(child.name); }} style={{ padding: 4 }}>
                                 <IconSymbol name="pencil" size={20} color={colors.tint} />
