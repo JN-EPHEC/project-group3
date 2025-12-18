@@ -3,13 +3,15 @@ import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constan
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
-import { doc, getDoc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
+type CategoryRule = { name: string; limit: number; allowOverLimit: boolean };
+
 function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; colors: any }) {
-  const [categories, setCategories] = useState<{ name: string; limit: number; allowOverLimit: boolean }[]>([]);
+  const [categories, setCategories] = useState<CategoryRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -30,6 +32,46 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
           return { name, limit: obj?.limit ?? 0, allowOverLimit: !!obj?.allowOverLimit };
         });
         setCategories(categoryArray);
+      } else {
+        await setDoc(budgetRef, { categoryRules: {} });
+        setCategories([]);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [familyId]);
+
+  const handleUpdateLimit = async (categoryName: string, newLimit: string) => {
+    if (!familyId) return;
+
+    const limit = parseFloat(newLimit);
+    if (isNaN(limit) || limit < 0) {
+      Alert.alert('Erreur', 'Veuillez entrer un montant valide');
+      return;
+    }
+
+    try {
+      const budgetRef = doc(db, 'budgets', familyId);
+      const current = categories.find((c) => c.name === categoryName);
+      await updateDoc(budgetRef, {
+        [`categoryRules.${categoryName}`]: { limit, allowOverLimit: current?.allowOverLimit ?? false },
+      });
+      setEditingCategory(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error updating limit:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la limite');
+    }
+  };
+
+  const handleToggleAllow = async (categoryName: string, allow: boolean) => {
+    if (!familyId) return;
+    try {
+      const budgetRef = doc(db, 'budgets', familyId);
+      const current = categories.find((c) => c.name === categoryName);
+      const limit = current?.limit ?? 0;
+      await updateDoc(budgetRef, {
         [`categoryRules.${categoryName}`]: { limit, allowOverLimit: allow },
       });
     } catch (error) {
@@ -38,6 +80,15 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
     }
   };
 
+  if (loading) {
+    return <ActivityIndicator size="small" color={colors.tint} />;
+  }
+
+  if (categories.length === 0) {
+    return (
+      <View style={[styles.emptyCard, { backgroundColor: colors.cardBackground }]}>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          Aucune catégorie créée. Les catégories apparaîtront ici lorsque vous ajouterez des dépenses.
         </Text>
       </View>
     );
@@ -127,10 +178,9 @@ export default function BudgetSettingsScreen() {
         const userFamily = await getUserFamily(currentUser.uid);
         if (userFamily?.id) {
           setFamilyId(userFamily.id);
-          // Famille active récupérée, aucune devise à gérer désormais
         }
       } catch (error) {
-        console.error("Error fetching family settings:", error);
+        console.error('Error fetching family settings:', error);
       } finally {
         setLoading(false);
       }
@@ -153,7 +203,6 @@ export default function BudgetSettingsScreen() {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
-          {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
               <IconSymbol name="chevron.left" size={24} color={colors.tint} />
@@ -162,64 +211,13 @@ export default function BudgetSettingsScreen() {
             <View style={{ width: 24 }} />
           </View>
 
-          {/* Currency Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Devise</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Règles par catégorie</Text>
             <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
-              Cette devise sera utilisée par tous les membres de la famille
-            </Text>
-
-            {CURRENCIES.map((currency) => (
-              <TouchableOpacity
-                key={currency.code}
-                style={[
-                  styles.currencyCard,
-                  { backgroundColor: colors.cardBackground },
-                  selectedCurrency === currency.code && { 
-                    borderColor: colors.tint, 
-                    borderWidth: 2 
-                  }
-                ]}
-                onPress={() => handleSaveCurrency(currency.code)}
-                disabled={saving}
-              >
-                <View style={styles.currencyInfo}>
-                  <Text style={[styles.currencySymbol, { color: colors.text }]}>
-                    {currency.symbol}
-                  </Text>
-                  <View style={styles.currencyDetails}>
-                    <Text style={[styles.currencyName, { color: colors.text }]}>
-                      {currency.name}
-                    </Text>
-                    <Text style={[styles.currencyCode, { color: colors.textSecondary }]}>
-                      {currency.code}
-                    </Text>
-                  </View>
-                </View>
-                {selectedCurrency === currency.code && (
-                  <IconSymbol name="checkmark.circle.fill" size={24} color={colors.tint} />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Category Limits Section */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Limites par Catégorie</Text>
-            <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
-              Définissez un montant maximum pour chaque catégorie. Les dépenses dépassant cette limite nécessiteront une approbation.
+              Fixez un plafond et choisissez si les dépenses au-dessus doivent être autorisées.
             </Text>
             <CategoryLimitsManager familyId={familyId} colors={colors} />
           </View>
-
-          {saving && (
-            <View style={styles.savingIndicator}>
-              <ActivityIndicator size="small" color={colors.tint} />
-              <Text style={[styles.savingText, { color: colors.textSecondary }]}>
-                Enregistrement...
-              </Text>
-            </View>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>
