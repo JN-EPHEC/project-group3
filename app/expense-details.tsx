@@ -4,7 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native';
-import { db } from '../constants/firebase';
+import { auth, db } from '../constants/firebase';
 
 export default function ExpenseDetailsScreen() {
   const router = useRouter();
@@ -14,6 +14,7 @@ export default function ExpenseDetailsScreen() {
   const [expense, setExpense] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     const fetchExpense = async () => {
@@ -22,7 +23,10 @@ export default function ExpenseDetailsScreen() {
       try {
         const expenseDoc = await getDoc(doc(db, 'expenses', expenseId));
         if (expenseDoc.exists()) {
-          setExpense({ id: expenseDoc.id, ...expenseDoc.data() });
+          const data = { id: expenseDoc.id, ...expenseDoc.data() };
+          setExpense(data);
+          const currentUser = auth.currentUser;
+          setIsOwner(!!currentUser && data.paidBy === currentUser.uid);
         }
       } catch (error) {
         console.error('Error fetching expense:', error);
@@ -119,10 +123,13 @@ export default function ExpenseDetailsScreen() {
               <Text style={[styles.amount, { color: colors.tint }]}>{expense.amount?.toFixed(2)} €</Text>
             </View>
 
-            {expense.receiptUrl && (
+            {(expense.receiptImage || expense.receiptUrl || expense.productImage) && (
               <View style={styles.imageSection}>
-                <Text style={[styles.imageLabel, { color: colors.text }]}>Ticket de caisse</Text>
-                <Image source={{ uri: expense.receiptUrl }} style={styles.receiptImage} />
+                <Text style={[styles.imageLabel, { color: colors.text }]}>Justificatif</Text>
+                <Image
+                  source={{ uri: expense.receiptImage || expense.receiptUrl || expense.productImage }}
+                  style={styles.receiptImage}
+                />
               </View>
             )}
 
@@ -145,26 +152,20 @@ export default function ExpenseDetailsScreen() {
               </View>
             </View>
 
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={[styles.editButton, { backgroundColor: colors.tint }]}
-                onPress={() => router.push(`/edit-expense?expenseId=${expense.id}`)}
-              >
-                <IconSymbol name="pencil" size={20} color="#fff" />
-                <Text style={styles.editButtonText}>Modifier</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.deleteButton, deleting && styles.disabled]}
-                onPress={handleDelete}
-                disabled={deleting}
-              >
-                <IconSymbol name="trash" size={20} color="#fff" />
-                <Text style={styles.deleteButtonText}>
-                  {deleting ? 'Suppression...' : 'Supprimer'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {isOwner && (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity 
+                  style={[styles.deleteButton, deleting && styles.disabled]}
+                  onPress={handleDelete}
+                  disabled={deleting}
+                >
+                  <IconSymbol name="trash" size={20} color="#fff" />
+                  <Text style={styles.deleteButtonText}>
+                    {deleting ? 'Suppression...' : 'Supprimer'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
