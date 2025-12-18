@@ -1,8 +1,11 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // Types
 export type SeverityLevel = 'Faible' | 'Modérée' | 'Sévère';
@@ -128,6 +131,8 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
   const [record, setRecord] = useState<ChildMedicalRecordData>(computedInitialRecord);
   const [submitting, setSubmitting] = useState(false);
   const [originalRecord, setOriginalRecord] = useState<ChildMedicalRecordData | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
   // Temp inputs for adding entries in history
   const [newHistoryEntry, setNewHistoryEntry] = useState('');
@@ -201,6 +206,94 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
     setNewAllergySeverity('Faible');
   };
 
+  const handleAddTreatment = () => {
+    setRecord(prev => ({
+      ...prev,
+      currentTracking: {
+        ...prev.currentTracking,
+        treatments: [...prev.currentTracking.treatments, { medicineName: '', dosage: '', duration: '' }],
+      },
+    }));
+  };
+
+  const handleRemoveTreatment = (index: number) => {
+    setRecord(prev => ({
+      ...prev,
+      currentTracking: {
+        ...prev.currentTracking,
+        treatments: prev.currentTracking.treatments.filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  const handleAddVisit = () => {
+    setRecord(prev => ({
+      ...prev,
+      currentTracking: {
+        ...prev.currentTracking,
+        visits: [...prev.currentTracking.visits, { date: '', notes: '' }],
+      },
+    }));
+  };
+
+  const handleRemoveVisit = (index: number) => {
+    setRecord(prev => ({
+      ...prev,
+      currentTracking: {
+        ...prev.currentTracking,
+        visits: prev.currentTracking.visits.filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  const sanitizeFileName = (name: string) => name.replace(/[^a-z0-9._-]/gi, '_');
+
+  const handlePickFile = async () => {
+    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+    setUploadingFile(true);
+    try {
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const storage = getStorage();
+      const safeChild = sanitizeFileName(record.general.fullName || childName || 'enfant');
+      const safeName = sanitizeFileName(asset.name || 'document');
+      const path = `medical_files/${safeChild}/${Date.now()}_${safeName}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, blob);
+      const downloadUrl = await getDownloadURL(storageRef);
+      const newFile: MedicalFile = { id: path, label: asset.name || 'Document', url: downloadUrl };
+      setRecord(prev => ({ ...prev, files: [...prev.files, newFile] }));
+      Alert.alert('Document importé', 'Le fichier a été ajouté à la fiche médicale.');
+    } catch (e) {
+      console.error('Error uploading medical file', e);
+      Alert.alert('Erreur', 'Impossible d\'importer le document.');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDownloadFile = async (file: MedicalFile) => {
+    if (!file.url) {
+      Alert.alert('Erreur', 'Aucun lien disponible pour ce fichier.');
+      return;
+    }
+    setDownloadingFileId(file.id);
+    try {
+      const safeName = sanitizeFileName(file.label || 'document');
+      const destination = `${FileSystem.documentDirectory || ''}${safeName}`;
+      await FileSystem.downloadAsync(file.url, destination);
+      Alert.alert('Téléchargé', `Fichier enregistré dans :\n${destination}`);
+    } catch (e) {
+      console.error('Error downloading medical file', e);
+      Alert.alert('Erreur', 'Téléchargement impossible.');
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
+
   const SectionHeader = ({ title, id }: { title: string; id: NonNullable<typeof expandedSectionId> }) => (
     <TouchableOpacity style={styles.sectionHeader} onPress={() => toggleSection(id)} activeOpacity={0.85}>
       <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
@@ -255,9 +348,9 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
           <View style={styles.sectionBody}>
             {editMode ? (
               <>
-                <LabeledInput label="Nom / Prénom" value={record.general.fullName} onChangeText={(t) => onChangeGeneral('fullName', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
-                <LabeledInput label="Date de naissance" value={record.general.dateOfBirth} onChangeText={(t) => onChangeGeneral('dateOfBirth', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
-                <LabeledInput label="Identifiant national" value={record.general.nationalRegistryId} onChangeText={(t) => onChangeGeneral('nationalRegistryId', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Nom / Prénom" value={record.general.fullName} onChangeText={(t) => onChangeGeneral('fullName', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
+                <LabeledInput label="Date de naissance" value={record.general.dateOfBirth} onChangeText={(t) => onChangeGeneral('dateOfBirth', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
+                <LabeledInput label="Identifiant national" value={record.general.nationalRegistryId} onChangeText={(t) => onChangeGeneral('nationalRegistryId', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
                 <DualInputs
                   leftLabel="Taille (cm)"
                   leftValue={record.general.heightCm}
@@ -269,9 +362,10 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                   inputBg={colors.background}
                   inputText={colors.text}
                   inputBorder={colors.border}
+                  labelColor={colors.textSecondary}
                 />
-                <LabeledInput label="Groupe sanguin" value={record.general.bloodType} onChangeText={(t) => onChangeGeneral('bloodType', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
-                <LabeledInput label="Allergies connues (résumé)" value={record.general.knownAllergiesSummary} onChangeText={(t) => onChangeGeneral('knownAllergiesSummary', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Groupe sanguin" value={record.general.bloodType} onChangeText={(t) => onChangeGeneral('bloodType', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
+                <LabeledInput label="Allergies connues (résumé)" value={record.general.knownAllergiesSummary} onChangeText={(t) => onChangeGeneral('knownAllergiesSummary', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
                 <DualInputs
                   leftLabel="Pointure"
                   leftValue={record.general.shoeSize}
@@ -283,6 +377,7 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
                   inputBg={colors.background}
                   inputText={colors.text}
                   inputBorder={colors.border}
+                  labelColor={colors.textSecondary}
                 />
               </>
             ) : (
@@ -310,9 +405,9 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
             <Text style={[styles.subTitle, { color: colors.text }]}>Médecin traitant</Text>
             {editMode ? (
               <>
-                <LabeledInput label="Nom" value={record.contacts.primaryPhysician.name} onChangeText={(t) => onChangePrimaryPhysician('name', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
-                <LabeledInput label="Téléphone" value={record.contacts.primaryPhysician.phone} onChangeText={(t) => onChangePrimaryPhysician('phone', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
-                <LabeledInput label="Adresse" value={record.contacts.primaryPhysician.address || ''} onChangeText={(t) => onChangePrimaryPhysician('address', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Nom" value={record.contacts.primaryPhysician.name} onChangeText={(t) => onChangePrimaryPhysician('name', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
+                <LabeledInput label="Téléphone" value={record.contacts.primaryPhysician.phone} onChangeText={(t) => onChangePrimaryPhysician('phone', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
+                <LabeledInput label="Adresse" value={record.contacts.primaryPhysician.address || ''} onChangeText={(t) => onChangePrimaryPhysician('address', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
               </>
             ) : (
               <>
@@ -325,9 +420,9 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
             <Text style={[styles.subTitle, { marginTop: 12, color: colors.text }]}>Spécialiste</Text>
             {editMode ? (
               <>
-                <LabeledInput label="Nom" value={record.contacts.specialist?.name || ''} onChangeText={(t) => onChangeSpecialist('name', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
-                <LabeledInput label="Type" value={record.contacts.specialist?.type || ''} onChangeText={(t) => onChangeSpecialist('type', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
-                <LabeledInput label="Téléphone" value={record.contacts.specialist?.phone || ''} onChangeText={(t) => onChangeSpecialist('phone', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+                <LabeledInput label="Nom" value={record.contacts.specialist?.name || ''} onChangeText={(t) => onChangeSpecialist('name', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
+                <LabeledInput label="Type" value={record.contacts.specialist?.type || ''} onChangeText={(t) => onChangeSpecialist('type', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
+                <LabeledInput label="Téléphone" value={record.contacts.specialist?.phone || ''} onChangeText={(t) => onChangeSpecialist('phone', t)} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
               </>
             ) : (
               <>
@@ -339,7 +434,7 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
 
             <Text style={[styles.subTitle, { marginTop: 12, color: colors.text }]}>Hôpital de référence</Text>
             {editMode ? (
-              <LabeledInput label="Hôpital" value={record.contacts.referenceHospital || ''} onChangeText={(t) => setRecord(prev => ({ ...prev, contacts: { ...prev.contacts, referenceHospital: t } }))} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} />
+              <LabeledInput label="Hôpital" value={record.contacts.referenceHospital || ''} onChangeText={(t) => setRecord(prev => ({ ...prev, contacts: { ...prev.contacts, referenceHospital: t } }))} placeholderColor={colors.textSecondary} inputBg={colors.background} inputText={colors.text} inputBorder={colors.border} labelColor={colors.textSecondary} />
             ) : (
               <ReadRow label="Hôpital" value={record.contacts.referenceHospital || '—'} colors={colors} />
             )}
@@ -413,52 +508,74 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
             <Text style={[styles.subTitle, { color: colors.text }]}>Traitements en cours</Text>
             {record.currentTracking.treatments.map((t, idx) => (
               editMode ? (
-                <View key={`trt-${idx}`} style={styles.dualRow}>
-                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={t.medicineName} onChangeText={(val) => {
-                    setRecord(prev => ({
-                      ...prev,
-                      currentTracking: { ...prev.currentTracking, treatments: prev.currentTracking.treatments.map((item, i) => i === idx ? { ...item, medicineName: val } : item) }
-                    }));
-                  }} />
-                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={t.dosage} onChangeText={(val) => {
-                    setRecord(prev => ({
-                      ...prev,
-                      currentTracking: { ...prev.currentTracking, treatments: prev.currentTracking.treatments.map((item, i) => i === idx ? { ...item, dosage: val } : item) }
-                    }));
-                  }} />
-                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={t.duration} onChangeText={(val) => {
-                    setRecord(prev => ({
-                      ...prev,
-                      currentTracking: { ...prev.currentTracking, treatments: prev.currentTracking.treatments.map((item, i) => i === idx ? { ...item, duration: val } : item) }
-                    }));
-                  }} />
+                <View key={`trt-${idx}`} style={{ marginBottom: 10 }}>
+                  <View style={[styles.dualRow, { alignItems: 'flex-start' }]}>
+                    <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={t.medicineName} onChangeText={(val) => {
+                      setRecord(prev => ({
+                        ...prev,
+                        currentTracking: { ...prev.currentTracking, treatments: prev.currentTracking.treatments.map((item, i) => i === idx ? { ...item, medicineName: val } : item) }
+                      }));
+                    }} />
+                    <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={t.dosage} onChangeText={(val) => {
+                      setRecord(prev => ({
+                        ...prev,
+                        currentTracking: { ...prev.currentTracking, treatments: prev.currentTracking.treatments.map((item, i) => i === idx ? { ...item, dosage: val } : item) }
+                      }));
+                    }} />
+                    <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={t.duration} onChangeText={(val) => {
+                      setRecord(prev => ({
+                        ...prev,
+                        currentTracking: { ...prev.currentTracking, treatments: prev.currentTracking.treatments.map((item, i) => i === idx ? { ...item, duration: val } : item) }
+                      }));
+                    }} />
+                  </View>
+                  <TouchableOpacity onPress={() => handleRemoveTreatment(idx)} style={styles.inlineAction}>
+                    <Text style={[styles.inlineActionText, { color: colors.dangerButton }]}>Supprimer</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <ReadRow key={`trt-${idx}`} label={t.medicineName} value={`${t.dosage} • ${t.duration}`} colors={colors} />
               )
             ))}
+            {editMode && (
+              <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.tint, alignSelf: 'flex-start', marginTop: 4 }]} onPress={handleAddTreatment}>
+                <IconSymbol name="plus" size={16} color="#fff" />
+                <Text style={[styles.addButtonText, { color: '#fff' }]}>Ajouter un traitement</Text>
+              </TouchableOpacity>
+            )}
 
             <Text style={[styles.subTitle, { marginTop: 12, color: colors.text }]}>Historique des visites</Text>
             {record.currentTracking.visits.map((v, idx) => (
               editMode ? (
-                <View key={`vis-${idx}`} style={styles.dualRow}>
-                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={v.date} onChangeText={(val) => {
-                    setRecord(prev => ({
-                      ...prev,
-                      currentTracking: { ...prev.currentTracking, visits: prev.currentTracking.visits.map((item, i) => i === idx ? { ...item, date: val } : item) }
-                    }));
-                  }} />
-                  <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={v.notes || ''} onChangeText={(val) => {
-                    setRecord(prev => ({
-                      ...prev,
-                      currentTracking: { ...prev.currentTracking, visits: prev.currentTracking.visits.map((item, i) => i === idx ? { ...item, notes: val } : item) }
-                    }));
-                  }} />
+                <View key={`vis-${idx}`} style={{ marginBottom: 10 }}>
+                  <View style={[styles.dualRow, { alignItems: 'flex-start' }]}>
+                    <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={v.date} onChangeText={(val) => {
+                      setRecord(prev => ({
+                        ...prev,
+                        currentTracking: { ...prev.currentTracking, visits: prev.currentTracking.visits.map((item, i) => i === idx ? { ...item, date: val } : item) }
+                      }));
+                    }} />
+                    <TextInput style={[styles.input, styles.flexItem, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]} value={v.notes || ''} onChangeText={(val) => {
+                      setRecord(prev => ({
+                        ...prev,
+                        currentTracking: { ...prev.currentTracking, visits: prev.currentTracking.visits.map((item, i) => i === idx ? { ...item, notes: val } : item) }
+                      }));
+                    }} />
+                  </View>
+                  <TouchableOpacity onPress={() => handleRemoveVisit(idx)} style={styles.inlineAction}>
+                    <Text style={[styles.inlineActionText, { color: colors.dangerButton }]}>Supprimer</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <ReadRow key={`vis-${idx}`} label={v.date} value={v.notes || '—'} colors={colors} />
               )
             ))}
+            {editMode && (
+              <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.tint, alignSelf: 'flex-start', marginTop: 4 }]} onPress={handleAddVisit}>
+                <IconSymbol name="plus" size={16} color="#fff" />
+                <Text style={[styles.addButtonText, { color: '#fff' }]}>Ajouter une visite</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -469,15 +586,27 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
         {expandedSectionId === 'files' && (
           <View style={styles.sectionBody}>
             {record.files.map((f) => (
-              <View key={f.id} style={styles.fileRow}>
+              <View key={f.id} style={[styles.fileRow, { borderBottomColor: colors.border }]}>
                 <IconSymbol name="doc.text" size={18} color={colors.tint} />
-                <Text style={[styles.fileLabel, { color: colors.text }]}>{f.label}</Text>
+                <Text style={[styles.fileLabel, { color: colors.text }]} numberOfLines={1}>{f.label}</Text>
                 <View style={{ flex: 1 }} />
-                <TouchableOpacity onPress={() => {/* Could implement file view */}}>
-                  <IconSymbol name="eye" size={18} color={colors.textSecondary} />
-                </TouchableOpacity>
+                {f.url ? (
+                  <TouchableOpacity onPress={() => handleDownloadFile(f)} disabled={downloadingFileId === f.id} style={styles.iconButton}>
+                    <IconSymbol name="arrow.down.to.line" size={18} color={colors.tint} />
+                  </TouchableOpacity>
+                ) : null}
               </View>
             ))}
+            {editMode && (
+              <TouchableOpacity
+                style={[styles.addButton, { backgroundColor: colors.tint, alignSelf: 'flex-start', marginTop: 8 }]}
+                onPress={handlePickFile}
+                disabled={uploadingFile}
+              >
+                <IconSymbol name="paperclip" size={16} color="#fff" />
+                <Text style={[styles.addButtonText, { color: '#fff' }]}>{uploadingFile ? 'Import en cours...' : 'Importer un document'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -494,10 +623,10 @@ function ReadRow({ label, value, colors }: { label: string; value: string; color
   );
 }
 
-function LabeledInput({ label, value, onChangeText, placeholderColor, inputBg, inputText, inputBorder }: { label: string; value: string; onChangeText: (t: string) => void; placeholderColor: string; inputBg: string; inputText: string; inputBorder: string }) {
+function LabeledInput({ label, value, onChangeText, placeholderColor, inputBg, inputText, inputBorder, labelColor }: { label: string; value: string; onChangeText: (t: string) => void; placeholderColor: string; inputBg: string; inputText: string; inputBorder: string; labelColor: string }) {
   return (
     <View style={styles.inputRow}>
-      <Text style={[styles.readLabel]}>{label}</Text>
+      <Text style={[styles.readLabel, { color: labelColor }]}>{label}</Text>
       <TextInput
         style={[styles.input, { backgroundColor: inputBg, color: inputText, borderColor: inputBorder }]}
         value={value}
@@ -519,7 +648,8 @@ function DualInputs(
     placeholderColor,
     inputBg,
     inputText,
-    inputBorder
+    inputBorder,
+    labelColor
   }:
   {
     leftLabel: string;
@@ -532,16 +662,17 @@ function DualInputs(
     inputBg: string;
     inputText: string;
     inputBorder: string;
+    labelColor: string;
   }
 ) {
   return (
     <View style={styles.dualRow}>
       <View style={styles.dualItem}>
-        <Text style={[styles.readLabel]}>{leftLabel}</Text>
+        <Text style={[styles.readLabel, { color: labelColor }]}>{leftLabel}</Text>
         <TextInput style={[styles.input, { backgroundColor: inputBg, color: inputText, borderColor: inputBorder }]} value={leftValue} onChangeText={onLeftChange} placeholderTextColor={placeholderColor} />
       </View>
       <View style={styles.dualItem}>
-        <Text style={[styles.readLabel]}>{rightLabel}</Text>
+        <Text style={[styles.readLabel, { color: labelColor }]}>{rightLabel}</Text>
         <TextInput style={[styles.input, { backgroundColor: inputBg, color: inputText, borderColor: inputBorder }]} value={rightValue} onChangeText={onRightChange} placeholderTextColor={placeholderColor} />
       </View>
     </View>
@@ -641,17 +772,29 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   addButtonText: {
-    fontSize: 12,
     fontWeight: '600',
   },
   fileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
   },
   fileLabel: {
     fontSize: 13,
+  },
+  iconButton: {
+    padding: 4,
+  },
+  inlineAction: {
+    alignSelf: 'flex-end',
+    marginTop: 4,
+  },
+  inlineActionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
