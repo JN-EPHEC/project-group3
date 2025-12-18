@@ -61,6 +61,16 @@ export default function ConversationScreen() {
           if (userDocSnap.exists()) {
             setOtherUser(userDocSnap.data());
           }
+          
+          // Also try to fetch professional data for the photo
+          const proDocRef = doc(db, 'professionals', String(otherUserId));
+          const proDocSnap = await getDoc(proDocRef);
+          if (proDocSnap.exists()) {
+            const proData = proDocSnap.data();
+            if (proData.photoUrl) {
+              setOtherUser((prev) => ({ ...prev, photoUrl: proData.photoUrl }));
+            }
+          }
         } catch (error) {
             console.error("Failed to fetch other user data:", error)
         }
@@ -126,6 +136,13 @@ export default function ConversationScreen() {
               const parentPhotoURL = parentDoc.exists() ? (parentDoc.data().photoURL || parentDoc.data().profileImage || '') : '';
               const parentName = `${parentFirstName} ${parentLastName}`.trim() || (currentUser.email || 'Parent');
 
+              // Charger les infos du professionnel
+              const proDoc = await getDoc(doc(db, 'professionals', String(otherUserId)));
+              const professionalFirstName = proDoc.exists() ? (proDoc.data().firstName || '') : '';
+              const professionalLastName = proDoc.exists() ? (proDoc.data().lastName || '') : '';
+              const professionalPhotoUrl = proDoc.exists() ? (proDoc.data().photoUrl || '') : '';
+              const professionalName = `${professionalFirstName} ${professionalLastName}`.trim() || 'Professionnel';
+
               // Créer la conversation avec l'ID déterministe
               await setDoc(convRef, {
                 conversationId: uniqueConversationId,
@@ -136,6 +153,8 @@ export default function ConversationScreen() {
                 parentPhotoURL,
                 parentName,
                 professionalId: otherUserId,
+                professionalName,
+                professionalPhotoUrl,
                 createdAt: serverTimestamp(),
                 lastMessage: null,
                 lastMessageTime: serverTimestamp()
@@ -529,8 +548,8 @@ export default function ConversationScreen() {
               <Text style={[styles.backButtonText, { color: colors.tint }]}>←</Text>
             </TouchableOpacity>
             <View style={styles.headerInfo}>
-              {(otherUser?.photoURL || otherUser?.profileImage) ? (
-                <Image source={{ uri: otherUser.photoURL || otherUser.profileImage }} style={styles.headerAvatar} />
+              {(otherUser?.photoURL || otherUser?.profileImage || otherUser?.photoUrl) ? (
+                <Image source={{ uri: otherUser.photoURL || otherUser.profileImage || otherUser.photoUrl }} style={styles.headerAvatar} />
               ) : (
                 <View style={[styles.headerAvatar, { backgroundColor: colors.tint }]}>
                   <Text style={styles.headerAvatarText}>

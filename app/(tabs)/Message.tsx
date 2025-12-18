@@ -19,6 +19,7 @@ export default function MessageScreen() {
   const [membersWithoutConversation, setMembersWithoutConversation] = useState<any[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const [professionalProfiles, setProfessionalProfiles] = useState<Record<string, any>>({});
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -81,6 +82,37 @@ export default function MessageScreen() {
                 
                 let familyConvs: any[] = [];
                 let professionalConvs: any[] = [];
+
+                const fetchProfessionalProfiles = async (convs: any[]) => {
+                  const professionalIds = new Set<string>();
+                  convs.forEach((conv) => {
+                    if (conv.professionalId) {
+                      professionalIds.add(conv.professionalId);
+                    }
+                  });
+
+                  if (professionalIds.size === 0) {
+                    setProfessionalProfiles({});
+                    return;
+                  }
+
+                  const allIds = Array.from(professionalIds);
+                  const profiles: Record<string, any> = {};
+                  
+                  for (const proId of allIds) {
+                    try {
+                      const proDocRef = doc(db, 'professionals', proId);
+                      const proDocSnap = await import('firebase/firestore').then(m => m.getDoc(proDocRef));
+                      if (proDocSnap.exists()) {
+                        profiles[proId] = proDocSnap.data();
+                      }
+                    } catch (err) {
+                      console.error(`Error fetching professional ${proId}:`, err);
+                    }
+                  }
+                  
+                  setProfessionalProfiles(profiles);
+                };
                 
                 const unsubFamily = onSnapshot(familyConversationsQuery, (snapshot) => {
                     familyConvs = snapshot.docs.map(doc => ({
@@ -100,7 +132,7 @@ export default function MessageScreen() {
                     }
                 });
                 
-                const unsubProfessional = onSnapshot(professionalConversationsQuery, (snapshot) => {
+                const unsubProfessional = onSnapshot(professionalConversationsQuery, async (snapshot) => {
                     professionalConvs = snapshot.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
@@ -109,6 +141,8 @@ export default function MessageScreen() {
                     const allConvs = [...familyConvs, ...professionalConvs];
                     setConversations(allConvs);
                     setLoading(false);
+                    // Fetch professional profiles
+                    await fetchProfessionalProfiles(professionalConvs);
                 }, (error) => {
                     console.error("Error fetching professional conversations:", error);
                     // Continuer avec les conversations existantes
@@ -232,7 +266,9 @@ export default function MessageScreen() {
               if (isProfessionalConversation) {
                 // Conversation avec professionnel
                 displayName = conv.professionalName || 'Professionnel';
-                // Utiliser la première lettre du nom du professionnel pour l'avatar
+                // Chercher la photo du professionnel dans les profils chargés ou dans la conversation
+                const proProfile = professionalProfiles[conv.professionalId || ''];
+                displayImage = proProfile?.photoUrl || conv.professionalPhotoUrl || conv.professionalPhotoURL;
               } else {
                 // Conversation familiale
                 otherParticipant = conv.participants?.find((p: string) => p !== user?.uid);
