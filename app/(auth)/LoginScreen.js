@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { db } from '../../constants/firebase';
+import { createAndPersistSession } from '../../constants/sessionManager';
 import { Colors } from '../../constants/theme';
 
 const LoginScreen = () => {
@@ -29,6 +30,10 @@ const LoginScreen = () => {
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
+        
+        // Créer et persister la session avec le type d'utilisateur
+        const userType = userData.userType === 'professionnel' ? 'professionnel' : 'parent';
+        await createAndPersistSession(user, userType);
         
         // Vérifier le type d'utilisateur
         if (userData.userType === 'professionnel') {
