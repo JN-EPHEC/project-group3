@@ -11,7 +11,7 @@ import { Colors } from '../../constants/theme';
 type ProfessionalType = 'avocat' | 'psychologue' | '';
 
 import * as DocumentPicker from 'expo-document-picker';
-import { uploadProfessionalDiploma, deleteProfessionalDiploma } from '../../constants/firebase';
+import { deleteProfessionalDiploma, uploadProfessionalDiploma } from '../../constants/firebase';
 interface TimeSlot {
   start: string;
   end: string;
@@ -143,6 +143,8 @@ export default function ProProfilScreen() {
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [diplomaUrl, setDiplomaUrl] = useState<string | null>(null);
+  const [isUploadingDiploma, setIsUploadingDiploma] = useState(false);
   
   // Professional-specific fields
   const [professionalType, setProfessionalType] = useState<ProfessionalType>('');
@@ -215,8 +217,6 @@ export default function ProProfilScreen() {
         } catch (error) {
           console.error("Error fetching data:", error);
         } finally {
-                const [diplomaUrl, setDiplomaUrl] = useState<string | null>(null);
-                const [isUploadingDiploma, setIsUploadingDiploma] = useState(false);
           setLoading(false);
         }
       };
@@ -419,65 +419,6 @@ export default function ProProfilScreen() {
   }
 
   return (
-              {/* Diplôme */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <Text style={[styles.sectionTitle, { color: colors.tint }]}>Diplôme ou Certification</Text>
-                </View>
-
-                {diplomaUrl ? (
-                  <View style={[styles.diplomaCard, { backgroundColor: colors.cardBackground }]}>
-                    <View style={styles.diplomaInfo}>
-                      <IconSymbol name="doc.fill" size={24} color={colors.tint} />
-                      <View style={styles.diplomaTextContainer}>
-                        <Text style={[styles.diplomaLabel, { color: colors.textSecondary }]}>Diplôme téléchargé</Text>
-                        <Text style={[styles.diplomaValue, { color: colors.text }]}>Document disponible</Text>
-                      </View>
-                    </View>
-                    <View style={styles.diplomaButtonsContainer}>
-                      <TouchableOpacity 
-                        style={[styles.diplomaButton, { backgroundColor: colors.tint }]}
-                        onPress={handleUploadDiploma}
-                        disabled={isUploadingDiploma}
-                      >
-                        {isUploadingDiploma ? (
-                          <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                          <IconSymbol name="arrow.up.doc.fill" size={16} color="#fff" />
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.diplomaButton, { backgroundColor: '#FF6B6B' }]}
-                        onPress={handleDeleteDiploma}
-                        disabled={isUploadingDiploma}
-                      >
-                        <IconSymbol name="trash.fill" size={16} color="#fff" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={[styles.diplomaCard, { backgroundColor: colors.cardBackground, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.tint }]}>
-                    <View style={styles.diplomaInfo}>
-                      <IconSymbol name="doc.badge.plus" size={24} color={colors.tint} />
-                      <View style={styles.diplomaTextContainer}>
-                        <Text style={[styles.diplomaLabel, { color: colors.textSecondary }]}>Aucun diplôme</Text>
-                        <Text style={[styles.diplomaValue, { color: colors.text }]}>Ajoutez un diplôme ou une certification</Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity 
-                      style={[styles.diplomaButton, { backgroundColor: colors.tint }]}
-                      onPress={handleUploadDiploma}
-                      disabled={isUploadingDiploma}
-                    >
-                      {isUploadingDiploma ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                      ) : (
-                        <IconSymbol name="arrow.up.doc.fill" size={16} color="#fff" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
@@ -535,6 +476,66 @@ export default function ProProfilScreen() {
                 </TouchableOpacity>
               )}
             </View>
+          </View>
+
+          {/* Diplôme */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Diplôme ou Certification</Text>
+            </View>
+
+            {diplomaUrl ? (
+              <View style={[styles.diplomaCard, { backgroundColor: colors.cardBackground }]}>
+                <View style={styles.diplomaInfo}>
+                  <IconSymbol name="doc.fill" size={24} color={colors.tint} />
+                  <View style={styles.diplomaTextContainer}>
+                    <Text style={[styles.diplomaLabel, { color: colors.textSecondary }]}>Diplôme téléchargé</Text>
+                    <Text style={[styles.diplomaValue, { color: colors.text }]}>Document disponible</Text>
+                  </View>
+                </View>
+                <View style={styles.diplomaButtonsContainer}>
+                  <TouchableOpacity 
+                    style={[styles.diplomaButton, { backgroundColor: colors.tint }]}
+                    onPress={handleUploadDiploma}
+                    disabled={isUploadingDiploma}
+                  >
+                    {isUploadingDiploma ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <IconSymbol name="arrow.up.doc.fill" size={16} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.diplomaButton, { backgroundColor: '#FF6B6B' }]}
+                    onPress={handleDeleteDiploma}
+                    disabled={isUploadingDiploma}
+                  >
+                    <IconSymbol name="trash.fill" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={[styles.diplomaCard, { backgroundColor: colors.cardBackground, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.tint }]}>
+                <View style={styles.diplomaInfo}>
+                  <IconSymbol name="doc.badge.plus" size={24} color={colors.tint} />
+                  <View style={styles.diplomaTextContainer}>
+                    <Text style={[styles.diplomaLabel, { color: colors.textSecondary }]}>Aucun diplôme</Text>
+                    <Text style={[styles.diplomaValue, { color: colors.text }]}>Ajoutez un diplôme ou une certification</Text>
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  style={[styles.diplomaButton, { backgroundColor: colors.tint }]}
+                  onPress={handleUploadDiploma}
+                  disabled={isUploadingDiploma}
+                >
+                  {isUploadingDiploma ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <IconSymbol name="arrow.up.doc.fill" size={16} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Type de professionnel */}
@@ -1049,43 +1050,43 @@ const styles = StyleSheet.create({
   saveButton: { backgroundColor: '#FFCEB0' },
   cancelButtonText: { fontSize: 16, fontWeight: '600', color: '#333' },
   saveButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-});
 
-    diplomaCard: {
-      padding: 16,
-      borderRadius: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginVertical: 12,
-    },
-    diplomaInfo: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginRight: 12,
-    },
-    diplomaTextContainer: {
-      marginLeft: 12,
-      flex: 1,
-    },
-    diplomaLabel: {
-      fontSize: 12,
-      fontWeight: '500',
-    },
-    diplomaValue: {
-      fontSize: 14,
-      fontWeight: '600',
-      marginTop: 4,
-    },
-    diplomaButtonsContainer: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    diplomaButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 8,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
+  diplomaCard: {
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 12,
+  },
+  diplomaInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  diplomaTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  diplomaLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  diplomaValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  diplomaButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  diplomaButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
