@@ -844,6 +844,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.large,
     borderRadius: BORDER_RADIUS.medium,
     marginTop: V_SPACING.medium,
+    marginBottom: V_SPACING.xxlarge,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: vs(2) },
