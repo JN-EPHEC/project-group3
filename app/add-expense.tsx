@@ -12,7 +12,7 @@ import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, Style
 import { CURRENCIES, getCurrencySymbol } from '../constants/currencies';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
-const DEFAULT_CATEGORIES = ['Vêtement', 'Santé', 'Sport'];
+const DEFAULT_CATEGORIES = ['Santé', 'Vêtements', 'École', 'Alimentation', 'Transport'];
 
 export default function AddExpenseScreen() {
   const router = useRouter();

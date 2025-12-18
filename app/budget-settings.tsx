@@ -8,6 +8,8 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
+const DEFAULT_CATEGORIES = ['Santé', 'Vêtements', 'École', 'Alimentation', 'Transport'];
+
 type CategoryRule = { name: string; limit: number; allowOverLimit: boolean };
 
 function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; colors: any }) {
@@ -24,6 +26,14 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
       if (docSnap.exists()) {
         const data = docSnap.data();
         const rules = data.categoryRules || data.categoryLimits || {};
+        // Si aucune règle n'existe, initialiser avec les catégories par défaut
+        if (!rules || Object.keys(rules).length === 0) {
+          const seed: any = {};
+          DEFAULT_CATEGORIES.forEach((name) => {
+            seed[name] = { limit: 0, allowOverLimit: false };
+          });
+          await setDoc(budgetRef, { categoryRules: seed }, { merge: true });
+        }
         const categoryArray = Object.entries(rules).map(([name, value]) => {
           if (typeof value === 'number') {
             return { name, limit: value as number, allowOverLimit: false };
@@ -33,8 +43,13 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         });
         setCategories(categoryArray);
       } else {
-        await setDoc(budgetRef, { categoryRules: {} });
-        setCategories([]);
+        // Créer le document avec les catégories par défaut
+        const seed: any = {};
+        DEFAULT_CATEGORIES.forEach((name) => {
+          seed[name] = { limit: 0, allowOverLimit: false };
+        });
+        await setDoc(budgetRef, { categoryRules: seed });
+        setCategories(DEFAULT_CATEGORIES.map((name) => ({ name, limit: 0, allowOverLimit: false })));
       }
       setLoading(false);
     });
