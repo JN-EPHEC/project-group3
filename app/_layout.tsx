@@ -18,6 +18,7 @@ export default function RootLayout() {
         <Stack.Screen name="modal" options={{ headerShown: false }} />
         <Stack.Screen name="add-expense" options={{ headerShown: false }} />
         <Stack.Screen name="category-approvals" options={{ headerShown: false }} />
+        <Stack.Screen name="RoleSelection" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

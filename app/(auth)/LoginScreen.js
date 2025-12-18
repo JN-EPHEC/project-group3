@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { getAuth, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { db } from '../../constants/firebase';
@@ -32,22 +32,46 @@ const LoginScreen = () => {
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        
-        // Créer et persister la session avec le type d'utilisateur
-        const userType = userData.userType === 'professionnel' ? 'professionnel' : 'parent';
-        await createAndPersistSession(user, userType);
-        
-        // Vérifier le type d'utilisateur
-        if (userData.userType === 'professionnel') {
-          console.log('Professional user, redirecting to pro interface...');
-          router.replace('/(pro-tabs)');
-        } else if (userData.familyId) {
-          console.log('User already has a family, redirecting to home...');
-          router.replace('/(tabs)');
-        } else {
-          console.log('User has no family, redirecting to FamilyCodeScreen...');
-          router.replace('FamilyCodeScreen');
+
+        const parentId = userData.parent_id ?? (userData.userType === 'parent' ? user.uid : null);
+        const professionalId = userData.professional_id ?? (userData.userType === 'professionnel' ? user.uid : null);
+        const hasParent = !!parentId;
+        const hasPro = !!professionalId;
+
+        // Backfill ids if missing
+        if (userData.parent_id === undefined || userData.professional_id === undefined) {
+          await updateDoc(userDocRef, {
+            parent_id: parentId,
+            professional_id: professionalId,
+          });
         }
+
+        if (hasParent && hasPro) {
+          // Dual role: go to chooser
+          await createAndPersistSession(user, 'parent');
+          router.replace({ pathname: '/RoleSelection', params: { userId: user.uid } });
+          return;
+        }
+
+        if (hasParent) {
+          await createAndPersistSession(user, 'parent');
+          const hasFamily = (userData.familyIds && userData.familyIds.length > 0) || userData.familyId;
+          if (hasFamily) {
+            router.replace('/(tabs)');
+          } else {
+            router.replace('FamilyCodeScreen');
+          }
+          return;
+        }
+
+        if (hasPro) {
+          await createAndPersistSession(user, 'professionnel');
+          router.replace('/(pro-tabs)');
+          return;
+        }
+
+        // No role yet -> onboarding choose
+        router.replace('/UserTypeScreen');
       } else {
         router.replace('FamilyCodeScreen');
       }

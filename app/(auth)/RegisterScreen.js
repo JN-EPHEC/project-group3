@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { Colors } from '../../constants/theme';
 
 // Fonction de validation détaillée pour expliquer l'erreur spécifique
@@ -86,12 +86,15 @@ const RegisterScreen = () => {
         }
       }
 
+      const inferredType = userType || 'parent';
       const userDoc = {
         uid: user.uid,
         firstName: cleanFirstName,
         lastName: cleanLastName,
         email: cleanEmail.toLowerCase(),
-        userType: userType || 'parent',
+        userType: inferredType,
+        parent_id: inferredType === 'parent' ? user.uid : null,
+        professional_id: inferredType === 'professionnel' ? user.uid : null,
         createdAt: serverTimestamp(),
       };
       if (profileImage) userDoc.profileImage = profileImage;
