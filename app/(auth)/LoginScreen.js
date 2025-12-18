@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
@@ -12,6 +12,7 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetInfo, setResetInfo] = useState('');
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -21,6 +22,7 @@ const LoginScreen = () => {
   const handleLogin = async () => {
     setLoading(true);
     setError('');
+    setResetInfo('');
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -54,6 +56,27 @@ const LoginScreen = () => {
       setError('Email ou mot de passe incorrect');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    setError('');
+    setResetInfo('');
+    const trimmedEmail = (email || '').trim();
+    if (!trimmedEmail) {
+      setError('Veuillez entrer votre email pour réinitialiser le mot de passe.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      setResetInfo("Lien de réinitialisation envoyé. Vérifiez votre boîte mail.");
+    } catch (err) {
+      console.error('Password reset error:', err);
+      let message = "Impossible d'envoyer le lien de réinitialisation.";
+      if (err?.code === 'auth/invalid-email') message = 'Email invalide.';
+      else if (err?.code === 'auth/user-not-found') message = "Aucun compte trouvé pour cet email.";
+      else if (err?.code === 'auth/too-many-requests') message = 'Trop de tentatives. Réessayez plus tard.';
+      setError(message);
     }
   };
 
@@ -91,6 +114,10 @@ const LoginScreen = () => {
             value={password}
             onChangeText={setPassword}
           />
+
+          <TouchableOpacity onPress={handlePasswordReset} style={styles.linkButton}>
+            <Text style={[styles.linkText, { color: colors.tint }]}>Mot de passe oublié ?</Text>
+          </TouchableOpacity>
           
           <TouchableOpacity
             style={[styles.loginButton, { backgroundColor: colors.tint }]}
@@ -102,6 +129,7 @@ const LoginScreen = () => {
           
           {loading && <ActivityIndicator style={styles.loader} color={colors.tint} />}
           {error ? <Text style={[styles.error, { color: colors.dangerButton }]}>{error}</Text> : null}
+          {resetInfo ? <Text style={[styles.info, { color: colors.tint }]}>{resetInfo}</Text> : null}
         </View>
       </View>
       </View>
@@ -189,6 +217,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginTop: 10,
     textAlign: 'center'
+  },
+  info: {
+    marginTop: 10,
+    textAlign: 'center'
+  },
+  linkButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 10
+  },
+  linkText: {
+    fontSize: 14,
+    textDecorationLine: 'underline'
   }
 });
 
