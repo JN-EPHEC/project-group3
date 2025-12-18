@@ -10,6 +10,7 @@ export default function ProTabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingAppointments, setPendingAppointments] = useState(0);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -26,6 +27,26 @@ export default function ProTabLayout() {
         return sum + (data.unreadCount?.[currentUser.uid] || 0);
       }, 0);
       setUnreadCount(total);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const appointmentsQuery = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(appointmentsQuery, (snapshot) => {
+      const pending = snapshot.docs.reduce((count, doc) => {
+        const data = doc.data();
+        return data.status === 'pending' ? count + 1 : count;
+      }, 0);
+      setPendingAppointments(pending);
     });
 
     return () => unsubscribe();
@@ -106,6 +127,7 @@ export default function ProTabLayout() {
         options={{
           title: 'Agenda',
           headerShown: false,
+          tabBarBadge: pendingAppointments > 0 ? pendingAppointments : undefined,
           tabBarIcon: ({ focused, color }) => (
             <Image
               source={require('../../ImageAndLogo/Logoagenda.png')}

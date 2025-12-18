@@ -5,7 +5,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, Modal, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Modal, SafeAreaView, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../constants/firebase';
 
 // Type definitions
@@ -521,6 +521,7 @@ export default function AideScreen() {
   const [selectedDateForBooking, setSelectedDateForBooking] = useState<Date | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookedSlots, setBookedSlots] = useState<any[]>([]);
+  const [bookingNote, setBookingNote] = useState('');
 
   const weeksForBooking = useMemo(() => {
     const days: Date[] = Array.from({ length: 180 }, (_, index) => {
@@ -678,6 +679,7 @@ export default function AideScreen() {
     setSelectedDayForBooking(null);
     setSelectedSlotForBooking(null);
     setSelectedDateForBooking(null);
+    setBookingNote('');
     setIsBookingModalVisible(true);
   };
 
@@ -713,6 +715,7 @@ export default function AideScreen() {
         selectedDay: selectedDayForBooking,
         selectedTimeSlot: selectedSlotForBooking,
         selectedDate: selectedDateForBooking,
+        note: bookingNote.trim(),
         status: 'pending',
         createdAt: serverTimestamp()
       });
@@ -724,6 +727,7 @@ export default function AideScreen() {
       setSelectedDayForBooking(null);
       setSelectedSlotForBooking(null);
       setSelectedDateForBooking(null);
+      setBookingNote('');
       
       // Afficher un message de succès
       Alert.alert('Succès', `Demande de rendez-vous envoyée à ${selectedProfessionalForBooking.name}`);
@@ -1087,6 +1091,35 @@ export default function AideScreen() {
                     </View>
                   </View>
                 )}
+
+                {/* Note field */}
+                <View style={{ marginBottom: V_SPACING.large }}>
+                  <Text style={{ color: colors.text, fontSize: FONT_SIZES.medium, fontWeight: '600', marginBottom: V_SPACING.small }}>
+                    Informations pour le professionnel (500 caractères)
+                  </Text>
+                  <TextInput
+                    value={bookingNote}
+                    onChangeText={text => setBookingNote(text.slice(0, 500))}
+                    placeholder="Décrivez votre besoin ou précisez le contexte de votre rendez-vous"
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                    maxLength={500}
+                    style={{
+                      minHeight: vs(110),
+                      borderRadius: BORDER_RADIUS.medium,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.cardBackground,
+                      padding: SPACING.large,
+                      color: colors.text,
+                      fontSize: FONT_SIZES.medium,
+                      textAlignVertical: 'top'
+                    }}
+                  />
+                  <Text style={{ color: colors.textSecondary, fontSize: FONT_SIZES.tiny, textAlign: 'right', marginTop: vs(4) }}>
+                    {bookingNote.length}/500
+                  </Text>
+                </View>
 
                 {/* Action buttons */}
                 <View style={{ flexDirection: 'row', gap: SPACING.medium, marginBottom: V_SPACING.large }}>

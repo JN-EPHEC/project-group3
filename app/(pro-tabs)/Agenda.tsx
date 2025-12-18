@@ -26,6 +26,7 @@ interface Appointment {
   selectedDay: string;
   selectedTimeSlot: TimeSlot;
   selectedDate?: any;
+  note?: string;
   status: 'pending' | 'confirmed' | 'rejected';
   createdAt: any;
   parentName?: string;
@@ -222,6 +223,9 @@ export default function ProAgendaScreen() {
         const appointmentDate = appointment.selectedDate instanceof Date 
           ? appointment.selectedDate 
           : appointment.selectedDate.toDate();
+
+        const noteText = (appointment.note || '').trim();
+        const noteLine = noteText ? `\nNote parent: ${noteText}` : '';
         
         // Extraire les heures du créneau
         const [startHour, startMinute] = appointment.selectedTimeSlot.start.split(':').map(Number);
@@ -247,7 +251,7 @@ export default function ProAgendaScreen() {
               familyId: family.id,
               createdBy: currentUser.uid,
               appointmentId: appointment.id,
-              description: `Rendez-vous avec ${appointment.parentName || 'un parent'}\nType: Consultation`,
+              description: `Rendez-vous avec ${appointment.parentName || 'un parent'}\nType: Consultation${noteLine}`,
               createdAt: serverTimestamp()
             });
           }
@@ -263,7 +267,7 @@ export default function ProAgendaScreen() {
             userId: currentUser.uid,
             createdBy: currentUser.uid,
             appointmentId: appointment.id,
-            description: `Rendez-vous avec ${appointment.parentName || 'un parent'}\nType: Consultation`,
+            description: `Rendez-vous avec ${appointment.parentName || 'un parent'}\nType: Consultation${noteLine}`,
             createdAt: serverTimestamp()
           });
         }
@@ -279,7 +283,7 @@ export default function ProAgendaScreen() {
           userId: appointment.userId,
           createdBy: currentUser.uid,
           appointmentId: appointment.id,
-          description: `Rendez-vous avec ${appointment.professionalName}\nType: ${appointment.professionalType === 'avocat' ? 'Avocat' : 'Psychologue'}`,
+          description: `Rendez-vous avec ${appointment.professionalName}\nType: ${appointment.professionalType === 'avocat' ? 'Avocat' : 'Psychologue'}${noteLine}`,
           createdAt: serverTimestamp()
         });
 
@@ -816,6 +820,14 @@ export default function ProAgendaScreen() {
                       <Text style={[styles.eventLocation, { color: colors.textSecondary, marginTop: vs(2) }]}>
                         Time: {appointment.selectedTimeSlot?.start} - {appointment.selectedTimeSlot?.end}
                       </Text>
+                      {appointment.note ? (
+                        <Text
+                          style={{ color: colors.textSecondary, marginTop: vs(4), fontSize: FONT_SIZES.small }}
+                          numberOfLines={3}
+                        >
+                          Note: {appointment.note}
+                        </Text>
+                      ) : null}
                       <Text style={[styles.eventTime, { color: colors.textTertiary, marginTop: vs(4), fontSize: FONT_SIZES.tiny }]}>
                         Reçu le {new Date(appointment.createdAt?.toDate?.() || appointment.createdAt).toLocaleDateString('fr-FR')}
                       </Text>
@@ -919,6 +931,13 @@ export default function ProAgendaScreen() {
                       Time: {selectedAppointment.selectedTimeSlot?.start} - {selectedAppointment.selectedTimeSlot?.end}
                     </Text>
                   </View>
+
+                  <Text style={[styles.detailLabel, { color: colors.textSecondary, marginTop: V_SPACING.medium }]}>
+                    Description du parent
+                  </Text>
+                  <Text style={[styles.eventLocation, { color: colors.text }]}>
+                    {selectedAppointment.note?.trim() || 'Aucune description fournie'}
+                  </Text>
 
                   {selectedAppointment.status === 'pending' && (
                     <>
