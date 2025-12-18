@@ -10,6 +10,8 @@ import { Colors } from '../../constants/theme';
 
 type ProfessionalType = 'avocat' | 'psychologue' | '';
 
+import * as DocumentPicker from 'expo-document-picker';
+import { uploadProfessionalDiploma, deleteProfessionalDiploma } from '../../constants/firebase';
 interface TimeSlot {
   start: string;
   end: string;
@@ -61,6 +63,80 @@ export default function ProProfilScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const handleUploadDiploma = async () => {
+    try {
+      // Open document picker
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setIsUploadingDiploma(true);
+        const asset = result.assets[0];
+        
+        // Convert URI to blob
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        
+        // Upload to Firebase
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          throw new Error('Utilisateur non connecté');
+        }
+
+        const uploadResult = await uploadProfessionalDiploma(currentUser.uid, blob);
+        
+        if (uploadResult.success) {
+          setDiplomaUrl(uploadResult.diplomaUrl);
+          Alert.alert('Succès', 'Diplôme mis à jour');
+        } else {
+          Alert.alert('Erreur', uploadResult.error || 'Impossible de télécharger le diplôme');
+        }
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      Alert.alert('Erreur', 'Erreur lors du téléchargement du diplôme');
+    } finally {
+      setIsUploadingDiploma(false);
+    }
+  };
+
+  const handleDeleteDiploma = async () => {
+    Alert.alert(
+      'Supprimer le diplôme',
+      'Êtes-vous sûr de vouloir supprimer votre diplôme ?',
+      [
+        { text: 'Annuler', onPress: () => {} },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsUploadingDiploma(true);
+              const currentUser = auth.currentUser;
+              if (!currentUser) {
+                throw new Error('Utilisateur non connecté');
+              }
+
+              const deleteResult = await deleteProfessionalDiploma(currentUser.uid);
+              
+              if (deleteResult.success) {
+                setDiplomaUrl(null);
+                Alert.alert('Succès', 'Diplôme supprimé');
+              } else {
+                Alert.alert('Erreur', deleteResult.error || 'Impossible de supprimer le diplôme');
+              }
+            } catch (error) {
+              console.error('Delete error:', error);
+              Alert.alert('Erreur', 'Erreur lors de la suppression du diplôme');
+            } finally {
+              setIsUploadingDiploma(false);
+            }
+          }
+        }
+      ]
+    );
+  };
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -122,7 +198,8 @@ export default function ProProfilScreen() {
             
             // Handle availability - support both old (string) and new (object) format
             if (profData.availability) {
-              // Check if it's the old format (strings) or new format (objects)
+               // Check if it's the old format (strings) or new format (objects)
+               setDiplomaUrl(profData.diplomaUrl || null);
               const firstDay = profData.availability.lundi;
               if (typeof firstDay === 'string') {
                 // Old format - convert to new format
@@ -138,6 +215,8 @@ export default function ProProfilScreen() {
         } catch (error) {
           console.error("Error fetching data:", error);
         } finally {
+                const [diplomaUrl, setDiplomaUrl] = useState<string | null>(null);
+                const [isUploadingDiploma, setIsUploadingDiploma] = useState(false);
           setLoading(false);
         }
       };
@@ -340,6 +419,65 @@ export default function ProProfilScreen() {
   }
 
   return (
+              {/* Diplôme */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: colors.tint }]}>Diplôme ou Certification</Text>
+                </View>
+
+                {diplomaUrl ? (
+                  <View style={[styles.diplomaCard, { backgroundColor: colors.cardBackground }]}>
+                    <View style={styles.diplomaInfo}>
+                      <IconSymbol name="doc.fill" size={24} color={colors.tint} />
+                      <View style={styles.diplomaTextContainer}>
+                        <Text style={[styles.diplomaLabel, { color: colors.textSecondary }]}>Diplôme téléchargé</Text>
+                        <Text style={[styles.diplomaValue, { color: colors.text }]}>Document disponible</Text>
+                      </View>
+                    </View>
+                    <View style={styles.diplomaButtonsContainer}>
+                      <TouchableOpacity 
+                        style={[styles.diplomaButton, { backgroundColor: colors.tint }]}
+                        onPress={handleUploadDiploma}
+                        disabled={isUploadingDiploma}
+                      >
+                        {isUploadingDiploma ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <IconSymbol name="arrow.up.doc.fill" size={16} color="#fff" />
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.diplomaButton, { backgroundColor: '#FF6B6B' }]}
+                        onPress={handleDeleteDiploma}
+                        disabled={isUploadingDiploma}
+                      >
+                        <IconSymbol name="trash.fill" size={16} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={[styles.diplomaCard, { backgroundColor: colors.cardBackground, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.tint }]}>
+                    <View style={styles.diplomaInfo}>
+                      <IconSymbol name="doc.badge.plus" size={24} color={colors.tint} />
+                      <View style={styles.diplomaTextContainer}>
+                        <Text style={[styles.diplomaLabel, { color: colors.textSecondary }]}>Aucun diplôme</Text>
+                        <Text style={[styles.diplomaValue, { color: colors.text }]}>Ajoutez un diplôme ou une certification</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity 
+                      style={[styles.diplomaButton, { backgroundColor: colors.tint }]}
+                      onPress={handleUploadDiploma}
+                      disabled={isUploadingDiploma}
+                    >
+                      {isUploadingDiploma ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <IconSymbol name="arrow.up.doc.fill" size={16} color="#fff" />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
@@ -912,3 +1050,42 @@ const styles = StyleSheet.create({
   cancelButtonText: { fontSize: 16, fontWeight: '600', color: '#333' },
   saveButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
 });
+
+    diplomaCard: {
+      padding: 16,
+      borderRadius: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginVertical: 12,
+    },
+    diplomaInfo: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    diplomaTextContainer: {
+      marginLeft: 12,
+      flex: 1,
+    },
+    diplomaLabel: {
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    diplomaValue: {
+      fontSize: 14,
+      fontWeight: '600',
+      marginTop: 4,
+    },
+    diplomaButtonsContainer: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    diplomaButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
