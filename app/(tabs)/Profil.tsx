@@ -130,7 +130,7 @@ export default function ProfilScreen() {
 
     families.forEach((family) => {
       const familyDocRef = doc(db, 'families', family.id);
-      const unsubscribe = onSnapshot(familyDocRef, async (docSnapshot) => {
+      const unsubscribe = onSnapshot(familyDocRef, (docSnapshot) => {
         if (docSnapshot.exists()) {
           const familyData = docSnapshot.data();
           const memberIds = familyData.members || [];
@@ -142,10 +142,13 @@ export default function ProfilScreen() {
           
           // Compter seulement les membres qui ont encore un compte actif
           const membersQuery = query(collection(db, 'users'), where('__name__', 'in', memberIds));
-          const membersSnapshot = await getDocs(membersQuery);
-          const activeMemberCount = membersSnapshot.docs.length;
-          
-          setFamilyMemberCounts(prev => ({ ...prev, [family.id]: activeMemberCount }));
+          getDocs(membersQuery).then(membersSnapshot => {
+            const activeMemberCount = membersSnapshot.docs.length;
+            setFamilyMemberCounts(prev => ({ ...prev, [family.id]: activeMemberCount }));
+          }).catch(error => {
+            console.error('Error counting active members:', error);
+            setFamilyMemberCounts(prev => ({ ...prev, [family.id]: memberIds.length }));
+          });
         }
       });
       unsubscribers.push(unsubscribe);
