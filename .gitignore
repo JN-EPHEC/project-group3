@@ -31,6 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files
+# Contains secrets, API keys, etc.
+# Do not commit to version control.
 .env*.local
 .env
 backend/.env

@@ -5,6 +5,7 @@
 
 import { getAuth } from 'firebase/auth';
 import { Linking, NativeModules, Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { STRIPE_CONFIG } from '../constants/stripeConfig';
 
 export interface CreateCheckoutSessionParams {
@@ -84,11 +85,15 @@ export class StripeService {
       const data: CheckoutSessionResponse = await response.json();
 
       // Ouvrir l'URL de checkout dans le navigateur système
-      const canOpen = await Linking.canOpenURL(data.url);
-      if (!canOpen) {
-        throw new Error('Impossible d\'ouvrir Stripe Checkout');
+      try {
+        await WebBrowser.openBrowserAsync(data.url);
+      } catch {
+        const canOpen = await Linking.canOpenURL(data.url);
+        if (!canOpen) {
+          throw new Error('Impossible d\'ouvrir Stripe Checkout');
+        }
+        await Linking.openURL(data.url);
       }
-      await Linking.openURL(data.url);
 
     } catch (error: any) {
       console.error('Error creating checkout session:', error);

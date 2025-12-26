@@ -29,6 +29,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 app.use(cors());
 app.use(express.json());
 
+// Health check
+app.get('/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
 /**
  * POST /api/create-checkout-session
  * Crée une session Stripe Checkout avec essai gratuit de 30 jours
@@ -213,9 +218,10 @@ app.get('/api/subscription-status/:userId', async (req, res) => {
 });
 
 // Démarrer le serveur (pour développement local)
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
 });
 
 export default app;
