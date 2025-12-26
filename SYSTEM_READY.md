@@ -15,7 +15,7 @@
 ### Clés Stripe (Mode Test)
 - **Publishable** : `pk_test_51SUoM02OiYebg9QD...` ✅
 - **Secret** : `sk_test_51SUoM02OiYebg9QD...` ✅
-- **Webhook Secret** : `whsec_314cf2dd4f7996c694644449ee647b460a5b7d7f7e207c64a532a28da6823b2d` ✅
+- **Webhook Secret** : `whsec_...` ✅
 
 ### Price IDs
 - **Mensuel** : `price_1SiXfe2OiYebg9QDRWHm63We0` (7,99€/mois) ✅
