@@ -27,8 +27,6 @@ export default function SubscriptionScreen() {
   const [checkingStatus, setCheckingStatus] = useState(true);
 
   useEffect(() => {
-    checkSubscriptionStatus();
-    
     // Détecter le retour de Stripe via les query params
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -39,22 +37,35 @@ export default function SubscriptionScreen() {
         // Nettoyer l'URL
         window.history.replaceState({}, '', '/subscription');
         
-        // Afficher un message de succès
+        // Rediriger immédiatement vers l'accueil avec message
         Alert.alert(
           '🎉 Bienvenue Premium !',
           'Votre essai gratuit de 30 jours a commencé. Profitez de toutes les fonctionnalités premium !',
-          [{ text: 'OK' }]
+          [
+            {
+              text: 'Commencer',
+              onPress: () => router.push('/(tabs)/'),
+            },
+          ]
         );
         
-        // Recharger le statut
-        setTimeout(() => checkSubscriptionStatus(), 1000);
+        // Rediriger automatiquement après 1 seconde
+        setTimeout(() => {
+          router.replace('/(tabs)/');
+        }, 1000);
+        
+        // Ne pas exécuter le reste (pas de polling après paiement)
+        return;
       }
     }
     
-    // Recharger le statut quand l'écran reprend le focus
+    // Vérifier le statut initial
+    checkSubscriptionStatus();
+    
+    // Recharger le statut périodiquement seulement si on n'a pas de query param success
     const interval = setInterval(() => {
       checkSubscriptionStatus();
-    }, 3000); // Vérifier toutes les 3 secondes
+    }, 5000); // Vérifier toutes les 5 secondes
 
     return () => clearInterval(interval);
   }, []);
