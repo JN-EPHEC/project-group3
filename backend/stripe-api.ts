@@ -137,9 +137,9 @@ app.post('/api/create-checkout-session', async (req, res) => {
       // Forcer la collecte de la méthode de paiement
       payment_method_collection: 'always',
 
-      // URLs de redirection (Deep Linking)
-      success_url: `myapp://payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `myapp://payment-cancelled`,
+      // URLs de redirection - utiliser des URLs web pour dev, deep links pour mobile
+      success_url: process.env.SUCCESS_URL || `http://localhost:8081/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: process.env.CANCEL_URL || `http://localhost:8081/subscription?cancelled=true`,
 
       // Permettre les codes promo (optionnel)
       allow_promotion_codes: true,
