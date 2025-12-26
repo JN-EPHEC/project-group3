@@ -3,9 +3,9 @@
  * Gère les appels API vers le backend Stripe
  */
 
+import * as WebBrowser from 'expo-web-browser';
 import { getAuth } from 'firebase/auth';
 import { Linking, NativeModules, Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { STRIPE_CONFIG } from '../constants/stripeConfig';
 
 export interface CreateCheckoutSessionParams {
