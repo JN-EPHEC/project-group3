@@ -11,8 +11,12 @@
  */
 
 import cors from 'cors';
+import dotenv from 'dotenv';
 import express from 'express';
 import Stripe from 'stripe';
+
+// Charger les variables d'environnement
+dotenv.config();
 
 const app = express();
 
