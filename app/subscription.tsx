@@ -28,6 +28,35 @@ export default function SubscriptionScreen() {
 
   useEffect(() => {
     checkSubscriptionStatus();
+    
+    // Détecter le retour de Stripe via les query params
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const success = urlParams.get('success');
+      const sessionId = urlParams.get('session_id');
+      
+      if (success === 'true' && sessionId) {
+        // Nettoyer l'URL
+        window.history.replaceState({}, '', '/subscription');
+        
+        // Afficher un message de succès
+        Alert.alert(
+          '🎉 Bienvenue Premium !',
+          'Votre essai gratuit de 30 jours a commencé. Profitez de toutes les fonctionnalités premium !',
+          [{ text: 'OK' }]
+        );
+        
+        // Recharger le statut
+        setTimeout(() => checkSubscriptionStatus(), 1000);
+      }
+    }
+    
+    // Recharger le statut quand l'écran reprend le focus
+    const interval = setInterval(() => {
+      checkSubscriptionStatus();
+    }, 3000); // Vérifier toutes les 3 secondes
+
+    return () => clearInterval(interval);
   }, []);
 
   const checkSubscriptionStatus = async () => {
