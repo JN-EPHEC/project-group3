@@ -202,42 +202,50 @@ app.get('/api/subscription-status/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Rechercher le client Stripe via les métadonnées
-    const customers = await stripe.customers.list({
+    // Rechercher le client Stripe via les métadonnées (search est plus efficace)
+    const customers = await stripe.customers.search({
+      query: `metadata['userId']:'${userId}'`,
       limit: 1,
     });
 
-    const customer = customers.data.find(c => c.metadata.userId === userId);
-
-    if (!customer) {
+    if (customers.data.length === 0) {
       return res.json({
         hasActiveSubscription: false,
         subscription: null,
       });
     }
 
-    // Récupérer les abonnements actifs
+    const customer = customers.data[0];
+
+    // Récupérer les abonnements actifs ou en période d'essai
     const subscriptions = await stripe.subscriptions.list({
       customer: customer.id,
-      status: 'active',
-      limit: 1,
+      status: 'all',
+      limit: 10,
     });
 
-    if (subscriptions.data.length === 0) {
+    // Vérifier s'il y a un abonnement actif ou en période d'essai
+    const activeSubscription = subscriptions.data.find(
+      sub => sub.status === 'active' || sub.status === 'trialing'
+    );
+
+    if (!activeSubscription) {
       return res.json({
         hasActiveSubscription: false,
         subscription: null,
       });
     }
-
-    const subscription = subscriptions.data[0];
 
     res.json({
       hasActiveSubscription: true,
       subscription: {
-        id: subscription.id,
-        status: subscription.status,
-        currentPeriodEnd: subscription.current_period_end,
+        id: activeSubscription.id,
+        status: activeSubscription.status,
+        currentPeriodEnd: activeSubscription.current_period_end,
+        cancelAtPeriodEnd: activeSubscription.cancel_at_period_end,
+        trialEnd: activeSubscription.trial_end,
+      },
+    });
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
         trialEnd: subscription.trial_end,
       },
