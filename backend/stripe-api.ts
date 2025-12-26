@@ -86,11 +86,10 @@ app.post('/api/create-checkout-session', async (req, res) => {
       return res.status(400).json({ error: 'userId and userEmail are required' });
     }
 
-    // Vérifier que le priceId est valide
-    const validPriceIds = [
-      'price_1SiXfe2OiYebg9QDRWHm63We0', // Mensuel
-      'price_1SiXfe2OiYebg9QDfh8rWIcX1', // Annuel
-    ];
+    // Vérifier que le priceId est valide (configurable via variables d'environnement)
+    const monthlyPrice = process.env.PRICE_MONTHLY_ID || 'price_1SiXfe2OiYebg9QDRWHm63We0';
+    const yearlyPrice = process.env.PRICE_YEARLY_ID || 'price_1SiXfe2OiYebg9QDfh8rWIcX1';
+    const validPriceIds = [monthlyPrice, yearlyPrice].filter(Boolean);
 
     if (!validPriceIds.includes(priceId)) {
       return res.status(400).json({ error: 'Invalid priceId' });
