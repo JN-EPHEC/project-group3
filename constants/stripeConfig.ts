@@ -12,8 +12,8 @@ export const STRIPE_CONFIG = {
   
   // Price IDs pour les abonnements
   PRICES: {
-    MONTHLY: 'price_1SiXfe2OiYebg9QDRWHm63We0', // 7,99€/mois
-    YEARLY: 'price_1SiXfe2OiYebg9QDfh8rWIcX1',  // 89,99€/an
+    MONTHLY: 'price_1SiXfe2OiYebg9QDRWHm63We', // 7,99€/mois
+    YEARLY: 'price_1SiXfe2OiYebg9QDfh8rWIcX',  // 89,99€/an
   },
   
   // ID du produit
