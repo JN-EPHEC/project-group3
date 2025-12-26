@@ -4,10 +4,12 @@ import {
     createUserWithEmailAndPassword,
     deleteUser as fbDeleteUser,
     signOut as fbSignOut,
-    getReactNativePersistence,
-    initializeAuth,
+    getAuth,
     signInWithEmailAndPassword
 } from 'firebase/auth';
+// Avoid static import of react-native auth entry to prevent bundler issues
+// We'll require the RN helpers at runtime on native platforms
+// import { initializeAuth, getReactNativePersistence } from 'firebase/auth/react-native';
 import {
     addDoc,
     arrayUnion,
@@ -29,14 +31,32 @@ import {
     ref,
     uploadBytes
 } from 'firebase/storage';
+import { Platform } from 'react-native';
 
 import firebaseConfig from './firebaseenv.js';
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-// Use persistent storage for React Native
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+// Use persistent storage for React Native, fall back to web
+let auth;
+if (Platform.OS === 'web') {
+  auth = getAuth(app);
+} else {
+  try {
+    const rnAuth = require('firebase/auth');
+    const initializeAuthRn = rnAuth.initializeAuth;
+    const getReactNativePersistenceRn = rnAuth.getReactNativePersistence;
+    if (initializeAuthRn && getReactNativePersistenceRn) {
+      auth = initializeAuthRn(app, {
+        persistence: getReactNativePersistenceRn(AsyncStorage),
+      });
+    } else {
+      // Fallback to default web-style auth if RN helpers unavailable
+      auth = getAuth(app);
+    }
+  } catch (e) {
+    auth = getAuth(app);
+  }
+}
 const db = getFirestore(app);
 const storage = getStorage(app);
 
