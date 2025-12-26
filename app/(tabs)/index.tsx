@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, signOut } from '../../constants/firebase';
 import { setActiveSessionRole } from '../../constants/sessionManager';
+import quotesData from '../../quoteOfTheDay.json';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -23,6 +24,8 @@ export default function HomeScreen() {
   const [families, setFamilies] = useState<any[]>([]);
   const [activeRole, setActiveRole] = useState<'parent' | 'professionnel'>('parent');
   const [dualRole, setDualRole] = useState(false);
+  const [dailyAdvice, setDailyAdvice] = useState('');
+  const [adviceCategory, setAdviceCategory] = useState('');
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -46,6 +49,14 @@ export default function HomeScreen() {
         setActiveRole(role);
       }
     });
+
+    // Get daily advice based on the current date
+    const today = new Date();
+    const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
+    const adviceIndex = dayOfYear % quotesData.length;
+    const todayAdvice = quotesData[adviceIndex];
+    setDailyAdvice(todayAdvice.content);
+    setAdviceCategory(todayAdvice.category);
 
     const fetchFamilies = async () => {
         try {
@@ -305,8 +316,9 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.tint }]}>Conseils du jour</Text>
             <View style={[styles.tipCard, { backgroundColor: colors.tipCardBackground }]}>
+              <Text style={[styles.adviceCategory, { color: colors.tint }]}>{adviceCategory}</Text>
               <Text style={[styles.tipText, { color: colors.text }]}>
-                La communication bienveillante avec votre ex-partenaire profite avant tout à votre enfant.
+                {dailyAdvice}
               </Text>
             </View>
           </View>
@@ -391,6 +403,7 @@ const styles = StyleSheet.create({
   },
   emptyText: { textAlign: 'center', fontSize: FONT_SIZES.regular },
   tipCard: { borderRadius: BORDER_RADIUS.large, padding: SPACING.xlarge, shadowColor: '#000', shadowOpacity: 0.06, shadowOffset: { width: 0, height: vs(4) }, shadowRadius: hs(10), elevation: 2 },
+  adviceCategory: { fontSize: FONT_SIZES.small, fontWeight: '700', marginBottom: V_SPACING.small },
   tipText: { fontSize: FONT_SIZES.regular, textAlign: 'center', lineHeight: vs(22) },
   seeMoreButton: {
     borderRadius: BORDER_RADIUS.medium,
