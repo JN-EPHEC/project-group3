@@ -9,13 +9,13 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '../constants/stripeConfig';
 import { StripeService } from '../constants/stripeService';
 
