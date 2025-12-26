@@ -4,7 +4,7 @@
  */
 
 import { getAuth } from 'firebase/auth';
-import { Linking } from 'react-native';
+import { Linking, NativeModules, Platform } from 'react-native';
 import { STRIPE_CONFIG } from '../constants/stripeConfig';
 
 export interface CreateCheckoutSessionParams {
@@ -33,7 +33,19 @@ export interface SubscriptionStatus {
  * Service principal pour gérer les paiements Stripe
  */
 export class StripeService {
-  private static apiUrl = STRIPE_CONFIG.API_URL;
+  private static resolveApiUrl(): string {
+    const configured = STRIPE_CONFIG.API_URL || 'http://localhost:3000';
+    if (Platform.OS === 'web') return configured;
+    if (!configured.includes('localhost')) return configured;
+    const scriptURL: string | undefined = (NativeModules as any)?.SourceCode?.scriptURL;
+    if (!scriptURL) return configured;
+    const hostMatch = scriptURL.match(/^(?:http|https):\/\/([^:]+):\d+\//);
+    const host = hostMatch?.[1];
+    if (!host) return configured;
+    return `http://${host}:3000`;
+  }
+
+  private static apiUrl = StripeService.resolveApiUrl();
 
   /**
    * Crée une session Stripe Checkout et ouvre le navigateur
@@ -45,6 +57,10 @@ export class StripeService {
 
       if (!user) {
         throw new Error('User must be authenticated');
+      }
+
+      if (!user.email) {
+        throw new Error("Votre compte n'a pas d'email. Veuillez ajouter un email à votre profil.");
       }
 
       // Appeler l'API backend
@@ -69,11 +85,10 @@ export class StripeService {
 
       // Ouvrir l'URL de checkout dans le navigateur système
       const canOpen = await Linking.canOpenURL(data.url);
-      if (canOpen) {
-        await Linking.openURL(data.url);
-      } else {
-        throw new Error('Cannot open Stripe Checkout URL');
+      if (!canOpen) {
+        throw new Error('Impossible d\'ouvrir Stripe Checkout');
       }
+      await Linking.openURL(data.url);
 
     } catch (error: any) {
       console.error('Error creating checkout session:', error);
