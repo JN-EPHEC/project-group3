@@ -1,0 +1,302 @@
+[
+  {
+    "id": 1,
+    "category": "Communication",
+    "content": "Adoptez la règle des 24h : ne répondez pas à un message agressif sous le coup de l'émotion.",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 2,
+    "category": "Organisation",
+    "content": "Synchronisez vos agendas scolaires (réunions parents-profs) dès la rentrée.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 3,
+    "category": "Bien-être",
+    "content": "Rassurez l'enfant : l'amour que vous lui portez ne change pas, même si la famille change.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 4,
+    "category": "Juridique",
+    "content": "Respectez les dates de versement de la pension alimentaire pour maintenir la paix financière.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 5,
+    "category": "Communication",
+    "content": "Parlez de l'autre parent de manière neutre ou positive (« Papa vient te chercher », pas « Il arrive »).",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 6,
+    "category": "Bien-être",
+    "content": "Laissez l'enfant exprimer sa tristesse ou sa colère sans le juger ni le faire taire.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 7,
+    "category": "Organisation",
+    "content": "Ayez un double des documents d'identité de l'enfant (CNI, passeport) chez chaque parent.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 8,
+    "category": "Communication",
+    "content": "Soyez précis sur les horaires : « 18h00 » est plus clair que « en fin d'après-midi ».",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 9,
+    "category": "Bien-être",
+    "content": "Ne faites pas de l'enfant votre confident sur les problèmes du divorce.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 10,
+    "category": "Juridique",
+    "content": "Conservez les justificatifs des frais extraordinaires (dentiste, voyages) pour le partage des coûts.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 11,
+    "category": "Communication",
+    "content": "Si vous avez un empêchement, prévenez l'autre parent le plus tôt possible par respect.",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 12,
+    "category": "Organisation",
+    "content": "Étiquetez les vêtements de l'enfant pour faciliter le tri lors des retours.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 13,
+    "category": "Bien-être",
+    "content": "Encouragez l'enfant à appeler l'autre parent pour lui raconter ses réussites scolaires.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 14,
+    "category": "Juridique",
+    "content": "Ne modifiez pas le droit de visite unilatéralement, sauf accord écrit ou décision de justice.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 15,
+    "category": "Communication",
+    "content": "Utilisez des outils collaboratifs (Google Agenda, apps dédiées) pour limiter les conflits directs.",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 16,
+    "category": "Bien-être",
+    "content": "Montrez à l'enfant des photos de lui avec l'autre parent, cela valide son histoire.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 17,
+    "category": "Organisation",
+    "content": "Convenez d'une règle commune pour l'heure du coucher afin d'assurer un rythme stable.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 18,
+    "category": "Communication",
+    "content": "Évitez les discussions sérieuses lors de l'échange de l'enfant. C'est un moment pour lui.",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 19,
+    "category": "Bien-être",
+    "content": "Ne culpabilisez pas l'enfant s'il passe un bon moment chez l'autre parent.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 20,
+    "category": "Juridique",
+    "content": "Vérifiez que l'assurance scolaire couvre l'enfant dans les deux domiciles.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 21,
+    "category": "Communication",
+    "content": "Restez courtois avec la famille élargie de l'autre parent (grands-parents, oncles).",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 22,
+    "category": "Organisation",
+    "content": "Partagez les infos médicales (allergies, traitements) immédiatement.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 23,
+    "category": "Bien-être",
+    "content": "Soyez prévisible pour l'enfant. Les routines le sécurisent dans cette période de changement.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 24,
+    "category": "Juridique",
+    "content": "Respectez l'autorité parentale conjointe : consultez l'autre pour les choix importants (école, santé).",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 25,
+    "category": "Communication",
+    "content": "Terminez vos échanges sur une note neutre ou positive (« Bonne semaine à toi »).",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 26,
+    "category": "Organisation",
+    "content": "Faites un point 'logistique' mensuel par email pour anticiper le mois suivant.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 27,
+    "category": "Bien-être",
+    "content": "Ne demandez pas à l'enfant d'espionner ou de rapporter ce qui se passe chez l'autre.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 28,
+    "category": "Communication",
+    "content": "Distinguez votre rôle de parent de votre rôle d'ex-conjoint.",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 29,
+    "category": "Organisation",
+    "content": "Si l'enfant oublie un objet important, organisez son transfert sans blâmer l'enfant.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 30,
+    "category": "Bien-être",
+    "content": "Accordez-vous du temps libre quand l'enfant n'est pas là pour vous ressourcer.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 31,
+    "category": "Juridique",
+    "content": "Informez l'autre parent de tout déplacement de l'enfant hors du territoire.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 32,
+    "category": "Communication",
+    "content": "Écoutez les demandes de modification de planning avec ouverture d'esprit.",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 33,
+    "category": "Organisation",
+    "content": "Assurez-vous que l'enfant a un espace à lui (même petit) dans chaque maison.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 34,
+    "category": "Bien-être",
+    "content": "Rassurez l'enfant sur le fait qu'il aura toujours deux parents pour s'occuper de lui.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 35,
+    "category": "Juridique",
+    "content": "Gardez une copie du carnet de santé ou scannez les pages importantes.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 36,
+    "category": "Communication",
+    "content": "Reformulez les propos de l'autre pour vérifier que vous avez bien compris la demande.",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 37,
+    "category": "Organisation",
+    "content": "Répartissez équitablement les trajets pour les activités extrascolaires.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 38,
+    "category": "Bien-être",
+    "content": "Ne jetez pas les cadeaux offerts par l'autre parent.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 39,
+    "category": "Communication",
+    "content": "En cas de conflit, recentrez immédiatement la discussion sur l'intérêt de l'enfant.",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 40,
+    "category": "Organisation",
+    "content": "Prévoyez des doubles des chargeurs de téléphone/tablette dans les deux foyers.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 41,
+    "category": "Bien-être",
+    "content": "Dites à l'enfant qu'il a le droit d'aimer le nouveau partenaire de l'autre parent.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 42,
+    "category": "Juridique",
+    "content": "Ne déduisez pas de frais de la pension alimentaire sans accord écrit ou jugement.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 43,
+    "category": "Communication",
+    "content": "Évitez les ultimatums. Proposez plutôt des alternatives : « Si X n'est pas possible, peut-on essayer Y ? ».",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 44,
+    "category": "Organisation",
+    "content": "Mettez en place un code couleur sur le calendrier pour les jours de garde.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 45,
+    "category": "Bien-être",
+    "content": "Soyez attentif aux changements de comportement de l'enfant (sommeil, appétit).",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 46,
+    "category": "Juridique",
+    "content": "Respectez le choix religieux ou laïc défini en commun ou par le jugement.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 47,
+    "category": "Communication",
+    "content": "Ne relancez pas les vieux conflits. Chaque interaction est une nouvelle page.",
+    "source_ref": "Inspiré de l'APMF"
+  },
+  {
+    "id": 48,
+    "category": "Organisation",
+    "content": "Assurez-vous que les vêtements portés lors de l'échange sont à la bonne taille et propres.",
+    "source_ref": "Basé sur les principes de la CAF"
+  },
+  {
+    "id": 49,
+    "category": "Bien-être",
+    "content": "Ne faites pas de promesses à l'enfant que vous ne pourrez pas tenir.",
+    "source_ref": "Inspiré de Psychology Today"
+  },
+  {
+    "id": 50,
+    "category": "Juridique",
+    "content": "En cas de déménagement lointain, prévenez l'autre parent au moins un mois à l'avance (obligation légale).",
+    "source_ref": "Basé sur les principes de la CAF"
+  }
+]
