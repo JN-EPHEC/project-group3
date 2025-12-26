@@ -10,9 +10,13 @@
  * - invoice.payment_failed
  */
 
+import dotenv from 'dotenv';
 import express from 'express';
 import { getFirestore } from 'firebase-admin/firestore';
 import Stripe from 'stripe';
+
+// Charger les variables d'environnement
+dotenv.config();
 
 const app = express();
 
