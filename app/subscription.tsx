@@ -37,22 +37,28 @@ export default function SubscriptionScreen() {
       if (success === 'true' && sessionId) {
         setIsRedirecting(true);
         
-        // Nettoyer l'URL immédiatement
-        window.history.replaceState({}, '', '/(tabs)/');
+        // Nettoyer l'URL
+        window.history.replaceState({}, '', '/subscription');
         
-        // Rediriger vers l'accueil immédiatement
-        router.replace('/(tabs)/');
+        // Attendre que la navigation soit prête puis rediriger
+        const timer = setTimeout(() => {
+          try {
+            router.replace('/(tabs)/');
+            
+            // Afficher le message après redirection
+            setTimeout(() => {
+              Alert.alert(
+                '🎉 Bienvenue Premium !',
+                'Votre essai gratuit de 30 jours a commencé. Profitez de toutes les fonctionnalités premium !'
+              );
+            }, 500);
+          } catch (error) {
+            console.error('Navigation error:', error);
+            setIsRedirecting(false);
+          }
+        }, 100);
         
-        // Afficher le message après redirection
-        setTimeout(() => {
-          Alert.alert(
-            '🎉 Bienvenue Premium !',
-            'Votre essai gratuit de 30 jours a commencé. Profitez de toutes les fonctionnalités premium !'
-          );
-        }, 500);
-        
-        // Ne pas exécuter le reste
-        return;
+        return () => clearTimeout(timer);
       }
     }
     
@@ -76,6 +82,11 @@ export default function SubscriptionScreen() {
 
       const hasActive = await StripeService.hasActiveSubscription(user.uid);
       setHasSubscription(hasActive);
+      
+      // Si l'utilisateur a déjà un abonnement actif, le rediriger vers l'accueil
+      if (hasActive && !isRedirecting) {
+        router.replace('/(tabs)/');
+      }
     } catch (error) {
       console.error('Error checking subscription:', error);
     } finally {
