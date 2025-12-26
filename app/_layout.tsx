@@ -4,10 +4,13 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useStripeDeepLinks } from '@/hooks/useStripeDeepLinks';
 import '../constants/firebase';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  // Register deep link handlers for Stripe success/cancel
+  useStripeDeepLinks();
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
