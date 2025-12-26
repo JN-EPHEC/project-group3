@@ -1,14 +1,36 @@
 import { BlurView } from 'expo-blur';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Image, Platform, useColorScheme } from 'react-native';
 import { auth, db, getUserFamily } from '../../constants/firebase';
+import { StripeService } from '../../constants/stripeService';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [unreadCount, setUnreadCount] = useState(0);
+  const router = useRouter();
+
+  // Gate: redirect to subscription if user has no active subscription
+  useEffect(() => {
+    const checkSubscription = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return; // auth flow will handle
+
+        const hasActive = await StripeService.hasActiveSubscription(user.uid);
+        if (!hasActive) {
+          router.replace('/subscription');
+        }
+      } catch (e) {
+        // In case of error, do not block the user; you may log it
+        console.error('Subscription check failed:', e);
+      }
+    };
+
+    checkSubscription();
+  }, []);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
