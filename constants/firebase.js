@@ -1,11 +1,14 @@
 import { initializeApp } from 'firebase/app';
 import {
-    createUserWithEmailAndPassword,
-    deleteUser as fbDeleteUser,
-    signOut as fbSignOut,
-    getAuth,
-    signInWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  deleteUser as fbDeleteUser,
+  signOut as fbSignOut,
+  getAuth,
+  initializeAuth,
+  getReactNativePersistence,
+  signInWithEmailAndPassword
 } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     addDoc,
     arrayUnion,
@@ -31,7 +34,10 @@ import {
 import firebaseConfig from './firebaseenv.js';
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// Use persistent storage for React Native
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
 const db = getFirestore(app);
 const storage = getStorage(app);
 
