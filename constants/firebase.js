@@ -1,14 +1,13 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp } from 'firebase/app';
 import {
-  createUserWithEmailAndPassword,
-  deleteUser as fbDeleteUser,
-  signOut as fbSignOut,
-  getAuth,
-  initializeAuth,
-  getReactNativePersistence,
-  signInWithEmailAndPassword
+    createUserWithEmailAndPassword,
+    deleteUser as fbDeleteUser,
+    signOut as fbSignOut,
+    getReactNativePersistence,
+    initializeAuth,
+    signInWithEmailAndPassword
 } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     addDoc,
     arrayUnion,
