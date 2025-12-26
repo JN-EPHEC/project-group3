@@ -246,10 +246,6 @@ app.get('/api/subscription-status/:userId', async (req, res) => {
         trialEnd: activeSubscription.trial_end,
       },
     });
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        trialEnd: subscription.trial_end,
-      },
-    });
 
   } catch (error: any) {
     console.error('Error fetching subscription status:', error);
