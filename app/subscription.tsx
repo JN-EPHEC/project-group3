@@ -25,6 +25,7 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     // Détecter le retour de Stripe via les query params
@@ -34,27 +35,23 @@ export default function SubscriptionScreen() {
       const sessionId = urlParams.get('session_id');
       
       if (success === 'true' && sessionId) {
-        // Nettoyer l'URL
-        window.history.replaceState({}, '', '/subscription');
+        setIsRedirecting(true);
         
-        // Rediriger immédiatement vers l'accueil avec message
-        Alert.alert(
-          '🎉 Bienvenue Premium !',
-          'Votre essai gratuit de 30 jours a commencé. Profitez de toutes les fonctionnalités premium !',
-          [
-            {
-              text: 'Commencer',
-              onPress: () => router.push('/(tabs)/'),
-            },
-          ]
-        );
+        // Nettoyer l'URL immédiatement
+        window.history.replaceState({}, '', '/(tabs)/');
         
-        // Rediriger automatiquement après 1 seconde
+        // Rediriger vers l'accueil immédiatement
+        router.replace('/(tabs)/');
+        
+        // Afficher le message après redirection
         setTimeout(() => {
-          router.replace('/(tabs)/');
-        }, 1000);
+          Alert.alert(
+            '🎉 Bienvenue Premium !',
+            'Votre essai gratuit de 30 jours a commencé. Profitez de toutes les fonctionnalités premium !'
+          );
+        }, 500);
         
-        // Ne pas exécuter le reste (pas de polling après paiement)
+        // Ne pas exécuter le reste
         return;
       }
     }
@@ -126,6 +123,15 @@ export default function SubscriptionScreen() {
       setLoading(false);
     }
   };
+
+  if (isRedirecting) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={{ marginTop: 20, color: '#007AFF' }}>Chargement...</Text>
+      </View>
+    );
+  }
 
   if (checkingStatus) {
     return (
