@@ -1,0 +1,26 @@
+{
+  "name": "project-group3-backend",
+  "version": "1.0.0",
+  "description": "Backend API pour gérer les paiements Stripe",
+  "main": "stripe-api.ts",
+  "scripts": {
+    "dev": "tsx watch stripe-api.ts",
+    "build": "tsc",
+    "start": "node dist/stripe-api.js",
+    "webhook": "tsx watch stripe-webhook.ts"
+  },
+  "dependencies": {
+    "stripe": "^17.5.0",
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "firebase-admin": "^13.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
