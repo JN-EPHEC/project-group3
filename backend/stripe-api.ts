@@ -20,13 +20,36 @@ dotenv.config();
 
 const app = express();
 
+// Origins autorisées pour le développement (configurable via ALLOWED_ORIGINS)
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:19006',
+  'http://127.0.0.1:19006',
+].join(','))
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
 // Configuration Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-12-18.acacia',
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // Requêtes sans en-tête Origin (ex: mobile native)
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`Blocked CORS origin: ${origin}`);
+    return callback(null, false);
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+app.options('*', cors());
 app.use(express.json());
 
 // Health check
