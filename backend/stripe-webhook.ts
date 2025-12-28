@@ -12,17 +12,18 @@
 
 import dotenv from 'dotenv';
 import express from 'express';
-import { getFirestore } from 'firebase-admin/firestore';
+import path from 'path';
 import Stripe from 'stripe';
+import { dateToTimestamp, db, timestamp } from './firebase-admin';
 
-// Charger les variables d'environnement
-dotenv.config();
+// Charger les variables d'environnement depuis la racine du projet
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const app = express();
 
 // Configuration Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia',
+  apiVersion: '2025-02-24.acacia',
 });
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -86,95 +87,138 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
 
 /**
  * Checkout Session terminée avec succès
+ * Enregistre le client Stripe et initialise l'abonnement
  */
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   console.log('💳 Checkout completed:', session.id);
 
   const userId = session.metadata?.userId;
   if (!userId) {
-    console.error('No userId in session metadata');
+    console.error('❌ No userId in session metadata');
     return;
   }
 
-  const db = getFirestore();
+  // Créer ou mettre à jour l'utilisateur dans Firestore
+  const userRef = db.collection('users').doc(userId);
+  const userDoc = await userRef.get();
 
-  // Mettre à jour Firestore avec les informations de l'abonnement
-  await db.collection('users').doc(userId).update({
+  // Si l'utilisateur n'existe pas, le créer
+  if (!userDoc.exists) {
+    console.log(`📝 Créant nouvel utilisateur: ${userId}`);
+    await userRef.set({
+      uid: userId,
+      createdAt: timestamp(),
+    });
+  }
+
+  // Mettre à jour avec les informations Stripe
+  const updateData: any = {
     stripeCustomerId: session.customer,
-    subscriptionStatus: 'trialing', // En période d'essai
-    subscriptionId: session.subscription,
-    updatedAt: new Date(),
-  });
+    subscriptionUpdatedAt: timestamp(),
+  };
 
-  console.log(`✅ User ${userId} subscription started (trial)`);
+  // Si c'est un abonnement, ajouter les infos
+  if (session.subscription) {
+    updateData.subscriptionId = session.subscription;
+    
+    // Récupérer les détails de l'abonnement
+    const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+    
+    updateData.subscriptionStatus = subscription.status;
+    updateData.currentPeriodEnd = dateToTimestamp(new Date(subscription.current_period_end * 1000));
+    updateData.cancelAtPeriodEnd = subscription.cancel_at_period_end || false;
+    updateData.lastPaymentFailed = false;
+    
+    if (subscription.trial_end) {
+      updateData.trialEnd = dateToTimestamp(new Date(subscription.trial_end * 1000));
+    }
+  }
+
+  await userRef.update(updateData);
+
+  console.log(`✅ User ${userId} subscription started`);
 }
 
 /**
  * Abonnement créé
+ * Enregistre les détails de l'abonnement dans Firestore
  */
 async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   console.log('📝 Subscription created:', subscription.id);
 
   const userId = subscription.metadata?.userId;
   if (!userId) {
-    console.error('No userId in subscription metadata');
+    console.error('❌ No userId in subscription metadata');
     return;
   }
 
-  const db = getFirestore();
-
-  await db.collection('users').doc(userId).update({
+  const updateData: any = {
     subscriptionId: subscription.id,
     subscriptionStatus: subscription.status,
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-    trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
-    updatedAt: new Date(),
-  });
+    currentPeriodEnd: dateToTimestamp(new Date(subscription.current_period_end * 1000)),
+    trialEnd: subscription.trial_end ? dateToTimestamp(new Date(subscription.trial_end * 1000)) : null,
+    cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
+    lastPaymentFailed: false,
+    subscriptionUpdatedAt: timestamp(),
+  };
+
+  await db.collection('users').doc(userId).update(updateData);
+
+  console.log(`✅ User ${userId} subscription created: ${subscription.id}`);
 }
 
 /**
  * Abonnement mis à jour
+ * Synchronise les changements (renouvellement, changement de plan, résiliation, etc.)
  */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log('🔄 Subscription updated:', subscription.id);
 
   const userId = subscription.metadata?.userId;
   if (!userId) {
-    console.error('No userId in subscription metadata');
+    console.error('❌ No userId in subscription metadata');
     return;
   }
 
-  const db = getFirestore();
-
-  await db.collection('users').doc(userId).update({
+  const updateData: any = {
     subscriptionStatus: subscription.status,
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    updatedAt: new Date(),
-  });
+    currentPeriodEnd: dateToTimestamp(new Date(subscription.current_period_end * 1000)),
+    cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
+    lastPaymentFailed: false,
+    subscriptionUpdatedAt: timestamp(),
+  };
+
+  // Mettre à jour trialEnd si en période d'essai
+  if (subscription.trial_end) {
+    updateData.trialEnd = dateToTimestamp(new Date(subscription.trial_end * 1000));
+  }
+
+  await db.collection('users').doc(userId).update(updateData);
 
   console.log(`✅ User ${userId} subscription updated: ${subscription.status}`);
 }
 
 /**
  * Abonnement supprimé/annulé
+ * Mise à jour du statut de l'abonnement à 'canceled'
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log('❌ Subscription deleted:', subscription.id);
 
   const userId = subscription.metadata?.userId;
   if (!userId) {
-    console.error('No userId in subscription metadata');
+    console.error('❌ No userId in subscription metadata');
     return;
   }
-
-  const db = getFirestore();
 
   await db.collection('users').doc(userId).update({
     subscriptionStatus: 'canceled',
     subscriptionId: null,
     currentPeriodEnd: null,
-    updatedAt: new Date(),
+    trialEnd: null,
+    cancelAtPeriodEnd: false,
+    lastPaymentFailed: false,
+    subscriptionUpdatedAt: timestamp(),
   });
 
   console.log(`✅ User ${userId} subscription canceled`);
@@ -182,6 +226,8 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
 /**
  * Échec de paiement
+ * Marque l'utilisateur comme ayant une erreur de paiement
+ * L'abonnement est généralement mis en suspens après quelques tentatives
  */
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
   console.error('⚠️ Payment failed for invoice:', invoice.id);
@@ -193,25 +239,25 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   const userId = customer.metadata?.userId;
 
   if (!userId) {
-    console.error('No userId in customer metadata');
+    console.error('❌ No userId in customer metadata');
     return;
   }
 
-  const db = getFirestore();
-
-  // Marquer comme impayé
+  // Marquer comme impayé et enregistrer l'erreur
   await db.collection('users').doc(userId).update({
-    subscriptionStatus: 'past_due',
     lastPaymentFailed: true,
-    updatedAt: new Date(),
+    lastPaymentFailedAt: timestamp(),
+    subscriptionUpdatedAt: timestamp(),
+    subscriptionStatus: 'past_due', // Marquer comme en retard de paiement
   });
 
-  // TODO: Envoyer une notification push à l'utilisateur
-  console.log(`⚠️ User ${userId} payment failed`);
+  console.log(`⚠️ User ${userId} payment failed - action required`);
+  // TODO: Envoyer une notification push à l'utilisateur pour relancer le paiement
 }
 
 /**
  * Facture payée avec succès
+ * Remet l'abonnement en bon état après paiement
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   console.log('✅ Invoice paid:', invoice.id);
@@ -221,19 +267,29 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const userId = customer.metadata?.userId;
 
   if (!userId) {
-    console.error('No userId in customer metadata');
+    console.error('❌ No userId in customer metadata');
     return;
   }
 
-  const db = getFirestore();
+  // Récupérer l'abonnement pour mettre à jour la période
+  if (invoice.subscription) {
+    const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+    
+    await db.collection('users').doc(userId).update({
+      subscriptionStatus: subscription.status,
+      currentPeriodEnd: dateToTimestamp(new Date(subscription.current_period_end * 1000)),
+      lastPaymentFailed: false,
+      subscriptionUpdatedAt: timestamp(),
+    });
+  } else {
+    // Juste mettre à jour le statut de paiement
+    await db.collection('users').doc(userId).update({
+      lastPaymentFailed: false,
+      subscriptionUpdatedAt: timestamp(),
+    });
+  }
 
-  await db.collection('users').doc(userId).update({
-    subscriptionStatus: 'active',
-    lastPaymentFailed: false,
-    updatedAt: new Date(),
-  });
-
-  console.log(`✅ User ${userId} payment successful`);
+  console.log(`✅ User ${userId} payment successful - subscription renewed`);
 }
 
 export default app;

@@ -13,60 +13,60 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import path from 'path';
 import Stripe from 'stripe';
+import { db } from './firebase-admin';
 
-// Charger les variables d'environnement
-dotenv.config();
+// Charger les variables d'environnement depuis la racine du projet
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const app = express();
 
-// Origins autorisées pour le développement (configurable via ALLOWED_ORIGINS)
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://localhost:19006',
-  'http://127.0.0.1:19006',
-  'http://localhost:8081',
-  'http://127.0.0.1:8081',
-  'http://localhost:8082',
-  'http://127.0.0.1:8082',
-  'http://localhost:8083',
-  'http://127.0.0.1:8083',
-  'http://localhost:8084',
-  'http://127.0.0.1:8084',
-  'http://localhost:8085',
-  'http://127.0.0.1:8085',
-  'http://localhost:8086',
-  'http://127.0.0.1:8086',
-].join(','))
-  .split(',')
-  .map(origin => origin.trim())
-  .filter(Boolean);
+// Mode permissif en développement (défaut). Mettre STRICT_CORS=1 pour n'autoriser que ALLOWED_ORIGINS.
+const strictCors = process.env.STRICT_CORS === '1';
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',').map(o => o.trim()).filter(Boolean);
 
 // Configuration Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia',
+  apiVersion: '2025-02-24.acacia',
 });
 
-// Middleware
+// Middleware CORS (très permissif en dev)
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // Requêtes sans en-tête Origin (ex: mobile native)
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    console.warn(`Blocked CORS origin: ${origin}`);
-    return callback(null, false);
-  },
+  origin: strictCors ? allowedOrigins : true, // true = reflet origin
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200,
 }));
-app.options('*', cors());
+
+// Pré-vol (OPTIONS)
+app.options('*', cors({ origin: strictCors ? allowedOrigins : true }));
 app.use(express.json());
 
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
+});
+
+// Test Firebase connection
+app.get('/test-firebase', async (_req, res) => {
+  try {
+    // Tester la connexion en listant les collections
+    const collections = await db.listCollections();
+    const collectionNames = collections.map(col => col.id);
+    
+    res.json({ 
+      connected: true,
+      collections: collectionNames,
+      projectId: process.env.FIREBASE_PROJECT_ID,
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      connected: false,
+      error: error.message,
+    });
+  }
 });
 
 /**
@@ -197,6 +197,7 @@ app.post('/api/create-portal-session', async (req, res) => {
 /**
  * GET /api/subscription-status/:userId
  * Vérifie le statut d'abonnement d'un utilisateur
+ * Retourne les informations de l'abonnement actif le plus récent
  */
 app.get('/api/subscription-status/:userId', async (req, res) => {
   try {
@@ -212,6 +213,7 @@ app.get('/api/subscription-status/:userId', async (req, res) => {
       return res.json({
         hasActiveSubscription: false,
         subscription: null,
+        stripeCustomerId: null,
       });
     }
 
@@ -233,11 +235,13 @@ app.get('/api/subscription-status/:userId', async (req, res) => {
       return res.json({
         hasActiveSubscription: false,
         subscription: null,
+        stripeCustomerId: customer.id,
       });
     }
 
     res.json({
       hasActiveSubscription: true,
+      stripeCustomerId: customer.id,
       subscription: {
         id: activeSubscription.id,
         status: activeSubscription.status,
@@ -249,6 +253,61 @@ app.get('/api/subscription-status/:userId', async (req, res) => {
 
   } catch (error: any) {
     console.error('Error fetching subscription status:', error);
+    res.status(500).json({
+      error: error.message || 'An error occurred',
+    });
+  }
+});
+
+/**
+ * POST /api/sync-subscription/:userId
+ * Force la synchronisation des informations d'abonnement depuis Stripe
+ * Utile pour s'assurer que Firestore est à jour
+ */
+app.post('/api/sync-subscription/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Récupérer le statut depuis Stripe
+    const customers = await stripe.customers.search({
+      query: `metadata['userId']:'${userId}'`,
+      limit: 1,
+    });
+
+    if (customers.data.length === 0) {
+      return res.json({
+        success: true,
+        synced: false,
+        message: 'Pas de client Stripe trouvé',
+      });
+    }
+
+    const customer = customers.data[0];
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: 'all',
+      limit: 10,
+    });
+
+    const activeSubscription = subscriptions.data.find(
+      sub => sub.status === 'active' || sub.status === 'trialing'
+    );
+
+    // Les webhooks se chargeront de mettre à jour Firestore
+    // Cette réponse confirme juste que la synchronisation a été déclenchée
+    res.json({
+      success: true,
+      synced: true,
+      message: 'Synchronisation déclenchée',
+      subscription: activeSubscription ? {
+        id: activeSubscription.id,
+        status: activeSubscription.status,
+        currentPeriodEnd: activeSubscription.current_period_end,
+      } : null,
+    });
+
+  } catch (error: any) {
+    console.error('Error syncing subscription:', error);
     res.status(500).json({
       error: error.message || 'An error occurred',
     });

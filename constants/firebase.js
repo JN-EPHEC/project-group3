@@ -741,3 +741,149 @@ export async function getProfessionalDiploma(uid) {
     return null;
   }
 }
+
+/**
+ * Récupère les informations d'abonnement Stripe d'un utilisateur depuis Firestore
+ * Retourne un objet avec l'état de l'abonnement
+ * 
+ * @param {string} uid - User ID
+ * @returns {Promise<Object>} { hasActiveSubscription, subscription, stripeCustomerId }
+ */
+export async function getUserSubscriptionInfo(uid) {
+  try {
+    const userRef = doc(db, 'users', uid);
+    const snap = await getDoc(userRef);
+    
+    if (!snap.exists()) {
+      return {
+        hasActiveSubscription: false,
+        subscription: null,
+        stripeCustomerId: null,
+      };
+    }
+
+    const data = snap.data() || {};
+    
+    // Vérifier si l'abonnement est actif
+    const isActive = data.subscriptionStatus === 'active' || data.subscriptionStatus === 'trialing';
+    
+    return {
+      hasActiveSubscription: isActive,
+      subscription: {
+        id: data.subscriptionId || null,
+        status: data.subscriptionStatus || null,
+        currentPeriodEnd: data.currentPeriodEnd || null,
+        trialEnd: data.trialEnd || null,
+        cancelAtPeriodEnd: data.cancelAtPeriodEnd || false,
+        lastPaymentFailed: data.lastPaymentFailed || false,
+      },
+      stripeCustomerId: data.stripeCustomerId || null,
+    };
+  } catch (error) {
+    console.error('[GetSubscriptionInfo] Erreur:', error);
+    return {
+      hasActiveSubscription: false,
+      subscription: null,
+      stripeCustomerId: null,
+    };
+  }
+}
+
+/**
+ * Met à jour les informations d'abonnement d'un utilisateur dans Firestore
+ * Utilisé par les webhooks Stripe pour synchroniser les données
+ * 
+ * @param {string} uid - User ID
+ * @param {Object} subscriptionData - Données d'abonnement à mettre à jour
+ * @returns {Promise<boolean>} true si succès
+ */
+export async function updateUserSubscriptionInfo(uid, subscriptionData) {
+  try {
+    const userRef = doc(db, 'users', uid);
+    
+    await updateDoc(userRef, {
+      stripeCustomerId: subscriptionData.stripeCustomerId || null,
+      subscriptionId: subscriptionData.subscriptionId || null,
+      subscriptionStatus: subscriptionData.subscriptionStatus || null,
+      currentPeriodEnd: subscriptionData.currentPeriodEnd || null,
+      trialEnd: subscriptionData.trialEnd || null,
+      cancelAtPeriodEnd: subscriptionData.cancelAtPeriodEnd || false,
+      lastPaymentFailed: subscriptionData.lastPaymentFailed || false,
+      subscriptionUpdatedAt: new Date(),
+    });
+    
+    console.log(`[UpdateSubscription] Infos d'abonnement mises à jour pour ${uid}`);
+    return true;
+  } catch (error) {
+    console.error('[UpdateSubscription] Erreur:', error);
+    return false;
+  }
+}
+
+/**
+ * Récupère le statut d'abonnement formaté pour l'affichage
+ * Retourne un texte lisible du statut d'abonnement
+ * 
+ * @param {string} uid - User ID
+ * @returns {Promise<Object>} { status, isActive, expiresAt, daysRemaining }
+ */
+export async function getFormattedSubscriptionStatus(uid) {
+  try {
+    const subInfo = await getUserSubscriptionInfo(uid);
+    
+    if (!subInfo.hasActiveSubscription || !subInfo.subscription) {
+      return {
+        status: 'Pas d\'abonnement actif',
+        isActive: false,
+        expiresAt: null,
+        daysRemaining: null,
+        trialDaysRemaining: null,
+      };
+    }
+
+    const now = new Date();
+    let expiresAt = null;
+    let daysRemaining = null;
+    let status = 'Abonnement actif';
+
+    // Vérifier si en période d'essai
+    if (subInfo.subscription.status === 'trialing' && subInfo.subscription.trialEnd) {
+      expiresAt = subInfo.subscription.trialEnd;
+      daysRemaining = Math.ceil((new Date(subInfo.subscription.trialEnd).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      status = `Période d'essai (${daysRemaining} jours restants)`;
+    } else if (subInfo.subscription.currentPeriodEnd) {
+      // Sinon, afficher la date de fin de période
+      expiresAt = subInfo.subscription.currentPeriodEnd;
+      daysRemaining = Math.ceil((new Date(subInfo.subscription.currentPeriodEnd).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (subInfo.subscription.cancelAtPeriodEnd) {
+        status = `Résilié (expire le ${new Date(subInfo.subscription.currentPeriodEnd).toLocaleDateString('fr-FR')})`;
+      } else {
+        status = `Actif jusqu'au ${new Date(subInfo.subscription.currentPeriodEnd).toLocaleDateString('fr-FR')}`;
+      }
+    }
+
+    // Gérer les cas d'erreur de paiement
+    if (subInfo.subscription.lastPaymentFailed) {
+      status = 'Erreur de paiement - Action requise';
+    }
+
+    return {
+      status,
+      isActive: subInfo.hasActiveSubscription,
+      expiresAt,
+      daysRemaining,
+      cancelAtPeriodEnd: subInfo.subscription.cancelAtPeriodEnd,
+      trialEnd: subInfo.subscription.trialEnd,
+    };
+  } catch (error) {
+    console.error('[FormattedStatus] Erreur:', error);
+    return {
+      status: 'Impossible de récupérer le statut',
+      isActive: false,
+      expiresAt: null,
+      daysRemaining: null,
+      trialDaysRemaining: null,
+    };
+  }
+}

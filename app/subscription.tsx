@@ -26,6 +26,7 @@ export default function SubscriptionScreen() {
   const [hasSubscription, setHasSubscription] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [checkDone, setCheckDone] = useState(false);
 
   useEffect(() => {
     // Détecter le retour de Stripe via les query params
@@ -62,15 +63,13 @@ export default function SubscriptionScreen() {
       }
     }
     
-    // Vérifier le statut initial
-    checkSubscriptionStatus();
-    
-    // Recharger le statut périodiquement seulement si on n'a pas de query param success
-    const interval = setInterval(() => {
+    // Vérifier le statut une seule fois au montage
+    if (!checkDone) {
       checkSubscriptionStatus();
-    }, 5000); // Vérifier toutes les 5 secondes
+      setCheckDone(true);
+    }
 
-    return () => clearInterval(interval);
+    return () => {};
   }, []);
 
   const checkSubscriptionStatus = async () => {

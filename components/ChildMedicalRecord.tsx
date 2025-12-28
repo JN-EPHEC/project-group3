@@ -313,45 +313,8 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
   );
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      {/* Header: Child name left, actions right */}
-      <View style={styles.headerRow}>
-        <Text style={[styles.childNameText, { color: colors.textSecondary }]}>{record.general.fullName || childName || 'Enfant'}</Text>
-        {editMode ? (
-          <View style={{ flexDirection: 'row', gap: 16 }}>
-            <TouchableOpacity
-              disabled={!!saving || submitting}
-              onPress={() => {
-                if (originalRecord) setRecord(originalRecord);
-                setEditMode(false);
-                setOriginalRecord(null);
-              }}
-            >
-              <Text style={[styles.editButtonText, { color: colors.textSecondary, fontStyle: 'normal' }]}>Annuler</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              disabled={!!saving || submitting}
-              onPress={async () => {
-                try {
-                  setSubmitting(true);
-                  await onConfirm?.(record);
-                  setEditMode(false);
-                  setOriginalRecord(null);
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-            >
-              <Text style={[styles.editButtonText, { color: colors.tint, fontStyle: 'normal' }]}>{saving || submitting ? 'Enregistrement...' : 'Confirmer'}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity onPress={() => { setOriginalRecord(record); setEditMode(true); }}>
-            <Text style={[styles.editButtonText, { color: colors.tint }]}>Modifier</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView contentContainerStyle={styles.content}>
       {/* 1. Informations générales */}
       <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
         <SectionHeader title="Informations générales" id="general" />
@@ -621,7 +584,8 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
           </View>
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -697,19 +661,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 32,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  childNameText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  editButtonText: {
-    fontStyle: 'italic',
-    fontSize: 16,
   },
   card: {
     borderRadius: 12,

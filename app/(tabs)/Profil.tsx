@@ -52,6 +52,8 @@ export default function ProfilScreen() {
   const [selectedChildForMedical, setSelectedChildForMedical] = useState<{ id: string; name: string } | null>(null);
   const [savingMedical, setSavingMedical] = useState(false);
   const [familyMemberCounts, setFamilyMemberCounts] = useState<{ [familyId: string]: number }>({});
+  const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(false);
 
   const currentFamilyId = families[selectedFamilyIndex]?.id;
   const selectedChildFull = selectedChildForMedical
@@ -118,11 +120,28 @@ export default function ProfilScreen() {
     );
   };
 
+  // Load subscription status on login
+  const loadSubscriptionStatus = async () => {
+    if (!user) return;
+    setLoadingSubscription(true);
+    try {
+      const { StripeService } = await import('../../constants/stripeService');
+      const status = await StripeService.getSubscriptionStatus(user.uid);
+      setSubscriptionStatus(status);
+    } catch (error) {
+      console.error('Error loading subscription status:', error);
+    } finally {
+      setLoadingSubscription(false);
+    }
+  };
+
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (currentUser) {
       setUser(currentUser);
       setEmail(currentUser.email || '');
+      // Load subscription status when user logs in or screen refocuses
+      loadSubscriptionStatus();
       const uid = currentUser.uid;
 
       const userDocRef = doc(db, 'users', uid);
@@ -744,9 +763,67 @@ export default function ProfilScreen() {
               <Text style={[styles.settingText, { color: colors.text }]}>Notifications</Text>
               <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
-          </View>
 
-          {/* Famille Section */}
+            {/* Subscription Section */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Abonnement</Text>
+              <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+                {loadingSubscription ? (
+                  <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={colors.tint} />
+                  </View>
+                ) : subscriptionStatus?.hasActiveSubscription ? (
+                  <>
+                    <View style={styles.infoRow}>
+                      <IconSymbol name="checkmark.circle.fill" size={24} color="#4CAF50" />
+                      <View style={styles.infoText}>
+                        <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Statut</Text>
+                        <Text style={[styles.infoValue, { color: '#4CAF50', fontWeight: '600' }]}>
+                          Abonnement {subscriptionStatus.subscription?.status === 'trialing' ? 'Essai' : 'Actif'}
+                        </Text>
+                      </View>
+                    </View>
+                    {subscriptionStatus.subscription?.trialEnd && (
+                      <>
+                        <View style={[styles.separator, { backgroundColor: colors.border }]} />
+                        <View style={styles.infoRow}>
+                          <IconSymbol name="calendar" size={20} color={colors.textSecondary} />
+                          <View style={styles.infoText}>
+                            <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
+                              {subscriptionStatus.subscription?.status === 'trialing' ? 'Essai jusqu\'au' : 'Fin de la période'}
+                            </Text>
+                            <Text style={[styles.infoValue, { color: colors.text }]}>
+                              {new Date(subscriptionStatus.subscription.trialEnd * 1000).toLocaleDateString('fr-FR')}
+                            </Text>
+                          </View>
+                        </View>
+                      </>
+                    )}
+                    <View style={[styles.separator, { backgroundColor: colors.border }]} />
+                    <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground, marginHorizontal: 0 }]}>
+                      <Text style={[styles.settingText, { color: colors.tint }]}>Gérer mon abonnement</Text>
+                      <IconSymbol name="chevron.right" size={20} color={colors.tint} />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.infoRow}>
+                      <IconSymbol name="xmark.circle.fill" size={24} color="#FF6B6B" />
+                      <View style={styles.infoText}>
+                        <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Statut</Text>
+                        <Text style={[styles.infoValue, { color: colors.text }]}>Pas d'abonnement actif</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.separator, { backgroundColor: colors.border }]} />
+                    <TouchableOpacity onPress={() => router.push('/subscription')} style={[styles.settingCard, { backgroundColor: colors.cardBackground, marginHorizontal: 0 }]}>
+                      <Text style={[styles.settingText, { color: colors.tint }]}>Découvrir nos plans</Text>
+                      <IconSymbol name="chevron.right" size={20} color={colors.tint} />
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            </View>
+          </View>
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.tint }]}>Famille</Text>
             

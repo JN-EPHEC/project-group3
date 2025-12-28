@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { db } from '../../constants/firebase';
 import { createAndPersistSession } from '../../constants/sessionManager';
+import { StripeService } from '../../constants/stripeService';
 import { Colors } from '../../constants/theme';
 
 const LoginScreen = () => {
@@ -44,6 +45,16 @@ const LoginScreen = () => {
             parent_id: parentId,
             professional_id: professionalId,
           });
+        }
+
+        // Si l'utilisateur a déjà un rôle (parent/pro), vérifier l'abonnement
+        if (hasParent || hasPro) {
+          const hasActiveSubscription = await StripeService.hasActiveSubscription(user.uid);
+          if (!hasActiveSubscription) {
+            // Rediriger vers la page d'abonnement pour choisir un plan
+            router.replace('/subscription');
+            return;
+          }
         }
 
         if (hasParent && hasPro) {
