@@ -267,11 +267,15 @@ export default function DepensesScreen() {
 
         // Calculer avec TOUTES les dépenses APPROUVÉES (cumulatif, pas limité par mois)
         const approvedExpenses = expensesList.filter(exp => exp.approvalStatus === 'APPROVED' || !exp.approvalStatus);
+
+        // Séparer les remboursements pour ne pas les diviser par 2
+        const standardExpenses = approvedExpenses.filter(exp => !exp.isRepayment);
+        const repaymentExpenses = approvedExpenses.filter(exp => exp.isRepayment);
         
-        const total = approvedExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        const total = standardExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         setTotalExpenses(total);
         
-        const myExpenses = approvedExpenses
+        const myExpenses = standardExpenses
           .filter(exp => exp.paidBy === uid)
           .reduce((sum, exp) => sum + (exp.amount || 0), 0);
         
@@ -280,7 +284,14 @@ export default function DepensesScreen() {
         
         // Calculate balance: positive means you are owed, negative means you owe
         const halfTotal = total / 2;
-        const calculatedBalance = myExpenses - halfTotal;
+        let calculatedBalance = myExpenses - halfTotal;
+
+        // Appliquer les remboursements en entier (ne pas diviser par 2)
+        repaymentExpenses.forEach((exp) => {
+          const amount = exp.amount || 0;
+          calculatedBalance += exp.paidBy === uid ? amount : -amount;
+        });
+
         setBalance(calculatedBalance);
         
         setLoading(false);
