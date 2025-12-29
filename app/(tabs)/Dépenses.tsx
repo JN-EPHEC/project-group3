@@ -290,9 +290,14 @@ export default function DepensesScreen() {
           const rules = data.categoryRules || data.categoryLimits || {};
           const categoryArray = Object.entries(rules).map(([name, value]: any) => {
             if (typeof value === 'number') {
-              return { name, limit: value, allowOverLimit: false };
+              return { name, limit: value, allowOverLimit: false, period: 'monthly' };
             }
-            return { name, limit: value?.limit ?? 0, allowOverLimit: !!value?.allowOverLimit };
+            return { 
+              name, 
+              limit: value?.limit ?? 0, 
+              allowOverLimit: !!value?.allowOverLimit,
+              period: value?.period || 'monthly'
+            };
           });
           setCategories(categoryArray);
         } else {
@@ -317,9 +322,34 @@ export default function DepensesScreen() {
   };
 
   const getCategorySpent = (categoryName: string) => {
-    // Calculer uniquement avec les dépenses APPROUVÉES
+    const category = categories.find((c: any) => c.name === categoryName);
+    const period = category?.period || 'monthly'; // Par défaut mensuel
+    
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date;
+
+    if (period === 'yearly') {
+      // Du 1er janvier au 31 décembre de l'année en cours
+      startDate = new Date(now.getFullYear(), 0, 1);
+      endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    } else {
+      // Du 1er au dernier jour du mois en cours (mensuel par défaut)
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    }
+
+    // Calculer uniquement avec les dépenses APPROUVÉES de la période
     return expenses
-      .filter((exp: any) => exp.category === categoryName && (exp.approvalStatus === 'APPROVED' || !exp.approvalStatus))
+      .filter((exp: any) => {
+        if (exp.category !== categoryName) return false;
+        if (exp.approvalStatus !== 'APPROVED' && exp.approvalStatus) return false;
+        
+        const expDate = exp.date?.toDate ? exp.date.toDate() : null;
+        if (!expDate) return false;
+        
+        return expDate >= startDate && expDate <= endDate;
+      })
       .reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
   };
 
@@ -471,6 +501,7 @@ export default function DepensesScreen() {
               {categories.map((category: any, index: number) => {
                 const name = category?.name || String(category);
                 const limit = typeof category?.limit === 'number' ? category.limit : 0;
+                const period = category?.period || 'monthly';
                 const noLimit = !isFinite(limit) || limit <= 0;
                 const spent = getCategorySpent(name);
                 const percentage = !noLimit && limit > 0 ? (spent / limit) * 100 : 0;
@@ -479,7 +510,12 @@ export default function DepensesScreen() {
                 return (
                   <View key={index} style={[styles.budgetCard, { backgroundColor: colors.cardBackground }]}>
                     <View style={styles.budgetHeader}>
-                      <Text style={[styles.budgetName, { color: colors.text }]}>{name}</Text>
+                      <View>
+                        <Text style={[styles.budgetName, { color: colors.text }]}>{name}</Text>
+                        <Text style={[styles.budgetPeriod, { color: colors.textSecondary }]}>
+                          {period === 'monthly' ? '📅 Mensuel' : '📆 Annuel'}
+                        </Text>
+                      </View>
                       <Text style={[styles.budgetAmount, { color: colors.textSecondary }, isOverBudget && styles.overBudget]}>
                         {spent.toFixed(2)} {currency} {noLimit ? '— Aucun plafond défini' : `/ ${limit.toFixed(2)} ${currency}`}
                       </Text>
@@ -923,6 +959,7 @@ const styles = StyleSheet.create({
   budgetCard: { borderRadius: BORDER_RADIUS.medium, padding: SPACING.regular, marginBottom: V_SPACING.medium },
   budgetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: V_SPACING.medium },
   budgetName: { fontSize: FONT_SIZES.medium, fontWeight: '600' },
+  budgetPeriod: { fontSize: FONT_SIZES.tiny, marginTop: vs(2) },
   budgetAmount: { fontSize: FONT_SIZES.regular, fontWeight: '600' },
   overBudget: { color: '#FF6B6B' },
   progressBarContainer: { height: vs(8), borderRadius: hs(4), overflow: 'hidden' },

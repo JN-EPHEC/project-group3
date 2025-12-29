@@ -11,7 +11,7 @@ import { auth, db, getUserFamily } from '../constants/firebase';
 const DEFAULT_CATEGORIES = ['Santé', 'Vêtements', 'École', 'Alimentation', 'Transport'];
 const DEFAULT_SEEDED_LIMIT = 100; // Montant par défaut pour les catégories nouvellement créées
 
-type CategoryRule = { name: string; limit: number; allowOverLimit: boolean };
+type CategoryRule = { name: string; limit: number; allowOverLimit: boolean; period: 'monthly' | 'yearly' };
 
 function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; colors: any }) {
   const [categories, setCategories] = useState<CategoryRule[]>([]);
@@ -39,23 +39,23 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         if (!rules || Object.keys(rules).length === 0) {
           const seed: any = {};
           DEFAULT_CATEGORIES.forEach((name) => {
-            seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false };
+            seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false, period: 'monthly' };
           });
           await setDoc(budgetRef, { categoryRules: seed }, { merge: true });
         }
         const categoryArray = Object.entries(rules).map(([name, value]) => {
           if (typeof value === 'number') {
-            return { name, limit: value as number, allowOverLimit: false };
+            return { name, limit: value as number, allowOverLimit: false, period: 'monthly' };
           }
           const obj = value as any;
-          return { name, limit: obj?.limit ?? 0, allowOverLimit: !!obj?.allowOverLimit };
+          return { name, limit: obj?.limit ?? 0, allowOverLimit: !!obj?.allowOverLimit, period: obj?.period || 'monthly' };
         });
         setCategories(categoryArray);
       } else {
         // Créer le document avec les catégories par défaut
         const seed: any = {};
         DEFAULT_CATEGORIES.forEach((name) => {
-          seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false };
+          seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false, period: 'monthly' };
         });
         await setDoc(budgetRef, { categoryRules: seed });
         setCategories(DEFAULT_CATEGORIES.map((name) => ({ name, limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false })));
@@ -198,7 +198,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         const budgetDoc = await getDoc(budgetRef);
         const rules = budgetDoc.data()?.categoryRules || {};
         delete rules[oldName];
-        rules[trimmedName] = { limit: current.limit, allowOverLimit: current.allowOverLimit };
+        rules[trimmedName] = { limit: current.limit, allowOverLimit: current.allowOverLimit, period: current.period };
         
         await updateDoc(budgetRef, { categoryRules: rules });
       }
@@ -221,12 +221,26 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
     try {
       // Mettre à jour le budget
       const budgetRef = doc(db, 'budgets', familyId);
-      await updateDoc(budgetRef, {
-        [`categoryRules.${request.categoryName}`]: {
-          limit: request.newLimit,
-          allowOverLimit: request.allowOverLimit,
-        },
-      });
+      
+      if (request.changeType === 'period') {
+        // Changement de période
+        await updateDoc(budgetRef, {
+          [`categoryRules.${request.categoryName}`]: {
+            limit: request.currentLimit,
+            allowOverLimit: request.allowOverLimit,
+            period: request.newPeriod,
+          },
+        });
+      } else {
+        // Changement de limite (comportement existant)
+        await updateDoc(budgetRef, {
+          [`categoryRules.${request.categoryName}`]: {
+            limit: request.newLimit,
+            allowOverLimit: request.allowOverLimit,
+            period: request.newPeriod || request.currentPeriod || 'monthly',
+          },
+        });
+      }
 
       // Mettre à jour le statut de la demande
       const requestRef = doc(db, 'budgetChangeRequests', request.id);
@@ -236,10 +250,17 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         approvedAt: new Date(),
       });
 
-      Alert.alert(
-        '✅ Demande approuvée',
-        `Le budget "${request.categoryName}" a été modifié de ${request.currentLimit.toFixed(2)} € à ${request.newLimit.toFixed(2)} €.`
-      );
+      if (request.changeType === 'period') {
+        Alert.alert(
+          '✅ Demande approuvée',
+          `La période de "${request.categoryName}" a été changée en ${request.newPeriod === 'monthly' ? 'mensuel' : 'annuel'}.`
+        );
+      } else {
+        Alert.alert(
+          '✅ Demande approuvée',
+          `Le budget "${request.categoryName}" a été modifié de ${request.currentLimit.toFixed(2)} € à ${request.newLimit.toFixed(2)} €.`
+        );
+      }
     } catch (error) {
       console.error('Error approving request:', error);
       Alert.alert('Erreur', 'Impossible d\'approuver la demande');
@@ -296,12 +317,78 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
       const budgetRef = doc(db, 'budgets', familyId);
       const current = categories.find((c) => c.name === categoryName);
       const limit = current?.limit ?? 0;
+      const period = current?.period || 'monthly';
       await updateDoc(budgetRef, {
-        [`categoryRules.${categoryName}`]: { limit, allowOverLimit: allow },
+        [`categoryRules.${categoryName}`]: { limit, allowOverLimit: allow, period },
       });
     } catch (error) {
       console.error('Error updating rule:', error);
       Alert.alert('Erreur', 'Impossible de mettre à jour la règle');
+    }
+  };
+
+  const handleTogglePeriod = async (categoryName: string, newPeriod: 'monthly' | 'yearly') => {
+    if (!familyId || !currentUser) {
+      Alert.alert('Session expirée', 'Reconnectez-vous pour modifier la période.');
+      return;
+    }
+
+    const current = categories.find((c) => c.name === categoryName);
+    if (!current) return;
+
+    const oldPeriod = current.period;
+    if (oldPeriod === newPeriod) return;
+
+    // Vérifier s'il y a d'autres membres dans la famille qui doivent approuver
+    try {
+      const familyDoc = await getDoc(doc(db, 'families', familyId));
+      if (!familyDoc.exists()) {
+        Alert.alert('Erreur', 'Famille introuvable');
+        return;
+      }
+
+      const members = familyDoc.data().members || [];
+      const otherMembers = members.filter((m: string) => m !== currentUser.uid);
+
+      if (otherMembers.length > 0) {
+        // Créer une demande d'approbation
+        await addDoc(collection(db, 'budgetChangeRequests'), {
+          familyId,
+          categoryName,
+          changeType: 'period',
+          currentPeriod: oldPeriod,
+          newPeriod: newPeriod,
+          currentLimit: current.limit,
+          newLimit: current.limit,
+          allowOverLimit: current.allowOverLimit,
+          requestedBy: currentUser.uid,
+          status: 'PENDING',
+          createdAt: new Date(),
+        });
+
+        Alert.alert(
+          '📝 Demande envoyée',
+          `Votre demande de changement de période pour "${categoryName}" (${oldPeriod === 'monthly' ? 'mensuel' : 'annuel'} → ${newPeriod === 'monthly' ? 'mensuel' : 'annuel'}) a été envoyée pour approbation.`
+        );
+      } else {
+        // Pas d'autres membres, appliquer directement
+        const budgetRef = doc(db, 'budgets', familyId);
+        await updateDoc(budgetRef, {
+          [`categoryRules.${categoryName}`]: {
+            limit: current.limit,
+            allowOverLimit: current.allowOverLimit,
+            period: newPeriod,
+          },
+        });
+
+        Alert.alert(
+          '✅ Période modifiée',
+          `La période de "${categoryName}" a été changée en ${newPeriod === 'monthly' ? 'mensuel' : 'annuel'}.`
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling period:', error);
+      Alert.alert('Erreur', 'Impossible de modifier la période');
     }
   };
 
@@ -328,7 +415,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
     try {
       const budgetRef = doc(db, 'budgets', familyId);
       await updateDoc(budgetRef, {
-        [`categoryRules.${name}`]: { limit, allowOverLimit: newAllowOverLimit },
+        [`categoryRules.${name}`]: { limit, allowOverLimit: newAllowOverLimit, period: 'monthly' },
       });
       setShowAddCategory(false);
       setNewCategoryName('');
@@ -410,9 +497,15 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
             <View key={request.id} style={[styles.requestCard, { backgroundColor: colors.cardBackground, borderColor: '#FF9500' }]}>
               <View style={styles.requestInfo}>
                 <Text style={[styles.requestCategory, { color: colors.text }]}>{request.categoryName}</Text>
-                <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
-                  {request.currentLimit.toFixed(2)} € → {request.newLimit.toFixed(2)} €
-                </Text>
+                {request.changeType === 'period' ? (
+                  <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
+                    Période: {request.currentPeriod === 'monthly' ? '📅 Mensuel' : '📆 Annuel'} → {request.newPeriod === 'monthly' ? '📅 Mensuel' : '📆 Annuel'}
+                  </Text>
+                ) : (
+                  <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
+                    {request.currentLimit.toFixed(2)} € → {request.newLimit.toFixed(2)} €
+                  </Text>
+                )}
                 <Text style={[styles.requestedBy, { color: colors.textSecondary }]}>
                   Demandé par {request.requestedByName}
                 </Text>
@@ -533,6 +626,18 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
                   <Switch
                     value={cat.allowOverLimit}
                     onValueChange={(val) => handleToggleAllow(cat.name, val)}
+                  />
+                </View>
+                <View style={styles.ruleRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.ruleLabel, { color: colors.textSecondary }]}>Période du budget</Text>
+                    <Text style={[styles.ruleSublabel, { color: colors.textSecondary }]}>
+                      {cat.period === 'monthly' ? '📅 Mensuel (se remet à zéro chaque mois)' : '📆 Annuel (se remet à zéro chaque année)'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={cat.period === 'yearly'}
+                    onValueChange={(val) => handleTogglePeriod(cat.name, val ? 'yearly' : 'monthly')}
                   />
                 </View>
               </View>
@@ -752,6 +857,11 @@ const styles = StyleSheet.create({
   ruleLabel: {
     fontSize: FONT_SIZES.small,
     fontWeight: '600',
+  },
+  ruleSublabel: {
+    fontSize: FONT_SIZES.tiny,
+    marginTop: vs(2),
+    fontStyle: 'italic',
   },
   editButton: {
     padding: SPACING.small,
