@@ -39,13 +39,13 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         if (!rules || Object.keys(rules).length === 0) {
           const seed: any = {};
           DEFAULT_CATEGORIES.forEach((name) => {
-            seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false, period: 'monthly' };
+            seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: true, period: 'monthly' };
           });
           await setDoc(budgetRef, { categoryRules: seed }, { merge: true });
         }
         const categoryArray = Object.entries(rules).map(([name, value]) => {
           if (typeof value === 'number') {
-            return { name, limit: value as number, allowOverLimit: false, period: 'monthly' };
+            return { name, limit: value as number, allowOverLimit: true, period: 'monthly' };
           }
           const obj = value as any;
           return { name, limit: obj?.limit ?? 0, allowOverLimit: !!obj?.allowOverLimit, period: obj?.period || 'monthly' };
@@ -55,10 +55,10 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         // Créer le document avec les catégories par défaut
         const seed: any = {};
         DEFAULT_CATEGORIES.forEach((name) => {
-          seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false, period: 'monthly' };
+          seed[name] = { limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: true, period: 'monthly' };
         });
         await setDoc(budgetRef, { categoryRules: seed });
-        setCategories(DEFAULT_CATEGORIES.map((name) => ({ name, limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false })));
+        setCategories(DEFAULT_CATEGORIES.map((name) => ({ name, limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: true, period: 'monthly' })));
       }
       setLoading(false);
     }, (err) => {
@@ -198,7 +198,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         const budgetDoc = await getDoc(budgetRef);
         const rules = budgetDoc.data()?.categoryRules || {};
         delete rules[oldName];
-        rules[trimmedName] = { limit: current.limit, allowOverLimit: current.allowOverLimit, period: current.period };
+        rules[trimmedName] = { limit: current.limit, allowOverLimit: true, period: current.period };
         
         await updateDoc(budgetRef, { categoryRules: rules });
       }
@@ -227,7 +227,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         await updateDoc(budgetRef, {
           [`categoryRules.${request.categoryName}`]: {
             limit: request.currentLimit,
-            allowOverLimit: request.allowOverLimit,
+            allowOverLimit: true,
             period: request.newPeriod,
           },
         });
@@ -236,7 +236,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         await updateDoc(budgetRef, {
           [`categoryRules.${request.categoryName}`]: {
             limit: request.newLimit,
-            allowOverLimit: request.allowOverLimit,
+            allowOverLimit: true,
             period: request.newPeriod || request.currentPeriod || 'monthly',
           },
         });
@@ -319,7 +319,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
       const limit = current?.limit ?? 0;
       const period = current?.period || 'monthly';
       await updateDoc(budgetRef, {
-        [`categoryRules.${categoryName}`]: { limit, allowOverLimit: allow, period },
+        [`categoryRules.${categoryName}`]: { limit, allowOverLimit: true, period },
       });
     } catch (error) {
       console.error('Error updating rule:', error);
@@ -360,7 +360,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
           newPeriod: newPeriod,
           currentLimit: current.limit,
           newLimit: current.limit,
-          allowOverLimit: current.allowOverLimit,
+          allowOverLimit: true,
           requestedBy: currentUser.uid,
           status: 'PENDING',
           createdAt: new Date(),
@@ -376,7 +376,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         await updateDoc(budgetRef, {
           [`categoryRules.${categoryName}`]: {
             limit: current.limit,
-            allowOverLimit: current.allowOverLimit,
+            allowOverLimit: true,
             period: newPeriod,
           },
         });
@@ -463,10 +463,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
                 value={newCategoryLimit}
                 onChangeText={setNewCategoryLimit}
               />
-              <View style={styles.modalSwitchRow}>
-                <Text style={[styles.modalSwitchLabel, { color: colors.text }]}>Autoriser au-dessus du plafond</Text>
-                <Switch value={newAllowOverLimit} onValueChange={setNewAllowOverLimit} />
-              </View>
+
               <View style={styles.modalButtons}>
                 <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowAddCategory(false)}>
                   <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Annuler</Text>
@@ -621,13 +618,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
                     <IconSymbol name="pencil" size={18} color={colors.tint} />
                   </TouchableOpacity>
                 </View>
-                <View style={styles.ruleRow}>
-                  <Text style={[styles.ruleLabel, { color: colors.textSecondary }]}>Autoriser au-dessus du plafond</Text>
-                  <Switch
-                    value={cat.allowOverLimit}
-                    onValueChange={(val) => handleToggleAllow(cat.name, val)}
-                  />
-                </View>
+
                 <View style={styles.ruleRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.ruleLabel, { color: colors.textSecondary }]}>Période du budget</Text>
@@ -664,10 +655,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
               value={newCategoryLimit}
               onChangeText={setNewCategoryLimit}
             />
-            <View style={styles.modalSwitchRow}>
-              <Text style={[styles.modalSwitchLabel, { color: colors.text }]}>Autoriser au-dessus du plafond</Text>
-              <Switch value={newAllowOverLimit} onValueChange={setNewAllowOverLimit} />
-            </View>
+
             <View style={styles.modalButtons}>
               <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowAddCategory(false)}>
                 <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Annuler</Text>

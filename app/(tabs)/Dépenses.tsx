@@ -5,9 +5,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
-import { collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { getCurrencySymbol } from '../../constants/currencies';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
 
@@ -36,6 +36,10 @@ export default function DepensesScreen() {
   const [showFilterDatePicker, setShowFilterDatePicker] = useState(false);
   const [filterAmountMin, setFilterAmountMin] = useState('');
   const [filterAmountMax, setFilterAmountMax] = useState('');
+  const [showRepaymentModal, setShowRepaymentModal] = useState(false);
+  const [repaymentAmount, setRepaymentAmount] = useState('');
+  const [repaymentNote, setRepaymentNote] = useState('');
+  const [submittingRepayment, setSubmittingRepayment] = useState(false);
   const [pendingExpenseApprovalsCount, setPendingExpenseApprovalsCount] = useState(0);
   const [pendingCategoryApprovalsCount, setPendingCategoryApprovalsCount] = useState(0);
   const [pendingBudgetRequestsCount, setPendingBudgetRequestsCount] = useState(0);
@@ -261,7 +265,7 @@ export default function DepensesScreen() {
         
         setExpenses(expensesList);
 
-        // Calculer uniquement avec les dépenses APPROUVÉES pour les totaux et la balance
+        // Calculer avec TOUTES les dépenses APPROUVÉES (cumulatif, pas limité par mois)
         const approvedExpenses = expensesList.filter(exp => exp.approvalStatus === 'APPROVED' || !exp.approvalStatus);
         
         const total = approvedExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
@@ -353,6 +357,64 @@ export default function DepensesScreen() {
       .reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
   };
 
+  const handleRepayment = async () => {
+    if (!repaymentAmount.trim() || !activeFamily?.id || !user) {
+      Alert.alert('Erreur', 'Veuillez entrer un montant valide');
+      return;
+    }
+
+    const amount = parseFloat(repaymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Erreur', 'Veuillez entrer un montant valide');
+      return;
+    }
+
+    // Vérifier que le montant ne dépasse pas la dette
+    const maxRepayment = Math.abs(balance);
+    if (balance >= 0) {
+      Alert.alert('Information', 'Vous n\'avez pas de dette à rembourser');
+      return;
+    }
+    if (amount > maxRepayment) {
+      Alert.alert('Erreur', `Le montant ne peut pas dépasser votre dette de ${maxRepayment.toFixed(2)} ${currency}`);
+      return;
+    }
+
+    setSubmittingRepayment(true);
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userName = userDoc.exists() ? `${userDoc.data().firstName || ''} ${userDoc.data().lastName || ''}`.trim() || 'Utilisateur' : 'Utilisateur';
+
+      // Créer une dépense de remboursement
+      await addDoc(collection(db, 'expenses'), {
+        description: `Remboursement${repaymentNote ? ': ' + repaymentNote : ''}`,
+        amount: amount,
+        category: 'Remboursement',
+        currency: activeFamily.currency || 'EUR',
+        paidBy: user.uid,
+        familyId: activeFamily.id,
+        date: new Date(),
+        approvalStatus: 'PENDING_APPROVAL',
+        isRepayment: true,
+        createdAt: new Date(),
+      });
+
+      Alert.alert(
+        '✅ Remboursement envoyé',
+        `Votre remboursement de ${amount.toFixed(2)} ${currency} a été envoyé pour approbation.`
+      );
+
+      setShowRepaymentModal(false);
+      setRepaymentAmount('');
+      setRepaymentNote('');
+    } catch (error) {
+      console.error('Error creating repayment:', error);
+      Alert.alert('Erreur', 'Impossible de créer le remboursement');
+    } finally {
+      setSubmittingRepayment(false);
+    }
+  };
+
   const filteredExpenses = expenses.filter((exp: any) => {
     if (filterCategory && exp.category !== filterCategory) return false;
     if (filterDate) {
@@ -437,15 +499,27 @@ export default function DepensesScreen() {
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Total dépenses</Text>
               <Text style={[styles.summaryAmount, { color: colors.text }]}>{totalExpenses.toFixed(2)} {currency}</Text>
             </View>
-            <View style={[styles.summaryCard, { backgroundColor: colors.tertiaryCardBackground }]}>
+            <TouchableOpacity 
+              style={[styles.summaryCard, { backgroundColor: colors.tertiaryCardBackground }]}
+              onPress={() => balance < 0 && setShowRepaymentModal(true)}
+              disabled={balance >= 0}
+            >
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Balance</Text>
               <Text style={[styles.summaryAmount, { color: balance >= 0 ? colors.progressBar : colors.dangerButton }]}>
                 {balance >= 0 ? '+' : ''}{balance.toFixed(2)} {currency}
               </Text>
-              <Text style={[styles.balanceHint, { color: colors.textSecondary }]}>
-                {balance >= 0 ? 'À recevoir' : 'À rembourser'}
-              </Text>
-            </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: vs(4) }}>
+                <Text style={[styles.balanceHint, { color: colors.textSecondary }]}>
+                  {balance >= 0 ? 'À recevoir' : 'À rembourser'}
+                </Text>
+                {balance < 0 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.tiny }}>
+                    <Text style={[styles.balanceHint, { color: colors.tint }]}>Rembourser</Text>
+                    <IconSymbol name="chevron.right" size={16} color={colors.tint} />
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* Action Buttons */}
@@ -786,6 +860,79 @@ export default function DepensesScreen() {
 
         </View>
       </ScrollView>
+
+      {/* Modale de remboursement */}
+      <Modal
+        visible={showRepaymentModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRepaymentModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Rembourser ma dette</Text>
+              <TouchableOpacity onPress={() => setShowRepaymentModal(false)}>
+                <IconSymbol name="xmark.circle.fill" size={28} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.debtInfo, { backgroundColor: colors.secondaryCardBackground }]}>
+              <Text style={[styles.debtLabel, { color: colors.textSecondary }]}>Votre dette actuelle</Text>
+              <Text style={[styles.debtAmount, { color: colors.dangerButton }]}>
+                {Math.abs(balance).toFixed(2)} {currency}
+              </Text>
+            </View>
+
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Montant à rembourser</Text>
+            <TextInput
+              style={[styles.amountInputLarge, { backgroundColor: colors.secondaryCardBackground, color: colors.text, borderColor: colors.border }]}
+              placeholder="0.00"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="decimal-pad"
+              value={repaymentAmount}
+              onChangeText={setRepaymentAmount}
+            />
+
+            <Text style={[styles.inputLabel, { color: colors.text }]}>Note (optionnel)</Text>
+            <TextInput
+              style={[styles.noteInput, { backgroundColor: colors.secondaryCardBackground, color: colors.text, borderColor: colors.border }]}
+              placeholder="Ex: Virement du 29/12"
+              placeholderTextColor={colors.textSecondary}
+              value={repaymentNote}
+              onChangeText={setRepaymentNote}
+              multiline
+            />
+
+            <View style={[styles.repaymentInfo, { backgroundColor: '#FFF3E0' }]}>
+              <IconSymbol name="info.circle" size={20} color="#FF9500" />
+              <Text style={[styles.repaymentInfoText, { color: '#FF9500' }]}>
+                L'autre parent devra approuver ce remboursement après réception de l'argent
+              </Text>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton, { backgroundColor: colors.secondaryCardBackground }]}
+                onPress={() => setShowRepaymentModal(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.submitButton, { backgroundColor: colors.tint }]}
+                onPress={handleRepayment}
+                disabled={submittingRepayment}
+              >
+                {submittingRepayment ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[styles.modalButtonText, { color: '#fff' }]}>Envoyer</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1161,4 +1308,98 @@ const styles = StyleSheet.create({
   balanceHint: { fontSize: FONT_SIZES.tiny, marginTop: vs(2) },
   rowCard: { borderRadius: BORDER_RADIUS.large, paddingVertical: V_SPACING.large, paddingHorizontal: SPACING.large, justifyContent: 'center', minHeight: vs(60) },
   emptyText: { textAlign: 'center', fontSize: FONT_SIZES.regular },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    borderRadius: BORDER_RADIUS.large,
+    padding: SPACING.large,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: vs(4) },
+    shadowRadius: hs(12),
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: V_SPACING.medium,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.xlarge,
+    fontWeight: '700',
+  },
+  debtInfo: {
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    marginBottom: V_SPACING.medium,
+    alignItems: 'center',
+  },
+  debtLabel: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+    marginBottom: V_SPACING.tiny,
+  },
+  debtAmount: {
+    fontSize: FONT_SIZES.xxlarge,
+    fontWeight: '800',
+  },
+  inputLabel: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+    marginTop: V_SPACING.small,
+    marginBottom: V_SPACING.tiny,
+  },
+  amountInputLarge: {
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.regular,
+    fontSize: FONT_SIZES.xlarge,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.medium,
+    padding: SPACING.regular,
+    fontSize: FONT_SIZES.regular,
+    minHeight: vs(80),
+    textAlignVertical: 'top',
+  },
+  repaymentInfo: {
+    flexDirection: 'row',
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    marginTop: V_SPACING.medium,
+    gap: SPACING.small,
+  },
+  repaymentInfoText: {
+    fontSize: FONT_SIZES.small,
+    flex: 1,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING.regular,
+    marginTop: V_SPACING.large,
+  },
+  modalButton: {
+    flex: 1,
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  submitButton: {},
+  modalButtonText: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '600',
+  },
 });
