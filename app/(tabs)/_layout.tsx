@@ -133,6 +133,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Accueil',
+          headerShown: false,
           tabBarIcon: ({ focused, color, size }) => (
             <Image 
               source={require('../../ImageAndLogo/LogoWeKid.png')}
@@ -146,6 +147,7 @@ export default function TabLayout() {
         name="Agenda"
         options={{
           title: 'Agenda',
+          headerShown: false,
           tabBarIcon: ({ focused, color, size }) => (
             <Image 
               source={require('../../ImageAndLogo/Logoagenda.png')}
@@ -160,6 +162,7 @@ export default function TabLayout() {
         name="Message"
         options={{
           title: 'Messages',
+          headerShown: false,
           tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
           tabBarIcon: ({ focused, color, size }) => (
             <Image 
@@ -175,6 +178,7 @@ export default function TabLayout() {
         name="Dépenses"
         options={{
           title: 'Dépenses',
+          headerShown: false,
           tabBarIcon: ({ focused, color, size }) => (
             <Image 
               source={require('../../ImageAndLogo/LogoDepense.png')}
@@ -189,6 +193,7 @@ export default function TabLayout() {
         name="Aide"
         options={{
           title: 'Aide',
+          headerShown: false,
           tabBarIcon: ({ focused, color, size }) => (
             <Image 
               source={require('../../ImageAndLogo/LogoaideWeKid.png')}

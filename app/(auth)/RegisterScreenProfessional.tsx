@@ -6,18 +6,18 @@ import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    useColorScheme,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useColorScheme,
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 
@@ -93,6 +93,65 @@ export default function RegisterScreenProfessional() {
   const auth = getAuth();
   const db = getFirestore();
   const storage = getStorage();
+
+  const isValidEmail = (value: string) => /.+@.+\..+/.test(value.trim());
+
+  const isStepValid = (step: number) => {
+    if (step === 1) {
+      const cleanFirstName = firstName.trim();
+      const cleanLastName = lastName.trim();
+      const cleanEmail = email.trim();
+      const pwdError = getPasswordError(password);
+      return !!cleanFirstName && !!cleanLastName && !!cleanEmail && isValidEmail(cleanEmail) && !pwdError;
+    }
+    if (step === 2) {
+      const cleanAddress = address.trim();
+      const cleanPhone = phone.trim();
+      const cleanSpecialty = specialty.trim();
+      const cleanDescription = description.trim();
+      const phoneLooksOk = cleanPhone.length >= 8;
+      return !!professionalType && !!cleanAddress && phoneLooksOk && !!cleanSpecialty && cleanDescription.length >= 10;
+    }
+    if (step === 3) {
+      // Photo optionnelle
+      return true;
+    }
+    if (step === 4) {
+      return !!diplomaUri;
+    }
+    return false;
+  };
+
+  const getStepHints = (step: number): string[] => {
+    const hints: string[] = [];
+
+    if (step === 1) {
+      if (!firstName.trim()) hints.push('Ajoutez votre prénom.');
+      if (!lastName.trim()) hints.push('Ajoutez votre nom.');
+      if (!email.trim()) hints.push('Saisissez votre email.');
+      else if (!isValidEmail(email)) hints.push('Utilisez un email valide.');
+      const pwdError = getPasswordError(password);
+      if (pwdError) hints.push(pwdError);
+    }
+
+    if (step === 2) {
+      if (!professionalType) hints.push('Choisissez votre profession.');
+      if (!address.trim()) hints.push('Ajoutez votre adresse.');
+      if (phone.trim().length < 8) hints.push('Téléphone trop court (8+ chiffres).');
+      if (!specialty.trim()) hints.push('Indiquez votre spécialité.');
+      if (description.trim().length < 10) hints.push('Description trop courte (10+ caractères).');
+    }
+
+    if (step === 3) {
+      // Photo optionnelle, aucun blocage
+    }
+
+    if (step === 4) {
+      if (!diplomaUri) hints.push('Téléchargez un diplôme (PDF ou image).');
+    }
+
+    return hints;
+  };
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -424,6 +483,15 @@ export default function RegisterScreenProfessional() {
             {currentStep === 4 && renderStepFourForm()}
           </View>
 
+          {getStepHints(currentStep).length > 0 && (
+            <View style={[styles.requirementsBox, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.requirementsTitle, { color: colors.text }]}>Pour continuer :</Text>
+              {getStepHints(currentStep).map((hint, idx) => (
+                <Text key={idx} style={[styles.requirementsText, { color: colors.textSecondary }]}>• {hint}</Text>
+              ))}
+            </View>
+          )}
+
           <View style={styles.buttonsContainer}>
             {currentStep > 1 && (
               <TouchableOpacity style={[styles.button, { backgroundColor: colors.cardBackground, flex: 1 }]} onPress={() => setCurrentStep(currentStep - 1)} disabled={loading}>
@@ -434,16 +502,22 @@ export default function RegisterScreenProfessional() {
             <TouchableOpacity
               style={[
                 styles.button,
-                { backgroundColor: colors.tint, flex: 1, marginLeft: currentStep > 1 ? 12 : 0 },
+                {
+                  backgroundColor: loading || !isStepValid(currentStep) ? colors.textSecondary : colors.tint,
+                  flex: 1,
+                  marginLeft: currentStep > 1 ? 12 : 0,
+                  opacity: loading || !isStepValid(currentStep) ? 0.7 : 1,
+                },
               ]}
               onPress={() => {
+                if (!isStepValid(currentStep)) return;
                 if (currentStep < 4) {
                   setCurrentStep(currentStep + 1);
                 } else {
                   handleRegister();
                 }
               }}
-              disabled={loading}
+              disabled={loading || !isStepValid(currentStep)}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
@@ -483,6 +557,20 @@ const styles = StyleSheet.create({
   stepIndicator: {
     fontSize: 14,
     marginBottom: 20,
+  },
+  requirementsBox: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  requirementsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  requirementsText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   errorText: {
     marginBottom: 16,
