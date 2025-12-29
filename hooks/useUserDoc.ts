@@ -38,15 +38,19 @@ export function useUserDoc(userId?: string | null) {
       (err: any) => {
         if (!mountedRef.current) return;
 
-        // C'est ICI qu'on ignore l'erreur de permission lors de la déconnexion
-        if (err.code === 'permission-denied') {
-          console.log('[useUserDoc] Permission denied (Logout probable) - Ignoré');
+        // MODIFICATION ICI : On vérifie le code ET le message pour être sûr
+        const isPermissionError = 
+            err.code === 'permission-denied' || 
+            err.message?.includes('permission-denied') ||
+            err.message?.includes('Missing or insufficient permissions');
+
+        if (isPermissionError) {
+          // On ne fait RIEN (même pas de console.log pour garder le silence)
           setLoading(false);
-          // On ne set PAS l'erreur pour ne pas casser l'UI
           return;
         }
 
-        console.error('[useUserDoc] Error:', err);
+        console.error('[useUserDoc] Real Error:', err);
         setError(err);
         setLoading(false);
       }

@@ -9,9 +9,11 @@ import { LogBox } from 'react-native';
 import '../constants/firebase';
 
 LogBox.ignoreLogs([
+  'Missing or insufficient permissions',
   'FirebaseError: [code=permission-denied]',
-  'Error in snapshot listener:',
-  '[2025-' // Optionnel: pour cibler les timestamps si nécessaire
+  'Uncaught Error in snapshot listener', // <--- C'est celle-ci qui s'affiche dans tes logs
+  '@firebase/firestore:',
+  'InternalBytecode.js'
 ]);
 
 export default function RootLayout() {
