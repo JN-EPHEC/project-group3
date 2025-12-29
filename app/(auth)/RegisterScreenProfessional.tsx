@@ -1,7 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth, sendEmailVerification } from 'firebase/auth';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
@@ -216,9 +216,44 @@ export default function RegisterScreenProfessional() {
         return;
       }
 
-      // Create Auth user
+      console.log('🔵 ÉTAPE 1 : Début création compte pro avec', cleanEmail);
+      
+      // Create Auth user avec traçage explicite
       const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       const user = userCredential.user;
+      
+      console.log('🔵 ÉTAPE 2 : Compte pro créé avec succès');
+      console.log('   - UID:', user.uid);
+      console.log('   - Email:', user.email);
+      console.log('   - emailVerified:', user.emailVerified);
+      
+      console.log('🔵 ÉTAPE 3 : Appel sendEmailVerification...');
+      
+      // Envoi email avec promesse traçée
+      await sendEmailVerification(user)
+        .then(() => {
+          console.log('✅ ÉTAPE 4 : sendEmailVerification réussi (promesse résolue)');
+          return user.reload();
+        })
+        .then(() => {
+          console.log('✅ ÉTAPE 5 : user.reload() terminé');
+          console.log('   - emailVerified après reload:', user.emailVerified);
+          
+          Alert.alert(
+            '✉️ Vérifiez vos emails',
+            `Un email de vérification a été envoyé à ${cleanEmail}.\n\nConsultez votre boîte mail (et spam).\n\nUID: ${user.uid.substring(0, 8)}...`
+          );
+        })
+        .catch((emailError) => {
+          console.error('❌ ÉCHEC ENVOI EMAIL - Code:', emailError?.code);
+          console.error('   - Message:', emailError?.message);
+          console.error('   - Stack:', emailError?.stack);
+          
+          Alert.alert(
+            '⚠️ Erreur',
+            `Impossible d'envoyer l'email de vérification:\n${emailError?.message || 'Erreur inconnue'}`
+          );
+        });
 
       let photoUrl = null;
       if (imageUri) {
@@ -286,8 +321,11 @@ export default function RegisterScreenProfessional() {
         errorMessage = 'Cet email est déjà utilisé.';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Email invalide.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Mot de passe trop faible (6 caractères min).';
       }
       setError(errorMessage);
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }

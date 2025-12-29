@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth, sendEmailVerification } from 'firebase/auth';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
@@ -69,9 +69,44 @@ const RegisterScreen = () => {
     }
 
     try {
-      // Création Auth
+      console.log('🔵 ÉTAPE 1 : Début création compte avec', cleanEmail);
+      
+      // Création Auth avec traçage explicite
       const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
       const user = userCredential.user;
+      
+      console.log('🔵 ÉTAPE 2 : Compte créé avec succès');
+      console.log('   - UID:', user.uid);
+      console.log('   - Email:', user.email);
+      console.log('   - emailVerified:', user.emailVerified);
+      
+      console.log('🔵 ÉTAPE 3 : Appel sendEmailVerification...');
+      
+      // Envoi email avec promesse traçée
+      await sendEmailVerification(user)
+        .then(() => {
+          console.log('✅ ÉTAPE 4 : sendEmailVerification réussi (promesse résolue)');
+          return user.reload();
+        })
+        .then(() => {
+          console.log('✅ ÉTAPE 5 : user.reload() terminé');
+          console.log('   - emailVerified après reload:', user.emailVerified);
+          
+          Alert.alert(
+            '✉️ Vérifiez vos emails',
+            `Un email de vérification a été envoyé à ${cleanEmail}.\n\nConsultez votre boîte mail (et spam).\n\nUID: ${user.uid.substring(0, 8)}...`
+          );
+        })
+        .catch((emailError) => {
+          console.error('❌ ÉCHEC ENVOI EMAIL - Code:', emailError?.code);
+          console.error('   - Message:', emailError?.message);
+          console.error('   - Stack:', emailError?.stack);
+          
+          Alert.alert(
+            '⚠️ Erreur',
+            `Impossible d'envoyer l'email de vérification:\n${emailError?.message || 'Erreur inconnue'}`
+          );
+        });
 
       let profileImage = null;
       if (imageUri) {
@@ -109,7 +144,7 @@ const RegisterScreen = () => {
       }
     } catch (error) {
       // Gestion des erreurs Firebase
-      let errorMessage = '';
+      let errorMessage = "Une erreur est survenue lors de l'inscription.";
       switch (error?.code) {
         case 'auth/email-already-in-use':
           errorMessage = 'Cette adresse email est déjà utilisée.';
@@ -117,10 +152,12 @@ const RegisterScreen = () => {
         case 'auth/invalid-email':
           errorMessage = 'Adresse email invalide.';
           break;
-        default:
-          errorMessage = error.message || 'Une erreur est survenue lors de l\'inscription.';
+        case 'auth/weak-password':
+          errorMessage = 'Mot de passe trop faible (6 caractères min).';
+          break;
       }
       setError(errorMessage);
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }
