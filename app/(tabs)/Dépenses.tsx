@@ -374,11 +374,14 @@ export default function DepensesScreen() {
       return;
     }
 
-    const amount = parseFloat(repaymentAmount);
-    if (isNaN(amount) || amount <= 0) {
+    const sanitized = repaymentAmount.replace(',', '.');
+    const parsedAmount = parseFloat(sanitized);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
       Alert.alert('Erreur', 'Veuillez entrer un montant valide');
       return;
     }
+
+    const amount = Math.round(parsedAmount * 100) / 100; // montant exact à 2 décimales
 
     // Vérifier que le montant ne dépasse pas la dette
     const maxRepayment = Math.abs(balance);
@@ -903,6 +906,7 @@ export default function DepensesScreen() {
               placeholder="0.00"
               placeholderTextColor={colors.textSecondary}
               keyboardType="decimal-pad"
+              inputMode="decimal"
               value={repaymentAmount}
               onChangeText={setRepaymentAmount}
             />
