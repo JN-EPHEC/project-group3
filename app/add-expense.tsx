@@ -8,7 +8,7 @@ import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTime
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { auth, db } from '../constants/firebase';
+import { auth, db, getUserFamilies } from '../constants/firebase';
 
 const DEFAULT_CATEGORIES = ['Santé', 'Vêtements', 'École', 'Alimentation', 'Transport'];
 
@@ -70,47 +70,38 @@ export default function AddExpenseScreen() {
       }
 
       try {
-        // Récupérer les familles de l'utilisateur
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-        if (userDoc.exists()) {
-          const familyIds = userDoc.data().familyIds || [];
-          
-          if (familyIds.length === 0) {
-            Alert.alert('Erreur', 'Vous devez appartenir à une famille pour ajouter une dépense');
-            // Ne pas router.back() automatiquement, laisser l'utilisateur voir le message
-            return;
-          }
+        // Récupérer les familles de l'utilisateur (gère familyId ET familyIds)
+        const familiesData = await getUserFamilies(currentUser.uid);
+        
+        if (!familiesData || familiesData.length === 0) {
+          Alert.alert('Erreur', 'Vous devez appartenir à une famille pour ajouter une dépense');
+          // Ne pas router.back() automatiquement, laisser l'utilisateur voir le message
+          return;
+        }
 
-          // Récupérer les informations de chaque famille
-          const familiesData: Family[] = [];
-          for (const fId of familyIds) {
-            const familyDoc = await getDoc(doc(db, 'families', fId));
-            if (familyDoc.exists()) {
-              familiesData.push({
-                id: fId,
-                name: familyDoc.data().name || 'Famille sans nom',
-              });
-            }
-          }
+        // Convertir au format attendu
+        const formattedFamilies: Family[] = familiesData.map((f) => ({
+          id: f.id,
+          name: f.name || 'Famille sans nom',
+        }));
 
-          setUserFamilies(familiesData);
+        setUserFamilies(formattedFamilies);
 
-          // Si une famille est passée en paramètre, l'utiliser
-          let initialFamilyId = params.familyId as string | undefined;
-          
-          // Sinon, utiliser la première famille
-          if (!initialFamilyId && familiesData.length > 0) {
-            initialFamilyId = familiesData[0].id;
-          }
+        // Si une famille est passée en paramètre, l'utiliser
+        let initialFamilyId = params.familyId as string | undefined;
+        
+        // Sinon, utiliser la première famille
+        if (!initialFamilyId && formattedFamilies.length > 0) {
+          initialFamilyId = formattedFamilies[0].id;
+        }
 
-          if (initialFamilyId) {
-            setFamilyId(initialFamilyId);
-            const selectedFamily = familiesData.find(f => f.id === initialFamilyId);
-            setFamilyName(selectedFamily?.name || null);
+        if (initialFamilyId) {
+          setFamilyId(initialFamilyId);
+          const selectedFamily = formattedFamilies.find(f => f.id === initialFamilyId);
+          setFamilyName(selectedFamily?.name || null);
 
-            // Récupérer les paramètres de cette famille
-            await loadFamilySettings(initialFamilyId);
-          }
+          // Récupérer les paramètres de cette famille
+          await loadFamilySettings(initialFamilyId);
         }
       } catch (error) {
         console.error('Error fetching user data:', error);

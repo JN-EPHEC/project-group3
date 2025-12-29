@@ -114,38 +114,30 @@ export default function DepensesScreen() {
     });
   }, []);
 
-  // Listen to pending budget change requests count
+  // Listen to pending budget change requests count (active family only)
   useEffect(() => {
     const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!currentUser || !activeFamily?.id) {
+      setPendingBudgetRequestsCount(0);
+      return;
+    }
 
-    const userDocRef = doc(db, 'users', currentUser.uid);
-    getDoc(userDocRef).then((userDoc) => {
-      if (!userDoc.exists()) return;
+    const budgetRequestsRef = collection(db, 'budgetChangeRequests');
+    const qPending = query(
+      budgetRequestsRef,
+      where('familyId', '==', activeFamily.id),
+      where('status', '==', 'PENDING')
+    );
 
-      const familyIds = userDoc.data().familyIds || [];
-      if (familyIds.length === 0) {
-        setPendingBudgetRequestsCount(0);
-        return;
-      }
-
-      const budgetRequestsRef = collection(db, 'budgetChangeRequests');
-      const q = query(
-        budgetRequestsRef,
-        where('familyId', 'in', familyIds),
-        where('status', '==', 'PENDING')
-      );
-
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const count = snapshot.docs.filter(
-          (doc) => doc.data().requestedBy !== currentUser.uid
-        ).length;
-        setPendingBudgetRequestsCount(count);
-      });
-
-      return () => unsubscribe();
+    const unsubscribe = onSnapshot(qPending, (snapshot) => {
+      const count = snapshot.docs.filter(
+        (d) => d.data().requestedBy !== currentUser.uid
+      ).length;
+      setPendingBudgetRequestsCount(count);
     });
-  }, []);
+
+    return () => unsubscribe();
+  }, [activeFamily?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -328,7 +320,7 @@ export default function DepensesScreen() {
                 <Text style={[styles.settingsButtonText, { color: colors.tint }]}>Paramètres</Text>
                 <IconSymbol name="gearshape.fill" size={20} color={colors.tint} />
                 {pendingBudgetRequestsCount > 0 && (
-                  <View style={[styles.notificationBadge, { backgroundColor: '#FF9500' }]}>
+                  <View style={[styles.notificationBadge, { backgroundColor: '#FF3B30' }]}>
                     <Text style={styles.notificationBadgeText}>{pendingBudgetRequestsCount}</Text>
                   </View>
                 )}

@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import { Tabs, useRouter } from 'expo-router';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Image, Platform, useColorScheme } from 'react-native';
 import { auth, db, getUserFamily } from '../../constants/firebase';
@@ -10,6 +10,7 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingExpenseApprovals, setPendingExpenseApprovals] = useState(0);
   const router = useRouter();
 
   // Gate: redirect to subscription if user has no active subscription
@@ -62,6 +63,44 @@ export default function TabLayout() {
     };
 
     setupUnreadListener();
+  }, []);
+
+  // Pending expense approvals badge for Dépenses tab
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    let unsubscribe: (() => void) | undefined;
+
+    getDoc(userDocRef).then((userDoc) => {
+      if (!userDoc.exists()) return;
+
+      let familyIds: string[] = userDoc.data().familyIds || [];
+      const legacy = userDoc.data().familyId;
+      if (legacy && !familyIds.includes(legacy)) familyIds = [legacy, ...familyIds];
+
+      if (!familyIds || familyIds.length === 0) {
+        setPendingExpenseApprovals(0);
+        return;
+      }
+
+      const approvalsRef = collection(db, 'categoryApprovals');
+      const qApprovals = query(
+        approvalsRef,
+        where('familyId', 'in', familyIds.slice(0, 10)), // Firestore 'in' limit
+        where('status', '==', 'PENDING')
+      );
+
+      unsubscribe = onSnapshot(qApprovals, (snapshot) => {
+        const count = snapshot.docs.filter((d) => d.data().requestedBy !== currentUser.uid).length;
+        setPendingExpenseApprovals(count);
+      });
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   return (
@@ -179,6 +218,7 @@ export default function TabLayout() {
         options={{
           title: 'Dépenses',
           headerShown: false,
+          tabBarBadge: pendingExpenseApprovals > 0 ? pendingExpenseApprovals : undefined,
           tabBarIcon: ({ focused, color, size }) => (
             <Image 
               source={require('../../ImageAndLogo/LogoDepense.png')}
