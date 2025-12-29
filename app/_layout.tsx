@@ -5,7 +5,14 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useStripeDeepLinks } from '@/hooks/useStripeDeepLinks';
+import { LogBox } from 'react-native';
 import '../constants/firebase';
+
+LogBox.ignoreLogs([
+  'FirebaseError: [code=permission-denied]',
+  'Error in snapshot listener:',
+  '[2025-' // Optionnel: pour cibler les timestamps si nécessaire
+]);
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

@@ -268,13 +268,26 @@ export default function ProProfilScreen() {
   }, [router]);
 
   const handleLogout = async () => {
-    try {
+  console.log('=== handleLogout triggered ===');
+  try {
+    // 1. Naviguer d'abord vers l'écran public (Welcome)
+    // Cela force le "unmount" de tes écrans protégés et déclenche le cleanup du useEffect
+    router.replace('/(auth)/WelcomeScreen');
+
+    // 2. Attendre que le démontage soit effectif (100ms suffisent)
+    // avant de couper l'accès Firebase
+    setTimeout(async () => {
+      console.log('Calling signOut after navigation...');
       await signOut();
-      router.replace('/(auth)/WelcomeScreen');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
+      console.log('SignOut completed cleanly');
+    }, 100);
+
+  } catch (error) {
+    console.error('Error signing out:', error);
+    // En cas d'erreur, on force quand même la navigation pour ne pas bloquer l'user
+    router.replace('/(auth)/WelcomeScreen');
+  }
+};
 
   const handleUploadPhoto = async () => {
     try {
