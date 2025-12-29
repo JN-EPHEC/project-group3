@@ -18,10 +18,12 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
+    useColorScheme,
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from '../constants/firebase';
+import { Colors } from '../constants/theme';
 
 interface CategoryApproval {
   id: string;
@@ -39,6 +41,8 @@ export default function CategoryApprovalsScreen() {
   const [approvals, setApprovals] = useState<CategoryApproval[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -179,27 +183,27 @@ export default function CategoryApprovalsScreen() {
     const isProcessing = processingId === item.id;
 
     return (
-      <View style={styles.approvalCard}>
+      <View style={[styles.approvalCard, { backgroundColor: colors.cardBackground }]}>
         <View style={styles.approvalHeader}>
           <View style={styles.categoryNameContainer}>
-            <Ionicons name="pricetag" size={20} color="#007AFF" />
-            <Text style={styles.categoryName}>{item.categoryName}</Text>
+            <Ionicons name="pricetag" size={20} color={colors.tint} />
+            <Text style={[styles.categoryName, { color: colors.text }]}>{item.categoryName}</Text>
           </View>
-          <Text style={styles.requestedBy}>
+          <Text style={[styles.requestedBy, { color: colors.textSecondary }]}>
             Demandé par {item.requestedByName}
           </Text>
         </View>
 
-        <View style={styles.approvalDetails}>
+        <View style={[styles.approvalDetails, { borderTopColor: colors.border }]}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Plafond mensuel :</Text>
-            <Text style={styles.detailValue}>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Plafond mensuel :</Text>
+            <Text style={[styles.detailValue, { color: colors.text }]}>
               {item.limit > 0 ? `${item.limit}€` : 'Aucun plafond'}
             </Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Dépassement autorisé :</Text>
-            <Text style={styles.detailValue}>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Dépassement autorisé :</Text>
+            <Text style={[styles.detailValue, { color: colors.text }]}>
               {item.allowOverLimit ? 'Oui' : 'Non'}
             </Text>
           </View>
@@ -241,25 +245,25 @@ export default function CategoryApprovalsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.header, { backgroundColor: colors.cardBackground, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          <Ionicons name="arrow-back" size={24} color={colors.tint} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Approbations en attente</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Approbations en attente</Text>
         <View style={styles.placeholder} />
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Chargement...</Text>
+          <ActivityIndicator size="large" color={colors.tint} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Chargement...</Text>
         </View>
       ) : approvals.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="checkmark-done-circle" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>Aucune approbation en attente</Text>
-          <Text style={styles.emptySubtext}>
+          <Ionicons name="checkmark-done-circle" size={64} color={colors.border} />
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucune approbation en attente</Text>
+          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
             Les nouvelles demandes de catégories apparaîtront ici
           </Text>
         </View>
@@ -279,7 +283,6 @@ export default function CategoryApprovalsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
@@ -287,9 +290,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   backButton: {
     padding: 4,
@@ -297,7 +298,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
   },
   placeholder: {
     width: 32,
@@ -310,7 +310,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
   },
   emptyContainer: {
     flex: 1,
@@ -321,13 +320,11 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
     marginTop: 16,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
     marginTop: 8,
     textAlign: 'center',
   },
@@ -335,7 +332,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   approvalCard: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -356,17 +352,14 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
     marginLeft: 8,
   },
   requestedBy: {
     fontSize: 13,
-    color: '#666',
     marginTop: 4,
   },
   approvalDetails: {
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
     paddingTop: 12,
     marginBottom: 16,
   },
@@ -378,12 +371,10 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    color: '#666',
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000',
   },
   actionButtons: {
     flexDirection: 'row',
