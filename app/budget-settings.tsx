@@ -2,8 +2,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { addDoc, collection, doc, getDoc, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
@@ -18,10 +18,14 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
   const [loading, setLoading] = useState(true);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [editingCategoryName, setEditingCategoryName] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState('');
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryLimit, setNewCategoryLimit] = useState(String(DEFAULT_SEEDED_LIMIT));
   const [newAllowOverLimit, setNewAllowOverLimit] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const currentUser = auth.currentUser;
 
   useEffect(() => {
     if (!familyId) return;
@@ -57,13 +61,64 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         setCategories(DEFAULT_CATEGORIES.map((name) => ({ name, limit: DEFAULT_SEEDED_LIMIT, allowOverLimit: false })));
       }
       setLoading(false);
+    }, (err) => {
+      console.warn('[budget-settings] budgets onSnapshot error:', err?.code, err?.message);
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, [familyId]);
 
+  // Écouter les demandes de changement en attente
+  useEffect(() => {
+    if (!familyId || !currentUser) return;
+
+    const requestsRef = collection(db, 'budgetChangeRequests');
+    const q = query(
+      requestsRef,
+      where('familyId', '==', familyId),
+      where('status', '==', 'PENDING')
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const requests: any[] = [];
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        // Ne montrer que les demandes faites par d'autres utilisateurs
+        if (data.requestedBy !== currentUser.uid) {
+          let requestedByName = 'Utilisateur';
+          try {
+            const userDoc = await getDoc(doc(db, 'users', data.requestedBy));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              requestedByName = userData.firstName || userData.name || 'Utilisateur';
+            }
+          } catch (error) {
+            console.error('Error fetching user:', error);
+          }
+
+          requests.push({
+            id: docSnap.id,
+            ...data,
+            requestedByName,
+          });
+        }
+      }
+      setPendingRequests(requests);
+    }, (err) => {
+      console.warn('[budget-settings] budgetChangeRequests onSnapshot error:', err?.code, err?.message);
+      setPendingRequests([]);
+    });
+
+    return () => unsubscribe();
+  }, [familyId, currentUser]);
+
   const handleUpdateLimit = async (categoryName: string, newLimit: string) => {
-    if (!familyId) return;
+    if (!familyId || !currentUser) {
+      console.warn('[budget-settings] No familyId or user for update limit');
+      Alert.alert('Session expirée', 'Reconnectez-vous pour modifier le budget.');
+      return;
+    }
 
     const limit = parseFloat(newLimit);
     if (isNaN(limit) || limit < 0) {
@@ -71,22 +126,172 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
       return;
     }
 
-    try {
-      const budgetRef = doc(db, 'budgets', familyId);
-      const current = categories.find((c) => c.name === categoryName);
-      await updateDoc(budgetRef, {
-        [`categoryRules.${categoryName}`]: { limit, allowOverLimit: current?.allowOverLimit ?? false },
-      });
+    const current = categories.find((c) => c.name === categoryName);
+    if (!current) return;
+
+    // Si la limite ne change pas, annuler
+    if (current.limit === limit) {
       setEditingCategory(null);
       setEditValue('');
-    } catch (error) {
-      console.error('Error updating limit:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour la limite');
+      return;
+    }
+
+    try {
+      // Créer une demande de changement au lieu de modifier directement
+      const requestData = {
+        familyId,
+        categoryName,
+        currentLimit: current.limit,
+        newLimit: limit,
+        allowOverLimit: current.allowOverLimit,
+        requestedBy: currentUser.uid,
+        status: 'PENDING',
+        createdAt: new Date(),
+      };
+
+      await addDoc(collection(db, 'budgetChangeRequests'), requestData);
+
+      Alert.alert(
+        '📬 Demande envoyée',
+        `Votre demande de modification du budget "${categoryName}" (${current.limit.toFixed(2)} € → ${limit.toFixed(2)} €) a été envoyée à l'autre parent pour approbation.`
+      );
+
+      setEditingCategory(null);
+      setEditValue('');
+    } catch (error: any) {
+      console.error('Error creating budget change request:', error);
+      const code = error?.code || 'unknown';
+      const message = error?.message || 'Erreur inconnue';
+      Alert.alert(
+        'Erreur demande budget',
+        `Impossible de créer la demande.\nCode: ${code}\nMessage: ${message}\n\nAstuce: vérifiez les règles Firestore pour "budgetChangeRequests" et votre appartenance à la famille.`
+      );
     }
   };
 
-  const handleToggleAllow = async (categoryName: string, allow: boolean) => {
+  const handleUpdateCategoryName = async (oldName: string, newName: string) => {
     if (!familyId) return;
+
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      Alert.alert('Erreur', 'Le nom de la catégorie ne peut pas être vide');
+      return;
+    }
+
+    if (trimmedName === oldName) {
+      setEditingCategoryName(null);
+      setEditNameValue('');
+      return;
+    }
+
+    if (categories.some((c) => c.name.toLowerCase() === trimmedName.toLowerCase() && c.name !== oldName)) {
+      Alert.alert('Erreur', 'Une catégorie avec ce nom existe déjà');
+      return;
+    }
+
+    try {
+      const budgetRef = doc(db, 'budgets', familyId);
+      const current = categories.find((c) => c.name === oldName);
+      
+      if (current) {
+        // Supprimer l'ancienne catégorie et créer la nouvelle
+        const budgetDoc = await getDoc(budgetRef);
+        const rules = budgetDoc.data()?.categoryRules || {};
+        delete rules[oldName];
+        rules[trimmedName] = { limit: current.limit, allowOverLimit: current.allowOverLimit };
+        
+        await updateDoc(budgetRef, { categoryRules: rules });
+      }
+      
+      setEditingCategoryName(null);
+      setEditNameValue('');
+    } catch (error) {
+      console.error('Error updating category name:', error);
+      Alert.alert('Erreur', 'Impossible de renommer la catégorie');
+    }
+  };
+
+  const handleApproveRequest = async (request: any) => {
+    if (!familyId || !currentUser) {
+      console.warn('[budget-settings] No familyId or user for approve request');
+      Alert.alert('Session expirée', 'Reconnectez-vous pour approuver la demande.');
+      return;
+    }
+
+    try {
+      // Mettre à jour le budget
+      const budgetRef = doc(db, 'budgets', familyId);
+      await updateDoc(budgetRef, {
+        [`categoryRules.${request.categoryName}`]: {
+          limit: request.newLimit,
+          allowOverLimit: request.allowOverLimit,
+        },
+      });
+
+      // Mettre à jour le statut de la demande
+      const requestRef = doc(db, 'budgetChangeRequests', request.id);
+      await updateDoc(requestRef, {
+        status: 'APPROVED',
+        approvedBy: currentUser.uid,
+        approvedAt: new Date(),
+      });
+
+      Alert.alert(
+        '✅ Demande approuvée',
+        `Le budget "${request.categoryName}" a été modifié de ${request.currentLimit.toFixed(2)} € à ${request.newLimit.toFixed(2)} €.`
+      );
+    } catch (error) {
+      console.error('Error approving request:', error);
+      Alert.alert('Erreur', 'Impossible d\'approuver la demande');
+    }
+  };
+
+  const handleRejectRequest = async (request: any) => {
+    if (!currentUser) {
+      console.warn('[budget-settings] No user for reject request');
+      Alert.alert('Session expirée', 'Reconnectez-vous pour rejeter la demande.');
+      return;
+    }
+
+    Alert.alert(
+      'Rejeter la demande',
+      `Êtes-vous sûr de vouloir rejeter la modification du budget "${request.categoryName}" ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Rejeter',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const requestRef = doc(db, 'budgetChangeRequests', request.id);
+              await updateDoc(requestRef, {
+                status: 'REJECTED',
+                rejectedBy: currentUser.uid,
+                rejectedAt: new Date(),
+              });
+
+              Alert.alert('❌ Demande rejetée', 'La modification a été refusée.');
+            } catch (error: any) {
+              console.error('Error rejecting request:', error);
+              const code = error?.code || 'unknown';
+              const message = error?.message || 'Erreur inconnue';
+              Alert.alert(
+                'Erreur rejet demande',
+                `Impossible de rejeter la demande.\nCode: ${code}\nMessage: ${message}`
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleToggleAllow = async (categoryName: string, allow: boolean) => {
+    if (!familyId) {
+      console.warn('[budget-settings] No familyId for toggle allow');
+      Alert.alert('Session expirée', 'Reconnectez-vous pour modifier les règles.');
+      return;
+    }
     try {
       const budgetRef = doc(db, 'budgets', familyId);
       const current = categories.find((c) => c.name === categoryName);
@@ -101,7 +306,11 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
   };
 
   const handleAddCategory = async () => {
-    if (!familyId) return;
+    if (!familyId) {
+      console.warn('[budget-settings] No familyId for add category');
+      Alert.alert('Session expirée', 'Reconnectez-vous pour ajouter une catégorie.');
+      return;
+    }
     const name = newCategoryName.trim();
     if (!name) {
       Alert.alert('Erreur', 'Le nom de la catégorie est requis');
@@ -188,6 +397,45 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
 
   return (
     <View>
+      {/* Demandes en attente */}
+      {pendingRequests.length > 0 && (
+        <View style={styles.pendingRequestsSection}>
+          <View style={[styles.pendingRequestsHeader, { backgroundColor: '#FFF3E0' }]}>
+            <IconSymbol name="bell.badge.fill" size={20} color="#FF9500" />
+            <Text style={[styles.pendingRequestsTitle, { color: '#FF9500' }]}>
+              {pendingRequests.length === 1 ? 'Demande en attente' : `${pendingRequests.length} demandes en attente`}
+            </Text>
+          </View>
+          {pendingRequests.map((request) => (
+            <View key={request.id} style={[styles.requestCard, { backgroundColor: colors.cardBackground, borderColor: '#FF9500' }]}>
+              <View style={styles.requestInfo}>
+                <Text style={[styles.requestCategory, { color: colors.text }]}>{request.categoryName}</Text>
+                <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
+                  {request.currentLimit.toFixed(2)} € → {request.newLimit.toFixed(2)} €
+                </Text>
+                <Text style={[styles.requestedBy, { color: colors.textSecondary }]}>
+                  Demandé par {request.requestedByName}
+                </Text>
+              </View>
+              <View style={styles.requestActions}>
+                <TouchableOpacity
+                  style={[styles.rejectRequestButton, { backgroundColor: '#FF3B30' }]}
+                  onPress={() => handleRejectRequest(request)}
+                >
+                  <IconSymbol name="xmark" size={18} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.approveRequestButton, { backgroundColor: '#34C759' }]}
+                  onPress={() => handleApproveRequest(request)}
+                >
+                  <IconSymbol name="checkmark" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       <View style={{ alignItems: 'flex-end', marginBottom: V_SPACING.small }}>
         <TouchableOpacity onPress={() => setShowAddCategory(true)} style={styles.addButton}>
           <IconSymbol name="plus" size={20} color={colors.tint} />
@@ -196,7 +444,47 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
       {categories.map((cat) => (
         <View key={cat.name} style={[styles.categoryLimitCard, { backgroundColor: colors.cardBackground }]}>
           <View style={styles.categoryLimitInfo}>
-            <Text style={[styles.categoryLimitName, { color: colors.text }]}>{cat.name}</Text>
+            {editingCategoryName === cat.name ? (
+              <View style={styles.editNameContainer}>
+                <TextInput
+                  style={[styles.editNameInput, { color: colors.text, borderColor: colors.border }]}
+                  value={editNameValue}
+                  onChangeText={setEditNameValue}
+                  placeholder="Nom de la catégorie"
+                  placeholderTextColor={colors.textSecondary}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={[styles.saveButton, { backgroundColor: colors.tint }]}
+                  onPress={() => handleUpdateCategoryName(cat.name, editNameValue)}
+                >
+                  <IconSymbol name="checkmark" size={18} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.cancelButton, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
+                  onPress={() => {
+                    setEditingCategoryName(null);
+                    setEditNameValue('');
+                  }}
+                >
+                  <IconSymbol name="xmark" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.categoryNameRow}>
+                <Text style={[styles.categoryLimitName, { color: colors.text }]}>{cat.name}</Text>
+                <TouchableOpacity
+                  style={styles.editNameButton}
+                  onPress={() => {
+                    setEditingCategoryName(cat.name);
+                    setEditNameValue(cat.name);
+                  }}
+                >
+                  <IconSymbol name="pencil" size={16} color={colors.tint} />
+                  <Text style={[styles.editNameButtonText, { color: colors.tint }]}>Modifier</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             {editingCategory === cat.name ? (
               <View style={styles.editLimitContainer}>
                 <TextInput
@@ -345,6 +633,7 @@ export default function BudgetSettingsScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <ScrollView style={styles.scrollView}>
         <View style={styles.container}>
           <View style={styles.header}>
@@ -409,9 +698,40 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: V_SPACING.small,
   },
+  categoryNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: V_SPACING.small,
+  },
   categoryLimitName: {
     fontSize: FONT_SIZES.medium,
     fontWeight: '600',
+    flex: 1,
+  },
+  editNameButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.tiny,
+    paddingHorizontal: SPACING.small,
+    paddingVertical: vs(4),
+  },
+  editNameButtonText: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+  },
+  editNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.small,
+    marginBottom: V_SPACING.small,
+  },
+  editNameInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.small,
+    padding: SPACING.small,
+    fontSize: FONT_SIZES.medium,
   },
   limitDisplay: {
     flexDirection: 'row',
@@ -467,6 +787,64 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.regular,
     textAlign: 'center',
     lineHeight: vs(22),
+  },
+  pendingRequestsSection: {
+    marginBottom: V_SPACING.large,
+  },
+  pendingRequestsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.small,
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    marginBottom: V_SPACING.small,
+  },
+  pendingRequestsTitle: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
+  },
+  requestCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    marginBottom: V_SPACING.small,
+    borderWidth: 2,
+  },
+  requestInfo: {
+    flex: 1,
+  },
+  requestCategory: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
+    marginBottom: vs(4),
+  },
+  requestChange: {
+    fontSize: FONT_SIZES.regular,
+    fontWeight: '600',
+    marginBottom: vs(4),
+  },
+  requestedBy: {
+    fontSize: FONT_SIZES.small,
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: SPACING.small,
+  },
+  rejectRequestButton: {
+    width: hs(44),
+    height: hs(44),
+    borderRadius: BORDER_RADIUS.medium,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  approveRequestButton: {
+    width: hs(44),
+    height: hs(44),
+    borderRadius: BORDER_RADIUS.medium,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalOverlay: {
     position: 'absolute',

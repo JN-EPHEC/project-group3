@@ -3,6 +3,7 @@
  * Gère les appels API vers le backend Stripe
  */
 
+import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import { getAuth } from 'firebase/auth';
 import { Linking, NativeModules, Platform } from 'react-native';
@@ -35,18 +36,51 @@ export interface SubscriptionStatus {
  */
 export class StripeService {
   private static resolveApiUrl(): string {
-    const configured = STRIPE_CONFIG.API_URL || 'http://localhost:3000';
+    // Priorité aux overrides explicites (Expo extra/env)
+    const explicitExtraUrl: string | undefined = (Constants as any)?.expoConfig?.extra?.EXPO_PUBLIC_API_URL
+      || (Constants as any)?.manifest?.extra?.EXPO_PUBLIC_API_URL;
+    if (explicitExtraUrl) return explicitExtraUrl;
+
+    const configured = STRIPE_CONFIG.API_URL || 'https://momentously-involucral-hal.ngrok-free.dev';
+    // Web: utiliser tel quel
     if (Platform.OS === 'web') return configured;
-    if (!configured.includes('localhost')) return configured;
+
+    // Si ce n'est pas une URL locale, garder tel quel (ex: ngrok/production)
+    const isLocal = /^(http:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)|::1)/i.test(configured) || configured.endsWith(':3000');
+    if (!isLocal) return configured;
+
+    // Essayer d'extraire l'hôte de l'URL du bundle Expo (marche souvent sur Expo Go)
     const scriptURL: string | undefined = (NativeModules as any)?.SourceCode?.scriptURL;
-    if (!scriptURL) return configured;
-    const hostMatch = scriptURL.match(/^(?:http|https):\/\/([^:]+):\d+\//);
-    const host = hostMatch?.[1];
-    if (!host) return configured;
-    return `http://${host}:3000`;
+    let hostFromScript: string | undefined;
+    if (scriptURL) {
+      const hostMatch = scriptURL.match(/^(?:http|https):\/\/([^:]+):\d+\//);
+      hostFromScript = hostMatch?.[1];
+      // Éviter les hôtes exp.direct (tunnel), non accessibles pour un backend local
+      if (hostFromScript && hostFromScript.includes('exp.direct')) {
+        hostFromScript = undefined;
+      }
+    }
+
+    // Autres fallbacks: Expo Constants (SDK récents)
+    const hostUri: string | undefined = (Constants as any)?.expoConfig?.hostUri || (Constants as any)?.manifest?.debuggerHost;
+    let hostFromConstants: string | undefined;
+    if (hostUri) hostFromConstants = hostUri.split(':')[0];
+
+    const host = hostFromScript || hostFromConstants;
+    if (host && !host.includes('exp.direct')) {
+      return `http://${host}:3000`;
+    }
+
+    // Android émulateur: fallback utile
+    if (Platform.OS === 'android') {
+      return 'http://10.0.2.2:3000';
+    }
+
+    // Dernier recours: configuré (probablement localhost) ➜ risque d'échec sur appareil réel
+    return configured;
   }
 
-  private static apiUrl = StripeService.resolveApiUrl();
+  private static apiUrl = 'https://momentously-involucral-hal.ngrok-free.dev'
 
   /**
    * Crée une session Stripe Checkout et ouvre le navigateur
@@ -156,7 +190,14 @@ export class StripeService {
       return await response.json();
 
     } catch (error: any) {
-      console.error('Error fetching subscription status:', error);
+      // Ajoute des détails utiles pour le debug sur appareil réel
+      console.error('[StripeService] Error fetching subscription status:', error);
+      console.error('[StripeService] API URL used:', this.apiUrl);
+      console.warn('[StripeService] Conseils:');
+      console.warn(' - Vérifiez que le backend tourne: cd backend && npm run dev');
+      console.warn(' - Depuis votre iPhone, ouvrez Safari: http://<IP_PC>:3000/health');
+      console.warn(' - Si inaccessible, désactivez/autorisez le pare-feu Windows pour Node.js (port 3000)');
+      console.warn(' - Ou définissez EXPO_PUBLIC_API_URL sur une URL accessible (LAN ou ngrok https)');
       throw error;
     }
   }

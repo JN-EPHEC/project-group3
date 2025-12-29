@@ -101,6 +101,10 @@ export default function CategoryApprovalsScreen() {
 
         setApprovals(approvalsData);
         setLoading(false);
+      }, (err) => {
+        console.warn('[category-approvals] onSnapshot error:', err?.code, err?.message);
+        setApprovals([]);
+        setLoading(false);
       });
 
       return () => unsubscribe();

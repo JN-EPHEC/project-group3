@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 /**
  * Configuration Stripe pour l'application
  * 
@@ -29,7 +30,12 @@ export const STRIPE_CONFIG = {
   },
   
   // URL de ton backend API
-  API_URL: process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000',
+  // Résolution de l'API URL: priorité à EXPO_PUBLIC_API_URL, sinon extra, sinon localhost
+  API_URL:
+    process.env.EXPO_PUBLIC_API_URL ||
+    // Expo extra (app.json → expo.extra.EXPO_PUBLIC_API_URL)
+    ((Constants as any)?.expoConfig?.extra?.EXPO_PUBLIC_API_URL as string | undefined) ||
+    'http://localhost:3000',
 };
 
 // Types pour TypeScript

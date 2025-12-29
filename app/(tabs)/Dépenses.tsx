@@ -37,6 +37,7 @@ export default function DepensesScreen() {
   const [filterAmountMin, setFilterAmountMin] = useState('');
   const [filterAmountMax, setFilterAmountMax] = useState('');
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [pendingBudgetRequestsCount, setPendingBudgetRequestsCount] = useState(0);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -107,6 +108,39 @@ export default function DepensesScreen() {
           (doc) => doc.data().requestedBy !== currentUser.uid
         ).length;
         setPendingApprovalsCount(count);
+      });
+
+      return () => unsubscribe();
+    });
+  }, []);
+
+  // Listen to pending budget change requests count
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    getDoc(userDocRef).then((userDoc) => {
+      if (!userDoc.exists()) return;
+
+      const familyIds = userDoc.data().familyIds || [];
+      if (familyIds.length === 0) {
+        setPendingBudgetRequestsCount(0);
+        return;
+      }
+
+      const budgetRequestsRef = collection(db, 'budgetChangeRequests');
+      const q = query(
+        budgetRequestsRef,
+        where('familyId', 'in', familyIds),
+        where('status', '==', 'PENDING')
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const count = snapshot.docs.filter(
+          (doc) => doc.data().requestedBy !== currentUser.uid
+        ).length;
+        setPendingBudgetRequestsCount(count);
       });
 
       return () => unsubscribe();
@@ -191,11 +225,14 @@ export default function DepensesScreen() {
         
         setExpenses(expensesList);
 
-        const total = expensesList.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        // Calculer uniquement avec les dépenses APPROUVÉES pour les totaux et la balance
+        const approvedExpenses = expensesList.filter(exp => exp.approvalStatus === 'APPROVED' || !exp.approvalStatus);
+        
+        const total = approvedExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         setTotalExpenses(total);
         
-        const myExpenses = expensesList
-          .filter(exp => exp.paidBy === uid && exp.approvalStatus !== 'PENDING_APPROVAL')
+        const myExpenses = approvedExpenses
+          .filter(exp => exp.paidBy === uid)
           .reduce((sum, exp) => sum + (exp.amount || 0), 0);
         
         setMyShare(myExpenses);
@@ -244,8 +281,9 @@ export default function DepensesScreen() {
   };
 
   const getCategorySpent = (categoryName: string) => {
+    // Calculer uniquement avec les dépenses APPROUVÉES
     return expenses
-      .filter((exp: any) => exp.category === categoryName)
+      .filter((exp: any) => exp.category === categoryName && (exp.approvalStatus === 'APPROVED' || !exp.approvalStatus))
       .reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
   };
 
@@ -284,11 +322,16 @@ export default function DepensesScreen() {
             <Text style={[styles.title, { color: colors.tint }]}>Dépenses</Text>
             <View style={styles.headerButtons}>
               <TouchableOpacity 
-                style={[styles.settingsButton, { backgroundColor: colors.secondaryCardBackground }]}
+                style={[styles.settingsButton, { backgroundColor: colors.secondaryCardBackground, position: 'relative' }]}
                 onPress={() => router.push({ pathname: '/budget-settings', params: { familyId: activeFamily?.id, familyName: activeFamily?.name } })}
               >
                 <Text style={[styles.settingsButtonText, { color: colors.tint }]}>Paramètres</Text>
                 <IconSymbol name="gearshape.fill" size={20} color={colors.tint} />
+                {pendingBudgetRequestsCount > 0 && (
+                  <View style={[styles.notificationBadge, { backgroundColor: '#FF9500' }]}>
+                    <Text style={styles.notificationBadgeText}>{pendingBudgetRequestsCount}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -337,6 +380,33 @@ export default function DepensesScreen() {
                 {balance >= 0 ? 'À recevoir' : 'À rembourser'}
               </Text>
             </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtonsSection}>
+            <TouchableOpacity
+              style={[styles.primaryActionButton, { backgroundColor: colors.tint }]}
+              onPress={() => router.push({ pathname: '/add-expense', params: { familyId: activeFamily?.id, familyName: activeFamily?.name } })}
+            >
+              <IconSymbol name="plus.circle.fill" size={24} color="#fff" />
+              <Text style={styles.primaryActionButtonText}>Nouvelle dépense</Text>
+            </TouchableOpacity>
+
+            {pendingApprovalsCount > 0 && (
+              <TouchableOpacity
+                style={[styles.approvalsActionButton, { backgroundColor: '#FF9500', borderColor: '#FF9500' }]}
+                onPress={() => router.push('/category-approvals')}
+              >
+                <View style={styles.approvalsBadge}>
+                  <IconSymbol name="exclamationmark.triangle.fill" size={20} color="#fff" />
+                  <Text style={styles.approvalsBadgeCount}>{pendingApprovalsCount}</Text>
+                </View>
+                <Text style={styles.approvalsActionButtonText}>
+                  {pendingApprovalsCount === 1 ? 'Dépense à approuver' : `${pendingApprovalsCount} dépenses à approuver`}
+                </Text>
+                <IconSymbol name="chevron.right" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Budget Categories */}
@@ -575,29 +645,45 @@ export default function DepensesScreen() {
                   const payerName = payer ? `${payer.firstName} ${payer.lastName}` : 'Membre';
                   const payerInitials = payer ? `${payer.firstName.charAt(0)}${payer.lastName.charAt(0)}` : 'M';
                   const isPending = expense.approvalStatus === 'PENDING_APPROVAL';
+                  const isCurrentUserExpense = expense.paidBy === user?.uid;
                   
                   return (
                     <TouchableOpacity 
                       key={expense.id} 
-                      style={[styles.expenseCard, { backgroundColor: colors.cardBackground }]}
+                      style={[
+                        styles.expenseCard, 
+                        { backgroundColor: colors.cardBackground },
+                        isPending && { borderLeftWidth: 4, borderLeftColor: '#FF9500' }
+                      ]}
                       onPress={() => router.push(`/expense-details?expenseId=${expense.id}`)}
                     >
-                      <View style={[styles.avatarBubble, { backgroundColor: colors.tint }]}>
-                        <Text style={styles.avatarText}>{payerInitials}</Text>
+                      <View style={[styles.avatarBubble, { backgroundColor: isPending ? '#FF9500' : colors.tint }]}>
+                        {isPending && <IconSymbol name="clock" size={24} color="#fff" />}
+                        {!isPending && <Text style={styles.avatarText}>{payerInitials}</Text>}
                       </View>
                       <View style={styles.expenseDetails}>
                         <View style={styles.expenseTopRow}>
-                          <Text style={[styles.expenseTitle, { color: colors.text }]}>{payerName}</Text>
+                          <Text style={[styles.expenseTitle, { color: colors.text }]}>{expense.description || payerName}</Text>
                           <Text style={[styles.expenseDate, { color: colors.textSecondary }]}>
                             {expense.date?.toDate ? new Date(expense.date.toDate()).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Date inconnue'}
                           </Text>
                         </View>
                         <View style={styles.expenseBottomRow}>
-                          <Text style={[styles.expenseCategory, { color: colors.tint }]}>{expense.category || 'Non catégorisé'}</Text>
-                          {isPending && <Text style={[styles.pendingBadge, { color: colors.dangerButton }]}>En attente</Text>}
+                          <Text style={[styles.expenseCategory, { color: isPending ? '#FF9500' : colors.tint }]}>{expense.category || 'Non catégorisé'}</Text>
+                          {isPending && (
+                            <View style={[styles.pendingBadgeContainer, { backgroundColor: '#FFF3E0' }]}>
+                              <IconSymbol name="exclamationmark.triangle.fill" size={12} color="#FF9500" />
+                              <Text style={[styles.pendingBadge, { color: '#FF9500' }]}>
+                                {isCurrentUserExpense ? 'En attente d\'approbation' : 'À approuver'}
+                              </Text>
+                            </View>
+                          )}
                         </View>
+                        <Text style={[styles.expensePayerName, { color: colors.textSecondary }]}>
+                          Payé par {payerName}
+                        </Text>
                       </View>
-                      <Text style={[styles.expenseAmount, { color: isPending ? colors.textSecondary : colors.tint }]}>{expense.amount?.toFixed(2)} {expense.currency ? getCurrencySymbol(expense.currency) : currency}</Text>
+                      <Text style={[styles.expenseAmount, { color: isPending ? '#FF9500' : colors.tint }]}>{expense.amount?.toFixed(2)} {expense.currency ? getCurrencySymbol(expense.currency) : currency}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -618,30 +704,11 @@ export default function DepensesScreen() {
                     />
                   </TouchableOpacity>
                 )}
-
-                {/* Add Expense Button */}
-                <TouchableOpacity
-                  style={[styles.addExpenseButton, { backgroundColor: colors.cardBackground }]}
-                  onPress={() => router.push({ pathname: '/add-expense', params: { familyId: activeFamily?.id, familyName: activeFamily?.name } })}
-                >
-                  <IconSymbol name="plus" size={20} color={colors.tint} />
-                  <Text style={[styles.addExpenseButtonText, { color: colors.tint }]}>Nouvelle dépense</Text>
-                </TouchableOpacity>
               </>
             ) : (
-              <>
-                <View style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}>
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucune dépense trouvée</Text>
-                </View>
-                {/* Add Expense Button */}
-                <TouchableOpacity
-                  style={[styles.addExpenseButton, { backgroundColor: colors.cardBackground }]}
-                  onPress={() => router.push({ pathname: '/add-expense', params: { familyId: activeFamily?.id, familyName: activeFamily?.name } })}
-                >
-                  <IconSymbol name="plus" size={20} color={colors.tint} />
-                  <Text style={[styles.addExpenseButtonText, { color: colors.tint }]}>Nouvelle dépense</Text>
-                </TouchableOpacity>
-              </>
+              <View style={[styles.rowCard, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aucune dépense trouvée</Text>
+              </View>
             )}
           </View>
 
@@ -698,15 +765,85 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.small,
+    position: 'relative',
   },
   settingsButtonText: {
     fontSize: FONT_SIZES.regular,
     fontWeight: '600',
   },
-  summarySection: { flexDirection: 'row', gap: SPACING.medium, marginBottom: V_SPACING.xlarge },
+  notificationBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: hs(20),
+    height: hs(20),
+    borderRadius: hs(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: hs(4),
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: FONT_SIZES.tiny,
+    fontWeight: '800',
+  },
+  summarySection: { flexDirection: 'row', gap: SPACING.medium, marginBottom: V_SPACING.medium },
   summaryCard: { flex: 1, borderRadius: BORDER_RADIUS.large, padding: SPACING.large, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: vs(2) }, shadowRadius: hs(8), elevation: 2 },
   summaryLabel: { fontSize: FONT_SIZES.regular, marginBottom: V_SPACING.small },
   summaryAmount: { fontSize: FONT_SIZES.xxlarge, fontWeight: '800' },
+  actionButtonsSection: {
+    marginBottom: V_SPACING.xlarge,
+    gap: SPACING.medium,
+  },
+  primaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: V_SPACING.regular,
+    borderRadius: BORDER_RADIUS.large,
+    gap: SPACING.small,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: vs(2) },
+    shadowRadius: hs(8),
+    elevation: 3,
+  },
+  primaryActionButtonText: {
+    color: '#fff',
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
+  },
+  approvalsActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: V_SPACING.regular,
+    paddingHorizontal: SPACING.large,
+    borderRadius: BORDER_RADIUS.large,
+    borderWidth: 2,
+    shadowColor: '#FF9500',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: vs(2) },
+    shadowRadius: hs(8),
+    elevation: 3,
+  },
+  approvalsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.tiny,
+  },
+  approvalsBadgeCount: {
+    color: '#fff',
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '800',
+  },
+  approvalsActionButtonText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
+    marginLeft: SPACING.small,
+  },
   section: { marginBottom: V_SPACING.xxlarge },
   sectionTitle: { fontSize: FONT_SIZES.xlarge, fontWeight: '600', marginBottom: V_SPACING.regular },
   sectionHeader: {
@@ -938,7 +1075,16 @@ const styles = StyleSheet.create({
   expenseCategory: { fontSize: FONT_SIZES.small, fontWeight: '600' },
   expenseDate: { fontSize: FONT_SIZES.small },
   expenseAmount: { fontSize: FONT_SIZES.large, fontWeight: '800', marginLeft: SPACING.small },
-  pendingBadge: { fontSize: FONT_SIZES.tiny, fontStyle: 'italic' },
+  pendingBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.tiny,
+    paddingHorizontal: SPACING.small,
+    paddingVertical: vs(4),
+    borderRadius: BORDER_RADIUS.small,
+  },
+  pendingBadge: { fontSize: FONT_SIZES.tiny, fontWeight: '600' },
+  expensePayerName: { fontSize: FONT_SIZES.tiny, marginTop: vs(2) },
   balanceHint: { fontSize: FONT_SIZES.tiny, marginTop: vs(2) },
   rowCard: { borderRadius: BORDER_RADIUS.large, paddingVertical: V_SPACING.large, paddingHorizontal: SPACING.large, justifyContent: 'center', minHeight: vs(60) },
   emptyText: { textAlign: 'center', fontSize: FONT_SIZES.regular },
