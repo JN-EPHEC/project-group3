@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { getCurrencySymbol } from '../../constants/currencies';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
 
@@ -508,17 +508,18 @@ export default function DepensesScreen() {
               <Text style={[styles.summaryAmount, { color: balance >= 0 ? colors.progressBar : colors.dangerButton }]}>
                 {balance >= 0 ? '+' : ''}{balance.toFixed(2)} {currency}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: vs(4) }}>
-                <Text style={[styles.balanceHint, { color: colors.textSecondary }]}>
-                  {balance >= 0 ? 'À recevoir' : 'À rembourser'}
-                </Text>
-                {balance < 0 && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.tiny }}>
-                    <Text style={[styles.balanceHint, { color: colors.tint }]}>Rembourser</Text>
-                    <IconSymbol name="chevron.right" size={16} color={colors.tint} />
+              {balance >= 0 ? (
+                <View style={styles.repayRow}>
+                  <Text style={[styles.balanceHint, { color: colors.textSecondary }]}>À recevoir</Text>
+                </View>
+              ) : (
+                <View style={styles.repayRow}>
+                  <View style={[styles.repayChip, { backgroundColor: colors.tint }]}>
+                    <Text style={styles.repayChipText}>Rembourser</Text>
+                    <IconSymbol name="chevron.right" size={16} color="#fff" />
                   </View>
-                )}
-              </View>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -868,8 +869,9 @@ export default function DepensesScreen() {
         animationType="fade"
         onRequestClose={() => setShowRepaymentModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Rembourser ma dette</Text>
               <TouchableOpacity onPress={() => setShowRepaymentModal(false)}>
@@ -930,8 +932,9 @@ export default function DepensesScreen() {
                 )}
               </TouchableOpacity>
             </View>
+            </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );
@@ -1306,6 +1309,9 @@ const styles = StyleSheet.create({
   pendingBadge: { fontSize: FONT_SIZES.tiny, fontWeight: '600' },
   expensePayerName: { fontSize: FONT_SIZES.tiny, marginTop: vs(2) },
   balanceHint: { fontSize: FONT_SIZES.tiny, marginTop: vs(2) },
+  repayRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', marginTop: vs(8) },
+  repayChip: { flexDirection: 'row', alignItems: 'center', gap: SPACING.tiny, paddingHorizontal: SPACING.medium, paddingVertical: vs(6), borderRadius: BORDER_RADIUS.large },
+  repayChipText: { color: '#fff', fontSize: FONT_SIZES.small, fontWeight: '700' },
   rowCard: { borderRadius: BORDER_RADIUS.large, paddingVertical: V_SPACING.large, paddingHorizontal: SPACING.large, justifyContent: 'center', minHeight: vs(60) },
   emptyText: { textAlign: 'center', fontSize: FONT_SIZES.regular },
   modalOverlay: {
