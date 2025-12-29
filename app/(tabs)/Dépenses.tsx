@@ -36,7 +36,8 @@ export default function DepensesScreen() {
   const [showFilterDatePicker, setShowFilterDatePicker] = useState(false);
   const [filterAmountMin, setFilterAmountMin] = useState('');
   const [filterAmountMax, setFilterAmountMax] = useState('');
-  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [pendingExpenseApprovalsCount, setPendingExpenseApprovalsCount] = useState(0);
+  const [pendingCategoryApprovalsCount, setPendingCategoryApprovalsCount] = useState(0);
   const [pendingBudgetRequestsCount, setPendingBudgetRequestsCount] = useState(0);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -81,7 +82,7 @@ export default function DepensesScreen() {
     };
   }, [router]);
 
-  // Listen to pending approvals count
+  // Listen to pending category approvals count
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
@@ -90,16 +91,21 @@ export default function DepensesScreen() {
     getDoc(userDocRef).then((userDoc) => {
       if (!userDoc.exists()) return;
 
-      const familyIds = userDoc.data().familyIds || [];
+      let familyIds: string[] = userDoc.data().familyIds || [];
+      const legacyFamilyId = userDoc.data().familyId;
+      if (legacyFamilyId && !familyIds.includes(legacyFamilyId)) {
+        familyIds = [legacyFamilyId, ...familyIds];
+      }
+
       if (familyIds.length === 0) {
-        setPendingApprovalsCount(0);
+        setPendingCategoryApprovalsCount(0);
         return;
       }
 
       const approvalsRef = collection(db, 'categoryApprovals');
       const q = query(
         approvalsRef,
-        where('familyId', 'in', familyIds),
+        where('familyId', 'in', familyIds.slice(0, 10)),
         where('status', '==', 'PENDING')
       );
 
@@ -107,7 +113,45 @@ export default function DepensesScreen() {
         const count = snapshot.docs.filter(
           (doc) => doc.data().requestedBy !== currentUser.uid
         ).length;
-        setPendingApprovalsCount(count);
+        setPendingCategoryApprovalsCount(count);
+      });
+
+      return () => unsubscribe();
+    });
+  }, []);
+
+  // Listen to pending expense approvals count
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    getDoc(userDocRef).then((userDoc) => {
+      if (!userDoc.exists()) return;
+
+      let familyIds: string[] = userDoc.data().familyIds || [];
+      const legacyFamilyId = userDoc.data().familyId;
+      if (legacyFamilyId && !familyIds.includes(legacyFamilyId)) {
+        familyIds = [legacyFamilyId, ...familyIds];
+      }
+
+      if (familyIds.length === 0) {
+        setPendingExpenseApprovalsCount(0);
+        return;
+      }
+
+      const expensesRef = collection(db, 'expenses');
+      const q = query(
+        expensesRef,
+        where('familyId', 'in', familyIds.slice(0, 10)),
+        where('approvalStatus', '==', 'PENDING_APPROVAL')
+      );
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const count = snapshot.docs.filter(
+          (doc) => doc.data().paidBy !== currentUser.uid
+        ).length;
+        setPendingExpenseApprovalsCount(count);
       });
 
       return () => unsubscribe();
@@ -384,17 +428,17 @@ export default function DepensesScreen() {
               <Text style={styles.primaryActionButtonText}>Nouvelle dépense</Text>
             </TouchableOpacity>
 
-            {pendingApprovalsCount > 0 && (
+            {pendingExpenseApprovalsCount > 0 && (
               <TouchableOpacity
                 style={[styles.approvalsActionButton, { backgroundColor: '#FF9500', borderColor: '#FF9500' }]}
-                onPress={() => router.push('/category-approvals')}
+                onPress={() => router.push('/expense-approvals')}
               >
                 <View style={styles.approvalsBadge}>
                   <IconSymbol name="exclamationmark.triangle.fill" size={20} color="#fff" />
-                  <Text style={styles.approvalsBadgeCount}>{pendingApprovalsCount}</Text>
+                  <Text style={styles.approvalsBadgeCount}>{pendingExpenseApprovalsCount}</Text>
                 </View>
                 <Text style={styles.approvalsActionButtonText}>
-                  {pendingApprovalsCount === 1 ? 'Dépense à approuver' : `${pendingApprovalsCount} dépenses à approuver`}
+                  {pendingExpenseApprovalsCount === 1 ? 'Dépense à approuver' : `${pendingExpenseApprovalsCount} dépenses à approuver`}
                 </Text>
                 <IconSymbol name="chevron.right" size={20} color="#fff" />
               </TouchableOpacity>
@@ -407,13 +451,13 @@ export default function DepensesScreen() {
               <View style={styles.sectionHeader}>
                 <Text style={[styles.sectionTitle, { color: colors.tint }]}>Budgets par catégorie</Text>
                 <View style={styles.budgetActions}>
-                  {pendingApprovalsCount > 0 && (
+                  {pendingCategoryApprovalsCount > 0 && (
                     <TouchableOpacity
                       style={[styles.approvalsButton, { backgroundColor: colors.dangerButton }]}
                       onPress={() => router.push('/category-approvals')}
                     >
                       <IconSymbol name="bell.badge" size={16} color="#fff" />
-                      <Text style={styles.approvalsButtonText}>{pendingApprovalsCount}</Text>
+                      <Text style={styles.approvalsButtonText}>{pendingCategoryApprovalsCount}</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity

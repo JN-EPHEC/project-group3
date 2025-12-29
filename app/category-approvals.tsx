@@ -56,7 +56,13 @@ export default function CategoryApprovalsScreen() {
     getDoc(userDocRef).then((userDoc) => {
       if (!userDoc.exists()) return;
 
-      const familyIds = userDoc.data().familyIds || [];
+      // Support both old (familyId) and new (familyIds) structure
+      let familyIds: string[] = userDoc.data().familyIds || [];
+      const legacyFamilyId = userDoc.data().familyId;
+      if (legacyFamilyId && !familyIds.includes(legacyFamilyId)) {
+        familyIds = [legacyFamilyId, ...familyIds];
+      }
+
       if (familyIds.length === 0) {
         setLoading(false);
         return;
@@ -66,7 +72,7 @@ export default function CategoryApprovalsScreen() {
       const approvalsRef = collection(db, 'categoryApprovals');
       const q = query(
         approvalsRef,
-        where('familyId', 'in', familyIds),
+        where('familyId', 'in', familyIds.slice(0, 10)), // Firestore 'in' limit
         where('status', '==', 'PENDING')
       );
 
