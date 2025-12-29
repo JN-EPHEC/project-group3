@@ -64,7 +64,7 @@ export default function MessageScreen() {
                 // Charger les conversations familiales et les conversations avec professionnels
                 let unsubscribers = [];
                 
-                // 1. Conversations familiales
+                // 1. Conversations familiales UNIQUEMENT (sans professionalId pour éviter mélange avec rôle pro)
                 const familyConversationsQuery = query(
                     collection(db, 'conversations'),
                     where('familyId', 'in', familyIds),
@@ -115,10 +115,10 @@ export default function MessageScreen() {
                 };
                 
                 const unsubFamily = onSnapshot(familyConversationsQuery, (snapshot) => {
-                    familyConvs = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
+                    familyConvs = snapshot.docs
+                        .map(doc => ({ id: doc.id, ...doc.data() }))
+                        // FILTRE: exclure les conversations avec un professionalId dans l'interface parent
+                        .filter(conv => !conv.professionalId);
                     // Combiner et mettre à jour
                     const allConvs = [...familyConvs, ...professionalConvs];
                     setConversations(allConvs);

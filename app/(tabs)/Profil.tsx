@@ -86,7 +86,6 @@ export default function ProfilScreen() {
   const handleAddMissingRole = async () => {
     const current = auth.currentUser;
     if (!current) return;
-    const userRef = doc(db, 'users', current.uid);
 
     const missingRole = parentId ? (professionalId ? null : 'professionnel') : 'parent';
     if (!missingRole) {
@@ -94,30 +93,35 @@ export default function ProfilScreen() {
       return;
     }
 
-    Alert.alert(
-      'Ajouter un rôle',
-      missingRole === 'professionnel'
-        ? 'Ajouter le rôle Professionnel à votre compte ?'
-        : 'Ajouter le rôle Parent à votre compte ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Continuer',
-          onPress: async () => {
-            try {
-              const payload = missingRole === 'professionnel'
-                ? { professional_id: current.uid, roles: arrayUnion('professionnel') }
-                : { parent_id: current.uid, roles: arrayUnion('parent') };
-              await updateDoc(userRef, payload);
-              Alert.alert('Succès', 'Rôle ajouté. Vous pouvez compléter les infos dans le profil correspondant.');
-            } catch (e) {
-              console.error('Error adding role', e);
-              Alert.alert('Erreur', 'Impossible d\'ajouter le rôle.');
-            }
+    if (missingRole === 'professionnel') {
+      // Rediriger vers l'écran dédié pour remplir toutes les infos professionnelles
+      router.push('/AddProfessionalRole');
+    } else {
+      // Pour le rôle parent, simple mise à jour
+      Alert.alert(
+        'Ajouter rôle Parent',
+        'Ajouter le rôle Parent à votre compte ?',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Continuer',
+            onPress: async () => {
+              try {
+                const userRef = doc(db, 'users', current.uid);
+                await updateDoc(userRef, {
+                  parent_id: current.uid,
+                  roles: arrayUnion('parent'),
+                });
+                Alert.alert('Succès', 'Rôle Parent ajouté avec succès.');
+              } catch (e) {
+                console.error('Error adding parent role', e);
+                Alert.alert('Erreur', 'Impossible d\'ajouter le rôle.');
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   };
 
   // Load subscription status on login
