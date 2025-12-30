@@ -1220,11 +1220,11 @@ export default function ProfilScreen() {
         transparent={false}
         onRequestClose={() => setMedicalModalVisible(false)}
       >
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'bottom']}> 
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
           <View style={{ 
             paddingHorizontal: SPACING.large, 
-            paddingTop: V_SPACING.large,
-            paddingBottom: V_SPACING.medium,
+            paddingTop: V_SPACING.medium,
+            paddingBottom: V_SPACING.small,
             borderBottomWidth: 1,
             borderBottomColor: colors.border
           }}>
@@ -1232,13 +1232,9 @@ export default function ProfilScreen() {
               <TouchableOpacity 
                 onPress={() => setMedicalModalVisible(false)} 
                 style={{ 
-                  padding: hs(10),
-                  marginLeft: -hs(10),
-                  marginRight: hs(12),
-                  minWidth: hs(44),
-                  minHeight: hs(44),
-                  justifyContent: 'center',
-                  alignItems: 'center',
+                  padding: hs(8),
+                  marginLeft: -hs(8),
+                  marginRight: hs(12)
                 }}
                 activeOpacity={0.7}
               >
@@ -1249,7 +1245,7 @@ export default function ProfilScreen() {
               </Text>
             </View>
           </View>
-          <View style={{ flex: 1, overflow: 'hidden' }}>
+          <View style={{ flex: 1 }}>
             <ChildMedicalRecord
               childName={selectedChildForMedical?.name}
               initialRecord={(selectedChildFull as any)?.medicalRecord}

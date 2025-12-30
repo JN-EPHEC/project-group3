@@ -5,7 +5,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { addDoc, collection, deleteField, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
 
 const DEFAULT_CATEGORIES = ['Santé', 'Vêtements', 'École', 'Alimentation', 'Transport'];
@@ -675,35 +675,45 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
           </Text>
         </View>
         {showAddCategory && (
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle catégorie</Text>
-              <TextInput
-                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-                placeholder="Nom de la catégorie"
-                placeholderTextColor={colors.textSecondary}
-                value={newCategoryName}
-                onChangeText={setNewCategoryName}
-              />
-              <TextInput
-                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-                placeholder="Plafond (ex: 100)"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="decimal-pad"
-                value={newCategoryLimit}
-                onChangeText={setNewCategoryLimit}
-              />
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalOverlay}
+            enabled
+          >
+            <ScrollView 
+              contentContainerStyle={{ paddingVertical: V_SPACING.large }}
+              keyboardShouldPersistTaps="handled"
+              scrollEnabled={true}
+            >
+              <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle catégorie</Text>
+                <TextInput
+                  style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                  placeholder="Nom de la catégorie"
+                  placeholderTextColor={colors.textSecondary}
+                  value={newCategoryName}
+                  onChangeText={setNewCategoryName}
+                />
+                <TextInput
+                  style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                  placeholder="Plafond (ex: 100)"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="decimal-pad"
+                  value={newCategoryLimit}
+                  onChangeText={setNewCategoryLimit}
+                />
 
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowAddCategory(false)}>
-                  <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalButton, styles.modalPrimary]} onPress={handleAddCategory}>
-                  <Text style={[styles.modalButtonText, { color: '#000' }]}>Ajouter</Text>
-                </TouchableOpacity>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowAddCategory(false)}>
+                    <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalButton, styles.modalPrimary]} onPress={handleAddCategory}>
+                    <Text style={[styles.modalButtonText, { color: '#000' }]}>Ajouter</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         )}
       </View>
     );
@@ -928,35 +938,45 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         </View>
       ))}
       {showAddCategory && (
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle catégorie</Text>
-            <TextInput
-              style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-              placeholder="Nom de la catégorie"
-              placeholderTextColor={colors.textSecondary}
-              value={newCategoryName}
-              onChangeText={setNewCategoryName}
-            />
-            <TextInput
-              style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
-              placeholder="Plafond (ex: 100)"
-              placeholderTextColor={colors.textSecondary}
-              keyboardType="decimal-pad"
-              value={newCategoryLimit}
-              onChangeText={setNewCategoryLimit}
-            />
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+          enabled
+        >
+          <ScrollView 
+            contentContainerStyle={{ paddingVertical: V_SPACING.large }}
+            keyboardShouldPersistTaps="handled"
+            scrollEnabled={true}
+          >
+            <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Nouvelle catégorie</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                placeholder="Nom de la catégorie"
+                placeholderTextColor={colors.textSecondary}
+                value={newCategoryName}
+                onChangeText={setNewCategoryName}
+              />
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
+                placeholder="Plafond (ex: 100)"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+                value={newCategoryLimit}
+                onChangeText={setNewCategoryLimit}
+              />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowAddCategory(false)}>
-                <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.modalPrimary]} onPress={handleAddCategory}>
-                <Text style={[styles.modalButtonText, { color: '#000' }]}>Ajouter</Text>
-              </TouchableOpacity>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowAddCategory(false)}>
+                  <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalButton, styles.modalPrimary]} onPress={handleAddCategory}>
+                  <Text style={[styles.modalButtonText, { color: '#000' }]}>Ajouter</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </View>
   );
