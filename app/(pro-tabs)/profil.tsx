@@ -602,12 +602,6 @@ export default function ProProfilScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.tint }]}>Type de professionnel</Text>
-              <TouchableOpacity 
-                onPress={() => openEditModal('type')}
-                style={[styles.editButton, { backgroundColor: colors.tint }]}
-              >
-                <IconSymbol name="pencil" size={18} color="#fff" />
-              </TouchableOpacity>
             </View>
             
             <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
@@ -627,12 +621,6 @@ export default function ProProfilScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: colors.tint }]}>Informations personnelles</Text>
-              <TouchableOpacity 
-                onPress={() => openEditModal('name')}
-                style={[styles.editButton, { backgroundColor: colors.tint }]}
-              >
-                <IconSymbol name="pencil" size={18} color="#fff" />
-              </TouchableOpacity>
             </View>
             
             <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>

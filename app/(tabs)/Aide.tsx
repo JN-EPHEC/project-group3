@@ -512,6 +512,8 @@ export default function AideScreen() {
   const [loading, setLoading] = useState(false);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loadingProfessionals, setLoadingProfessionals] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'avocat' | 'psychologue'>('all');
   
   // Booking modal state
   const [isBookingModalVisible, setIsBookingModalVisible] = useState(false);
@@ -559,9 +561,28 @@ export default function AideScreen() {
     loadProfessionals();
   }, []);
 
-  const filteredProfessionals = selectedCategory
-    ? professionals.filter(p => p.type === selectedCategory)
-    : [];
+  const filteredProfessionals = useMemo(() => {
+    let filtered = selectedCategory
+      ? professionals.filter(p => p.type === selectedCategory)
+      : professionals;
+
+    // Apply type filter
+    if (filterType !== 'all') {
+      filtered = filtered.filter(p => p.type === filterType);
+    }
+
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.name.toLowerCase().includes(query) ||
+        p.specialty.toLowerCase().includes(query) ||
+        p.location.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [professionals, selectedCategory, filterType, searchQuery]);
 
   // Charger les créneaux réservés quand un professionnel ou une date est sélectionné
   useEffect(() => {
@@ -900,6 +921,47 @@ export default function AideScreen() {
               {selectedCategory === 'avocat' ? 'Avocats' : 'Psychologues'}
             </Text>
           </View>
+
+          {/* Search Bar */}
+          <View style={{ 
+            backgroundColor: colors.cardBackground, 
+            borderRadius: BORDER_RADIUS.medium, 
+            flexDirection: 'row', 
+            alignItems: 'center',
+            paddingHorizontal: SPACING.medium,
+            paddingVertical: V_SPACING.small,
+            marginBottom: V_SPACING.medium,
+            borderWidth: 1,
+            borderColor: colors.border
+          }}>
+            <IconSymbol name="magnifyingglass" size={20} color={colors.textSecondary} />
+            <TextInput
+              style={{ 
+                flex: 1, 
+                marginLeft: SPACING.small, 
+                color: colors.text, 
+                fontSize: FONT_SIZES.regular 
+              }}
+              placeholder="Rechercher par nom, spécialité, ville..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <IconSymbol name="xmark.circle.fill" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Results count */}
+          <Text style={{ 
+            color: colors.textSecondary, 
+            fontSize: FONT_SIZES.small, 
+            marginBottom: V_SPACING.medium 
+          }}>
+            {filteredProfessionals.length} professionnel{filteredProfessionals.length > 1 ? 's' : ''} trouvé{filteredProfessionals.length > 1 ? 's' : ''}
+          </Text>
 
           {/* Professionals List */}
           <View style={{ gap: V_SPACING.medium }}>
