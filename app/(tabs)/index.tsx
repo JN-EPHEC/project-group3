@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, getDoc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamilies, signOut } from '../../constants/firebase';
 import { setActiveSessionRole } from '../../constants/sessionManager';
 import quotesData from '../../quoteOfTheDay.json';
@@ -26,6 +26,8 @@ export default function HomeScreen() {
   const [dualRole, setDualRole] = useState(false);
   const [dailyAdvice, setDailyAdvice] = useState('');
   const [adviceCategory, setAdviceCategory] = useState('');
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [membersWithoutConversation, setMembersWithoutConversation] = useState<any[]>([]);
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
@@ -161,12 +163,35 @@ export default function HomeScreen() {
     if (familyMembers.length === 0) {
       return;
     }
-    const otherMember = familyMembers[0];
+    
+    // Si une seule conversation existe, l'ouvrir directement
+    if (messages.length === 1) {
+      const msg = messages[0];
+      router.push({
+        pathname: '/conversation',
+        params: {
+          conversationId: msg.id,
+          otherUserId: msg.otherUserId,
+          otherUserName: msg.otherUserName
+        }
+      });
+      return;
+    }
+    
+    // Sinon, afficher la modal pour sélectionner le contact
+    const memberIds = new Set(messages.flatMap(m => [m.otherUserId]));
+    const withoutConv = familyMembers.filter(member => !memberIds.has(member.uid));
+    setMembersWithoutConversation(withoutConv.length > 0 ? withoutConv : familyMembers);
+    setIsModalVisible(true);
+  };
+
+  const onSelectMember = (member: any) => {
+    setIsModalVisible(false);
     router.push({
       pathname: '/conversation',
       params: {
-        otherUserId: otherMember.uid,
-        otherUserName: `${otherMember.firstName} ${otherMember.lastName || ''}`
+        otherUserId: member.uid,
+        otherUserName: `${member.firstName} ${member.lastName || ''}`
       }
     });
   };
@@ -325,6 +350,45 @@ export default function HomeScreen() {
 
         </View>
       </ScrollView>
+
+      {/* Modal pour sélectionner un contact */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Démarrer une conversation</Text>
+            <ScrollView>
+              {membersWithoutConversation.map((member) => (
+                <TouchableOpacity
+                  key={member.uid}
+                  style={styles.memberItem}
+                  onPress={() => onSelectMember(member)}
+                >
+                  {member.photoURL || member.profileImage ? (
+                    <Image source={{ uri: member.photoURL || member.profileImage }} style={styles.avatarImage} />
+                  ) : (
+                    <View style={[styles.avatarCircle, { backgroundColor: colors.tint, marginRight: SPACING.regular, }]}>
+                      <Text style={styles.avatarText}>
+                        {(member.firstName?.[0] || 'U').toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={[styles.memberName, { color: colors.text }]}>
+                    {member.firstName} {member.lastName || ''}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setIsModalVisible(false)} style={styles.closeButton}>
+              <Text style={{ color: colors.tint }}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -506,5 +570,59 @@ const styles = StyleSheet.create({
   familyMenuCode: {
     fontSize: FONT_SIZES.small,
     fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    borderTopLeftRadius: BORDER_RADIUS.large,
+    borderTopRightRadius: BORDER_RADIUS.large,
+    paddingHorizontal: SPACING.large,
+    paddingVertical: V_SPACING.large,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.large,
+    fontWeight: '700',
+    marginBottom: V_SPACING.large,
+    textAlign: 'center',
+  },
+  memberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: V_SPACING.medium,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  avatarCircle: {
+    width: hs(40),
+    height: hs(40),
+    borderRadius: hs(20),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.regular,
+  },
+  avatarImage: {
+    width: hs(40),
+    height: hs(40),
+    borderRadius: hs(20),
+    marginRight: SPACING.regular,
+  },
+  avatarText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: FONT_SIZES.regular,
+  },
+  memberName: {
+    fontSize: FONT_SIZES.regular,
+    fontWeight: '500',
+  },
+  closeButton: {
+    paddingVertical: V_SPACING.medium,
+    paddingHorizontal: SPACING.large,
+    alignItems: 'center',
+    marginTop: V_SPACING.large,
   },
 });

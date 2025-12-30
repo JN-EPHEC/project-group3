@@ -1,4 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as DocumentPicker from 'expo-document-picker';
@@ -659,14 +660,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 16,
-    paddingBottom: 32,
+    paddingHorizontal: SPACING.large,
+    paddingTop: V_SPACING.medium,
+    paddingBottom: V_SPACING.large,
   },
   card: {
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: BORDER_RADIUS.large,
+    padding: SPACING.regular,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: V_SPACING.medium,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -674,47 +676,47 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.regular,
     fontWeight: '600',
   },
   sectionBody: {
-    marginTop: 12,
+    marginTop: V_SPACING.medium,
   },
   subTitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.small,
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: V_SPACING.tiny,
   },
   readRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    paddingVertical: 8,
-    gap: 8,
+    paddingVertical: V_SPACING.small,
+    gap: SPACING.regular,
   },
   readLabel: {
-    fontSize: 13,
+    fontSize: FONT_SIZES.small,
     flexBasis: '45%',
   },
   readValue: {
-    fontSize: 13,
+    fontSize: FONT_SIZES.small,
     flexBasis: '55%',
     textAlign: 'right',
   },
   inputRow: {
-    marginBottom: 8,
+    marginBottom: V_SPACING.small,
   },
   input: {
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 13,
+    borderRadius: BORDER_RADIUS.medium,
+    paddingHorizontal: SPACING.small,
+    paddingVertical: V_SPACING.small,
+    fontSize: FONT_SIZES.small,
   },
   dualRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
+    gap: SPACING.regular,
+    marginBottom: V_SPACING.small,
   },
   dualItem: {
     flex: 1,
@@ -725,13 +727,13 @@ const styles = StyleSheet.create({
   addRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
+    gap: SPACING.regular,
+    marginTop: V_SPACING.small,
   },
   addButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: SPACING.small,
+    paddingVertical: V_SPACING.small,
+    borderRadius: BORDER_RADIUS.medium,
   },
   addButtonText: {
     fontWeight: '600',
@@ -739,24 +741,22 @@ const styles = StyleSheet.create({
   fileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
+    gap: SPACING.regular,
+    paddingVertical: V_SPACING.small,
     borderBottomWidth: 1,
   },
   fileLabel: {
-    fontSize: 13,
+    fontSize: FONT_SIZES.small,
   },
   iconButton: {
-    padding: 4,
+    padding: hs(4),
   },
   inlineAction: {
     alignSelf: 'flex-end',
-    marginTop: 4,
+    marginTop: V_SPACING.tiny,
   },
   inlineActionText: {
-    fontSize: 12,
+    fontSize: FONT_SIZES.tiny,
     fontWeight: '600',
   },
 });
