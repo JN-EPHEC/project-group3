@@ -3,10 +3,10 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { User } from 'firebase/auth';
 import { arrayUnion, collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db, getUserFamilies, joinFamilyByCode, leaveFamilyById, signOut } from '../../constants/firebase';
@@ -125,7 +125,7 @@ export default function ProfilScreen() {
   };
 
   // Load subscription status on login
-  const loadSubscriptionStatus = async () => {
+  const loadSubscriptionStatus = useCallback(async () => {
     if (!user) return;
     setLoadingSubscription(true);
     try {
@@ -137,14 +137,21 @@ export default function ProfilScreen() {
     } finally {
       setLoadingSubscription(false);
     }
-  };
+  }, [user]);
+
+  // Recharger le statut quand l'écran est affiché (focus)
+  useFocusEffect(
+    useCallback(() => {
+      loadSubscriptionStatus();
+    }, [loadSubscriptionStatus])
+  );
 
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (currentUser) {
       setUser(currentUser);
       setEmail(currentUser.email || '');
-      // Load subscription status when user logs in or screen refocuses
+      // Load subscription status when user logs in
       loadSubscriptionStatus();
       const uid = currentUser.uid;
 
@@ -1220,11 +1227,10 @@ export default function ProfilScreen() {
         transparent={false}
         onRequestClose={() => setMedicalModalVisible(false)}
       >
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['bottom']}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
           <View style={{ 
             paddingHorizontal: SPACING.large, 
-            paddingTop: SPACING.large,
-            paddingBottom: V_SPACING.medium,
+            paddingVertical: V_SPACING.medium,
             borderBottomWidth: 1,
             borderBottomColor: colors.border,
             flexDirection: 'row',
@@ -1256,6 +1262,8 @@ export default function ProfilScreen() {
             onConfirm={handleConfirmMedicalRecord}
             saving={savingMedical}
           />
+        </SafeAreaView>
+      </Modal>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
