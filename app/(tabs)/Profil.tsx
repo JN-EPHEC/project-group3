@@ -1227,41 +1227,47 @@ export default function ProfilScreen() {
         transparent={false}
         onRequestClose={() => setMedicalModalVisible(false)}
       >
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
-          <View style={{ 
-            paddingHorizontal: SPACING.large, 
-            paddingVertical: V_SPACING.medium,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <TouchableOpacity 
-              onPress={() => setMedicalModalVisible(false)} 
-              style={{ 
-                width: hs(40),
-                height: hs(40),
-                justifyContent: 'center',
-                alignItems: 'center'
-              }}
-              activeOpacity={0.7}
-            >
-              <IconSymbol name="chevron.left" size={hs(28)} color={colors.text} />
-            </TouchableOpacity>
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '700' }}>
-                Fiche médicale {selectedChildForMedical ? `- ${selectedChildForMedical.name}` : ''}
-              </Text>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+          <ScrollView style={styles.scrollView}>
+            <View style={styles.container}>
+              <View style={{ 
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: V_SPACING.large,
+                paddingHorizontal: SPACING.large,
+                paddingTop: V_SPACING.medium
+              }}>
+                <TouchableOpacity 
+                  onPress={() => setMedicalModalVisible(false)} 
+                  style={{ 
+                    width: hs(40),
+                    height: hs(40),
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <IconSymbol name="chevron.left" size={hs(28)} color={colors.text} />
+                </TouchableOpacity>
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '700' }}>
+                    Fiche médicale {selectedChildForMedical ? `- ${selectedChildForMedical.name}` : ''}
+                  </Text>
+                </View>
+                <View style={{ width: hs(40) }} />
+              </View>
+
+              <View style={{ paddingHorizontal: SPACING.large, paddingBottom: SAFE_BOTTOM_SPACING }}>
+                <ChildMedicalRecord
+                  childName={selectedChildForMedical?.name}
+                  initialRecord={(selectedChildFull as any)?.medicalRecord}
+                  onConfirm={handleConfirmMedicalRecord}
+                  saving={savingMedical}
+                />
+              </View>
             </View>
-            <View style={{ width: hs(40) }} />
-          </View>
-          <ChildMedicalRecord
-            childName={selectedChildForMedical?.name}
-            initialRecord={(selectedChildFull as any)?.medicalRecord}
-            onConfirm={handleConfirmMedicalRecord}
-            saving={savingMedical}
-          />
+          </ScrollView>
         </SafeAreaView>
       </Modal>
         </SafeAreaView>

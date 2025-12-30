@@ -7,7 +7,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 // Types
 export type SeverityLevel = 'Faible' | 'Modérée' | 'Sévère';
@@ -314,8 +314,7 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <View style={[styles.content]}>
       {/* 1. Informations générales */}
       <View style={[styles.card, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
         <SectionHeader title="Informations générales" id="general" />
@@ -585,7 +584,6 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
           </View>
         )}
       </View>
-      </ScrollView>
     </View>
   );
 }
