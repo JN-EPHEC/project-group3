@@ -25,6 +25,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
   const [newCategoryLimit, setNewCategoryLimit] = useState(String(DEFAULT_SEEDED_LIMIT));
   const [newAllowOverLimit, setNewAllowOverLimit] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [pendingCategoryRequests, setPendingCategoryRequests] = useState<any[]>([]);
   const currentUser = auth.currentUser;
 
   useEffect(() => {
@@ -108,6 +109,94 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
     }, (err) => {
       console.warn('[budget-settings] budgetChangeRequests onSnapshot error:', err?.code, err?.message);
       setPendingRequests([]);
+    });
+
+    return () => unsubscribe();
+  }, [familyId, currentUser]);
+
+  // Écouter les demandes de nouvelles catégories en attente
+  useEffect(() => {
+    if (!familyId || !currentUser) return;
+
+    const categoryApprovalsRef = collection(db, 'categoryApprovals');
+    const q = query(
+      categoryApprovalsRef,
+      where('familyId', '==', familyId),
+      where('status', '==', 'PENDING')
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const requests: any[] = [];
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        // Ne montrer que les demandes faites par d'autres utilisateurs
+        if (data.requestedBy !== currentUser.uid) {
+          let requestedByName = 'Utilisateur';
+          try {
+            const userDoc = await getDoc(doc(db, 'users', data.requestedBy));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              requestedByName = userData.firstName || userData.name || 'Utilisateur';
+            }
+          } catch (error) {
+            console.error('Error fetching user:', error);
+          }
+
+          requests.push({
+            id: docSnap.id,
+            ...data,
+            requestedByName,
+          });
+        }
+      }
+      setPendingCategoryRequests(requests);
+    }, (err) => {
+      console.warn('[budget-settings] categoryApprovals onSnapshot error:', err?.code, err?.message);
+      setPendingCategoryRequests([]);
+    });
+
+    return () => unsubscribe();
+  }, [familyId, currentUser]);
+
+  // Écouter les demandes de nouvelles catégories en attente
+  useEffect(() => {
+    if (!familyId || !currentUser) return;
+
+    const categoryApprovalsRef = collection(db, 'categoryApprovals');
+    const q = query(
+      categoryApprovalsRef,
+      where('familyId', '==', familyId),
+      where('status', '==', 'PENDING')
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const requests: any[] = [];
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        // Ne montrer que les demandes faites par d'autres utilisateurs
+        if (data.requestedBy !== currentUser.uid) {
+          let requestedByName = 'Utilisateur';
+          try {
+            const userDoc = await getDoc(doc(db, 'users', data.requestedBy));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              requestedByName = userData.firstName || userData.name || 'Utilisateur';
+            }
+          } catch (error) {
+            console.error('Error fetching user:', error);
+          }
+
+          requests.push({
+            id: docSnap.id,
+            ...data,
+            requestedByName,
+          });
+        }
+      }
+      setPendingCategoryRequests(requests);
+    }, (err) => {
+      console.warn('[budget-settings] categoryApprovals onSnapshot error:', err?.code, err?.message);
+      setPendingCategoryRequests([]);
     });
 
     return () => unsubscribe();
@@ -307,6 +396,56 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
     );
   };
 
+  const handleApproveCategoryRequest = async (request: any) => {
+    if (!familyId || !currentUser) {
+      console.warn('[budget-settings] No familyId or user for approve category request');
+      return;
+    }
+    try {
+      // Ajouter la catégorie au budget
+      const budgetRef = doc(db, 'budgets', familyId);
+      await updateDoc(budgetRef, {
+        [`categoryRules.${request.categoryName}`]: {
+          limit: request.limit,
+          allowOverLimit: request.allowOverLimit,
+          period: 'monthly'
+        },
+      });
+
+      // Mettre à jour le statut de la demande
+      const requestRef = doc(db, 'categoryApprovals', request.id);
+      await updateDoc(requestRef, {
+        status: 'APPROVED',
+        approvedBy: currentUser.uid,
+        approvedAt: new Date(),
+      });
+
+      Alert.alert('Succès', `La catégorie "${request.categoryName}" a été ajoutée.`);
+    } catch (error) {
+      console.error('Error approving category request:', error);
+      Alert.alert('Erreur', 'Impossible d\'approuver la demande');
+    }
+  };
+
+  const handleRejectCategoryRequest = async (request: any) => {
+    if (!currentUser) {
+      console.warn('[budget-settings] No user for reject category request');
+      return;
+    }
+    try {
+      const requestRef = doc(db, 'categoryApprovals', request.id);
+      await updateDoc(requestRef, {
+        status: 'REJECTED',
+        rejectedBy: currentUser.uid,
+        rejectedAt: new Date(),
+      });
+      Alert.alert('Refusé', `La demande de catégorie "${request.categoryName}" a été refusée.`);
+    } catch (error) {
+      console.error('Error rejecting category request:', error);
+      Alert.alert('Erreur', 'Impossible de refuser la demande');
+    }
+  };
+
   const handleToggleAllow = async (categoryName: string, allow: boolean) => {
     if (!familyId) {
       console.warn('[budget-settings] No familyId for toggle allow');
@@ -398,6 +537,10 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
       Alert.alert('Session expirée', 'Reconnectez-vous pour ajouter une catégorie.');
       return;
     }
+    if (!currentUser) {
+      Alert.alert('Erreur', 'Vous devez être connecté.');
+      return;
+    }
     const name = newCategoryName.trim();
     if (!name) {
       Alert.alert('Erreur', 'Le nom de la catégorie est requis');
@@ -413,14 +556,26 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
       return;
     }
     try {
-      const budgetRef = doc(db, 'budgets', familyId);
-      await updateDoc(budgetRef, {
-        [`categoryRules.${name}`]: { limit, allowOverLimit: newAllowOverLimit, period: 'monthly' },
+      // Créer une demande d'approbation pour la nouvelle catégorie
+      await addDoc(collection(db, 'categoryApprovals'), {
+        familyId,
+        categoryName: name,
+        limit,
+        allowOverLimit: newAllowOverLimit,
+        requestedBy: currentUser.uid,
+        status: 'PENDING',
+        createdAt: new Date(),
       });
+
       setShowAddCategory(false);
       setNewCategoryName('');
       setNewCategoryLimit(String(DEFAULT_SEEDED_LIMIT));
       setNewAllowOverLimit(false);
+      
+      Alert.alert(
+        'Demande envoyée',
+        'Votre demande de nouvelle catégorie a été envoyée. Elle sera visible une fois approuvée par l\'autre parent.'
+      );
     } catch (error) {
       console.error('Error adding category:', error);
       Alert.alert('Erreur', 'Impossible d\'ajouter la catégorie');
@@ -481,6 +636,48 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
 
   return (
     <View>
+      {/* Demandes de nouvelles catégories en attente */}
+      {pendingCategoryRequests.length > 0 && (
+        <View style={styles.pendingRequestsSection}>
+          <View style={[styles.pendingRequestsHeader, { backgroundColor: '#E3F2FD' }]}>
+            <IconSymbol name="folder.badge.plus" size={20} color="#2196F3" />
+            <Text style={[styles.pendingRequestsTitle, { color: '#2196F3' }]}>
+              {pendingCategoryRequests.length === 1 ? 'Nouvelle catégorie en attente' : `${pendingCategoryRequests.length} nouvelles catégories en attente`}
+            </Text>
+          </View>
+          {pendingCategoryRequests.map((request) => (
+            <View key={request.id} style={[styles.requestCard, { backgroundColor: colors.cardBackground, borderColor: '#2196F3' }]}>
+              <View style={styles.requestInfo}>
+                <Text style={[styles.requestCategory, { color: colors.text }]}>{request.categoryName}</Text>
+                <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
+                  Limite: {request.limit.toFixed(2)} €
+                </Text>
+                <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
+                  Dépassement autorisé: {request.allowOverLimit ? 'Oui' : 'Non'}
+                </Text>
+                <Text style={[styles.requestedBy, { color: colors.textSecondary }]}>
+                  Demandé par {request.requestedByName}
+                </Text>
+              </View>
+              <View style={styles.requestActions}>
+                <TouchableOpacity
+                  style={[styles.rejectRequestButton, { backgroundColor: '#FF3B30' }]}
+                  onPress={() => handleRejectCategoryRequest(request)}
+                >
+                  <IconSymbol name="xmark" size={18} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.approveRequestButton, { backgroundColor: '#34C759' }]}
+                  onPress={() => handleApproveCategoryRequest(request)}
+                >
+                  <IconSymbol name="checkmark" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* Demandes en attente */}
       {pendingRequests.length > 0 && (
         <View style={styles.pendingRequestsSection}>
