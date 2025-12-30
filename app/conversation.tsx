@@ -25,7 +25,7 @@ import {
     View,
     useColorScheme
 } from 'react-native';
-import { auth, db, getUserFamily } from '../constants/firebase';
+import { auth, db, getUserFamily, unhideConversationForUser } from '../constants/firebase';
 
 export default function ConversationScreen() {
   const router = useRouter();
@@ -175,13 +175,28 @@ export default function ConversationScreen() {
             orderBy('timestamp', 'desc')
           );
 
-          const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+          const unsubscribe = onSnapshot(messagesQuery, async (snapshot) => {
             const msgs = snapshot.docs.map(doc => ({
               id: doc.id,
               ...doc.data()
             }));
             setMessages(msgs);
             setLoading(false);
+
+            // Unhide la conversation si on reçoit un message de l'autre personne
+            if (msgs.length > 0) {
+              const lastMsg = msgs[0]; // Premier message (le plus récent)
+              console.log('[ConversationScreen] Dernier message de:', lastMsg.senderId, 'currentUser:', currentUser.uid, 'otherUser:', otherUserId);
+              if (lastMsg.senderId && lastMsg.senderId !== currentUser.uid && lastMsg.senderId === otherUserId) {
+                console.log('[ConversationScreen] Réception message - tentative unhide pour:', currentUser.uid, 'conversation:', convId);
+                try {
+                  await unhideConversationForUser(convId, currentUser.uid);
+                  console.log('[ConversationScreen] ✅ Unhide réussi après réception de message');
+                } catch (error) {
+                  console.log('Note: Message received, unhide attempted');
+                }
+              }
+            }
           });
 
           return () => unsubscribe();
@@ -445,6 +460,15 @@ export default function ConversationScreen() {
         lastMessageType: lastMessageType,
         [`unreadCount.${otherUserId}`]: increment(1) 
       });
+
+      // Unhide la conversation si elle était masquée
+      console.log('[ConversationScreen] Envoi de message - tentative unhide pour:', currentUser.uid, 'conversation:', currentConversationId);
+      try {
+        await unhideConversationForUser(currentConversationId, currentUser.uid);
+        console.log('[ConversationScreen] ✅ Unhide réussi après envoi de message');
+      } catch (error) {
+        console.log('Note: Conversation unhide attempted but may not have been hidden');
+      }
 
     } catch (error) {
       console.error('Error sending message:', error);

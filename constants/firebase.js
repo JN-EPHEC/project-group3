@@ -939,6 +939,7 @@ export async function hideConversationForUser(conversationId, userId) {
  */
 export async function unhideConversationForUser(conversationId, userId) {
   try {
+    console.log(`[UnhideConversation] Début unhide - Conv: ${conversationId}, User: ${userId}`);
     const convRef = doc(db, 'conversations', conversationId);
     
     const convSnap = await getDoc(convRef);
@@ -948,15 +949,17 @@ export async function unhideConversationForUser(conversationId, userId) {
 
     const convData = convSnap.data();
     let hiddenFor = convData.hiddenFor || [];
+    console.log(`[UnhideConversation] hiddenFor actuel:`, hiddenFor);
     
     // Retirer userId du tableau hiddenFor
     hiddenFor = hiddenFor.filter(id => id !== userId);
+    console.log(`[UnhideConversation] hiddenFor après filtrage:`, hiddenFor);
 
     await updateDoc(convRef, {
       hiddenFor: hiddenFor
     });
 
-    console.log(`[UnhideConversation] Conversation ${conversationId} restaurée pour l'utilisateur ${userId}`);
+    console.log(`[UnhideConversation] ✅ Conversation ${conversationId} restaurée pour l'utilisateur ${userId}`);
   } catch (error) {
     console.error('[UnhideConversation] Erreur:', error);
     throw error;

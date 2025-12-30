@@ -115,12 +115,21 @@ export default function MessageScreen() {
                 };
                 
                 const unsubFamily = onSnapshot(familyConversationsQuery, (snapshot) => {
-                    familyConvs = snapshot.docs
-                        .map(doc => ({ id: doc.id, ...doc.data() }))
+                    const rawFamilyConvs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    console.log('[MessageScreen] Conversations familiales brutes:', rawFamilyConvs.length);
+                    
+                    familyConvs = rawFamilyConvs
                         // FILTRE: exclure les conversations avec un professionalId dans l'interface parent
                         .filter(conv => !conv.professionalId)
                         // FILTRE: exclure les conversations masquées par cet utilisateur
-                        .filter(conv => !conv.hiddenFor || !conv.hiddenFor.includes(uid));
+                        .filter(conv => {
+                            const isHidden = conv.hiddenFor && conv.hiddenFor.includes(uid);
+                            if (isHidden) {
+                                console.log('[MessageScreen] Conversation masquée:', conv.id, 'hiddenFor:', conv.hiddenFor);
+                            }
+                            return !isHidden;
+                        });
+                    console.log('[MessageScreen] Conversations familiales filtrées:', familyConvs.length);
                     // Combiner et mettre à jour
                     const allConvs = [...familyConvs, ...professionalConvs];
                     setConversations(allConvs);
@@ -135,13 +144,19 @@ export default function MessageScreen() {
                 });
                 
                 const unsubProfessional = onSnapshot(professionalConversationsQuery, async (snapshot) => {
-                    professionalConvs = snapshot.docs
-                        .map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }))
+                    const rawProfessionalConvs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    console.log('[MessageScreen] Conversations professionnelles brutes:', rawProfessionalConvs.length);
+                    
+                    professionalConvs = rawProfessionalConvs
                         // FILTRE: exclure les conversations masquées par cet utilisateur
-                        .filter(conv => !conv.hiddenFor || !conv.hiddenFor.includes(uid));
+                        .filter(conv => {
+                            const isHidden = conv.hiddenFor && conv.hiddenFor.includes(uid);
+                            if (isHidden) {
+                                console.log('[MessageScreen] Conversation masquée (pro):', conv.id, 'hiddenFor:', conv.hiddenFor);
+                            }
+                            return !isHidden;
+                        });
+                    console.log('[MessageScreen] Conversations professionnelles filtrées:', professionalConvs.length);
                     // Combiner et mettre à jour
                     const allConvs = [...familyConvs, ...professionalConvs];
                     setConversations(allConvs);
