@@ -49,25 +49,34 @@ export default function AgendaScreen() {
     const uid = currentUser.uid;
 
     const userDocRef = doc(db, 'users', uid);
-    const unsubUser = onSnapshot(userDocRef, (doc) => {
-        if (doc.exists()) {
-          setFirstName(doc.data().firstName || 'Utilisateur');
+    const unsubUser = onSnapshot(userDocRef, (userDoc) => {
+        if (userDoc.exists()) {
+          setFirstName(userDoc.data().firstName || 'Utilisateur');
+          
+          // Re-fetch families quand les familyIds changent (parent quitte/rejoint une famille)
+          const fetchFamilies = async () => {
+              try {
+                  const userFamilies = await getUserFamilies(uid);
+                  const familiesWithData = await Promise.all(userFamilies.map(async (family) => {
+                      const familyDoc = await getDoc(doc(db, 'families', family.id));
+                      return familyDoc.exists() ? { ...family, ...familyDoc.data() } : family;
+                  }));
+                  setFamilies(familiesWithData);
+                  // Si la famille sélectionnée n'existe plus, retour à 'all'
+                  setSelectedFamilyId(prev => {
+                    const familyIds = familiesWithData.map(f => f.id);
+                    if (prev !== 'all' && !familyIds.includes(prev)) {
+                      return 'all';
+                    }
+                    return prev;
+                  });
+              } catch (error) {
+                  console.error("Error fetching families:", error);
+              }
+          }
+          fetchFamilies();
         }
     });
-
-    const fetchFamilies = async () => {
-        try {
-            const userFamilies = await getUserFamilies(uid);
-            const familiesWithData = await Promise.all(userFamilies.map(async (family) => {
-                const familyDoc = await getDoc(doc(db, 'families', family.id));
-                return familyDoc.exists() ? { ...family, ...familyDoc.data() } : family;
-            }));
-            setFamilies(familiesWithData);
-        } catch (error) {
-            console.error("Error fetching families:", error);
-        }
-    }
-    fetchFamilies();
 
     return () => unsubUser();
   }, [router]);
