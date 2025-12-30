@@ -38,6 +38,7 @@ export default function AddExpenseScreen() {
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [categoryRules, setCategoryRules] = useState<{ [key: string]: CategoryRule }>({});
+  const [categorySpent, setCategorySpent] = useState<{ [key: string]: number }>({});
   const [uploading, setUploading] = useState(false);
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [familyName, setFamilyName] = useState<string | null>(null);
@@ -121,9 +122,41 @@ export default function AddExpenseScreen() {
         setCurrency(familyCurrency);
       }
 
+      // Écouter les dépenses en temps réel pour calculer les montants par catégorie
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      const expensesQuery = query(
+        collection(db, 'expenses'),
+        where('familyId', '==', fId),
+        where('date', '>=', Timestamp.fromDate(startOfMonth))
+      );
+      
+      const unsubscribeExpenses = onSnapshot(expensesQuery, (expensesSnapshot) => {
+        const spentByCategory: { [key: string]: number } = {};
+        
+        expensesSnapshot.docs.forEach((doc) => {
+          const expense = doc.data();
+          // Ne compter que les dépenses approuvées ou sans statut (anciennes dépenses)
+          if (!expense.approvalStatus || expense.approvalStatus === 'APPROVED') {
+            const cat = expense.category || 'Non catégorisé';
+            const amount = expense.amount || 0;
+            
+            if (!spentByCategory[cat]) {
+              spentByCategory[cat] = 0;
+            }
+            spentByCategory[cat] += amount;
+          }
+        });
+        
+        setCategorySpent(spentByCategory);
+      }, (error) => {
+        console.error('Error listening to expenses:', error);
+      });
+
       // Écouter les catégories et limites en temps réel
       const budgetRef = doc(db, 'budgets', fId);
-      const unsubscribe = onSnapshot(budgetRef, (docSnap) => {
+      const unsubscribeBudget = onSnapshot(budgetRef, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           const rules = data.categoryRules || data.categoryLimits || {};
@@ -165,7 +198,11 @@ export default function AddExpenseScreen() {
         console.warn('[add-expense] Budget onSnapshot error:', err?.code, err?.message);
       });
 
-      return unsubscribe;
+      // Retourner une fonction qui désabonne les deux listeners
+      return () => {
+        unsubscribeExpenses();
+        unsubscribeBudget();
+      };
     } catch (error) {
       console.error('Error loading family settings:', error);
     }
@@ -524,7 +561,7 @@ export default function AddExpenseScreen() {
                     Budget {category}
                   </Text>
                   <Text style={[styles.budgetValue, { color: colors.text }]}>
-                    Limite: {categoryRules[category].limit.toFixed(2)} {currency}
+                    Limite: {(categorySpent[category] || 0).toFixed(2)} {currency} dépensés / {categoryRules[category].limit.toFixed(2)} {currency}
                   </Text>
                   {!categoryRules[category].allowOverLimit && (
                     <Text style={[styles.budgetWarning, { color: '#FF6B6B' }]}>
