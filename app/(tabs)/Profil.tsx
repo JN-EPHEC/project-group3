@@ -1223,7 +1223,7 @@ export default function ProfilScreen() {
       {/* Child Medical Record Modal */}
       <Modal
         visible={medicalModalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={false}
         onRequestClose={() => setMedicalModalVisible(false)}
       >
