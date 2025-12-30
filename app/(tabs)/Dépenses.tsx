@@ -31,6 +31,7 @@ export default function DepensesScreen() {
   const [sortBy, setSortBy] = useState<'date' | 'category' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [filterDate, setFilterDate] = useState<Date | null>(null);
   const [showFilterDatePicker, setShowFilterDatePicker] = useState(false);
@@ -630,13 +631,28 @@ export default function DepensesScreen() {
           <View style={styles.section}>
             <View style={styles.expensesHeader}>
               <Text style={[styles.sectionTitle, { color: colors.tint }]}>Historique des dépenses</Text>
-              <TouchableOpacity
-                style={[styles.sortButton, { backgroundColor: colors.cardBackground }]}
-                onPress={() => setShowSortMenu(!showSortMenu)}
-              >
-                <IconSymbol name="arrow.up.arrow.down" size={18} color={colors.tint} />
-                <Text style={[styles.sortButtonText, { color: colors.tint }]}>Trier</Text>
-              </TouchableOpacity>
+              <View style={styles.headerButtonsContainer}>
+                <TouchableOpacity
+                  style={[styles.sortButton, { backgroundColor: colors.cardBackground }]}
+                  onPress={() => {
+                    setShowFilterMenu(!showFilterMenu);
+                    setShowSortMenu(false);
+                  }}
+                >
+                  <IconSymbol name="line.3.horizontal.decrease.circle" size={18} color={colors.tint} />
+                  <Text style={[styles.sortButtonText, { color: colors.tint }]}>Filtrer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sortButton, { backgroundColor: colors.cardBackground }]}
+                  onPress={() => {
+                    setShowSortMenu(!showSortMenu);
+                    setShowFilterMenu(false);
+                  }}
+                >
+                  <IconSymbol name="arrow.up.arrow.down" size={18} color={colors.tint} />
+                  <Text style={[styles.sortButtonText, { color: colors.tint }]}>Trier</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Sort Menu */}
@@ -707,6 +723,7 @@ export default function DepensesScreen() {
             )}
 
             {/* Filtres détaillés */}
+            {showFilterMenu && (
             <View style={[styles.filterPanel, { backgroundColor: colors.secondaryCardBackground }]}>
               {/* Catégorie */}
               <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Catégorie</Text>
@@ -786,6 +803,7 @@ export default function DepensesScreen() {
                 <Text style={[styles.resetFiltersText, { color: colors.textSecondary }]}>Réinitialiser les filtres</Text>
               </TouchableOpacity>
             </View>
+            )}
 
             {showFilterDatePicker && (
               <DateTimePicker
@@ -1134,6 +1152,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: V_SPACING.regular,
+  },
+  headerButtonsContainer: {
+    flexDirection: 'row',
+    gap: SPACING.small,
   },
   sortButton: {
     flexDirection: 'row',
