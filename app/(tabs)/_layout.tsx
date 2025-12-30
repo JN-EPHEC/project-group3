@@ -85,15 +85,15 @@ export default function TabLayout() {
         return;
       }
 
-      const approvalsRef = collection(db, 'categoryApprovals');
-      const qApprovals = query(
-        approvalsRef,
+      const expensesRef = collection(db, 'expenses');
+      const qPending = query(
+        expensesRef,
         where('familyId', 'in', familyIds.slice(0, 10)), // Firestore 'in' limit
-        where('status', '==', 'PENDING')
+        where('approvalStatus', '==', 'PENDING_APPROVAL')
       );
 
-      unsubscribe = onSnapshot(qApprovals, (snapshot) => {
-        const count = snapshot.docs.filter((d) => d.data().requestedBy !== currentUser.uid).length;
+      unsubscribe = onSnapshot(qPending, (snapshot) => {
+        const count = snapshot.docs.filter((d) => d.data().paidBy !== currentUser.uid).length;
         setPendingExpenseApprovals(count);
       });
     });
