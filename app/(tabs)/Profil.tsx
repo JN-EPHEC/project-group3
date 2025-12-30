@@ -3,10 +3,10 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING, vs } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { arrayUnion, collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db, getUserFamilies, joinFamilyByCode, leaveFamilyById, signOut } from '../../constants/firebase';
@@ -1268,8 +1268,6 @@ export default function ProfilScreen() {
               </View>
             </View>
           </ScrollView>
-        </SafeAreaView>
-      </Modal>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
