@@ -1223,36 +1223,38 @@ export default function ProfilScreen() {
         <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
           <View style={{ 
             paddingHorizontal: SPACING.large, 
-            paddingTop: V_SPACING.medium,
-            paddingBottom: V_SPACING.small,
+            paddingVertical: V_SPACING.medium,
             borderBottomWidth: 1,
-            borderBottomColor: colors.border
+            borderBottomColor: colors.border,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: V_SPACING.small }}>
-              <TouchableOpacity 
-                onPress={() => setMedicalModalVisible(false)} 
-                style={{ 
-                  padding: hs(8),
-                  marginLeft: -hs(8),
-                  marginRight: hs(12)
-                }}
-                activeOpacity={0.7}
-              >
-                <IconSymbol name="chevron.left" size={hs(28)} color={colors.text} />
-              </TouchableOpacity>
-              <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '700', flex: 1 }}>
+            <TouchableOpacity 
+              onPress={() => setMedicalModalVisible(false)} 
+              style={{ 
+                width: hs(40),
+                height: hs(40),
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+              activeOpacity={0.7}
+            >
+              <IconSymbol name="chevron.left" size={hs(28)} color={colors.text} />
+            </TouchableOpacity>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '700' }}>
                 Fiche médicale {selectedChildForMedical ? `- ${selectedChildForMedical.name}` : ''}
               </Text>
             </View>
+            <View style={{ width: hs(40) }} />
           </View>
-          <View style={{ flex: 1 }}>
-            <ChildMedicalRecord
-              childName={selectedChildForMedical?.name}
-              initialRecord={(selectedChildFull as any)?.medicalRecord}
-              onConfirm={handleConfirmMedicalRecord}
-              saving={savingMedical}
-            />
-          </View>
+          <ChildMedicalRecord
+            childName={selectedChildForMedical?.name}
+            initialRecord={(selectedChildFull as any)?.medicalRecord}
+            onConfirm={handleConfirmMedicalRecord}
+            saving={savingMedical}
+          />
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
