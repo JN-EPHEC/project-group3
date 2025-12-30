@@ -887,3 +887,78 @@ export async function getFormattedSubscriptionStatus(uid) {
     };
   }
 }
+
+/**
+ * Masquer une conversation pour un utilisateur spécifique
+ * La conversation reste dans la BD mais n'est plus visible pour cet utilisateur
+ * Fonctionne pour les parents et les professionnels
+ * 
+ * @param {string} conversationId - ID de la conversation
+ * @param {string} userId - ID de l'utilisateur qui souhaite masquer la conversation
+ * @returns {Promise<void>}
+ */
+export async function hideConversationForUser(conversationId, userId) {
+  try {
+    const convRef = doc(db, 'conversations', conversationId);
+    
+    // Récupérer la conversation
+    const convSnap = await getDoc(convRef);
+    if (!convSnap.exists()) {
+      throw new Error('Conversation non trouvée');
+    }
+
+    // Vérifier que l'utilisateur est participant
+    const convData = convSnap.data();
+    if (!convData.participants || !convData.participants.includes(userId)) {
+      throw new Error('L\'utilisateur n\'est pas participant de cette conversation');
+    }
+
+    // Ajouter userId au tableau hiddenFor (créer le tableau s'il n'existe pas)
+    const hiddenFor = convData.hiddenFor || [];
+    if (!hiddenFor.includes(userId)) {
+      hiddenFor.push(userId);
+    }
+
+    await updateDoc(convRef, {
+      hiddenFor: hiddenFor
+    });
+
+    console.log(`[HideConversation] Conversation ${conversationId} masquée pour l'utilisateur ${userId}`);
+  } catch (error) {
+    console.error('[HideConversation] Erreur:', error);
+    throw error;
+  }
+}
+
+/**
+ * Afficher à nouveau une conversation précédemment masquée
+ * 
+ * @param {string} conversationId - ID de la conversation
+ * @param {string} userId - ID de l'utilisateur
+ * @returns {Promise<void>}
+ */
+export async function unhideConversationForUser(conversationId, userId) {
+  try {
+    const convRef = doc(db, 'conversations', conversationId);
+    
+    const convSnap = await getDoc(convRef);
+    if (!convSnap.exists()) {
+      throw new Error('Conversation non trouvée');
+    }
+
+    const convData = convSnap.data();
+    let hiddenFor = convData.hiddenFor || [];
+    
+    // Retirer userId du tableau hiddenFor
+    hiddenFor = hiddenFor.filter(id => id !== userId);
+
+    await updateDoc(convRef, {
+      hiddenFor: hiddenFor
+    });
+
+    console.log(`[UnhideConversation] Conversation ${conversationId} restaurée pour l'utilisateur ${userId}`);
+  } catch (error) {
+    console.error('[UnhideConversation] Erreur:', error);
+    throw error;
+  }
+}

@@ -6,8 +6,8 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { collection, doc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { auth, db, getUserFamilies } from '../../constants/firebase';
+import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { auth, db, getUserFamilies, hideConversationForUser } from '../../constants/firebase';
 
 export default function MessageScreen() {
   const router = useRouter();
@@ -118,7 +118,9 @@ export default function MessageScreen() {
                     familyConvs = snapshot.docs
                         .map(doc => ({ id: doc.id, ...doc.data() }))
                         // FILTRE: exclure les conversations avec un professionalId dans l'interface parent
-                        .filter(conv => !conv.professionalId);
+                        .filter(conv => !conv.professionalId)
+                        // FILTRE: exclure les conversations masquées par cet utilisateur
+                        .filter(conv => !conv.hiddenFor || !conv.hiddenFor.includes(uid));
                     // Combiner et mettre à jour
                     const allConvs = [...familyConvs, ...professionalConvs];
                     setConversations(allConvs);
@@ -133,10 +135,13 @@ export default function MessageScreen() {
                 });
                 
                 const unsubProfessional = onSnapshot(professionalConversationsQuery, async (snapshot) => {
-                    professionalConvs = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
+                    professionalConvs = snapshot.docs
+                        .map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }))
+                        // FILTRE: exclure les conversations masquées par cet utilisateur
+                        .filter(conv => !conv.hiddenFor || !conv.hiddenFor.includes(uid));
                     // Combiner et mettre à jour
                     const allConvs = [...familyConvs, ...professionalConvs];
                     setConversations(allConvs);
@@ -206,6 +211,35 @@ export default function MessageScreen() {
         otherUserName: `${member.firstName} ${member.lastName || ''}`
       }
     });
+  };
+
+  const handleDeleteConversation = (conversationId: string, displayName: string) => {
+    Alert.alert(
+      'Supprimer la conversation',
+      `Êtes-vous sûr de vouloir supprimer la conversation avec ${displayName}? Cette action ne peut pas être annulée.`,
+      [
+        {
+          text: 'Annuler',
+          onPress: () => {},
+          style: 'cancel'
+        },
+        {
+          text: 'Supprimer',
+          onPress: async () => {
+            try {
+              if (!user?.uid) return;
+              await hideConversationForUser(conversationId, user.uid);
+              // La conversation sera automatiquement filtrée par les listeners
+              Alert.alert('Succès', 'La conversation a été supprimée de votre vue');
+            } catch (error) {
+              console.error('Erreur lors de la suppression:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer la conversation');
+            }
+          },
+          style: 'destructive'
+        }
+      ]
+    );
   };
 
   const formatTime = (timestamp: any) => {
@@ -306,9 +340,17 @@ export default function MessageScreen() {
                       <Text style={[styles.conversationName, { color: colors.text }]}>
                         {displayName}
                       </Text>
-                      <Text style={[styles.messageTime, { color: colors.textTertiary }]}>
-                        {formatTime(conv.lastMessageTime)}
-                      </Text>
+                      <View style={styles.rightSection}>
+                        <Text style={[styles.messageTime, { color: colors.textTertiary }]}>
+                          {formatTime(conv.lastMessageTime)}
+                        </Text>
+                        <TouchableOpacity 
+                          style={styles.deleteButton}
+                          onPress={() => handleDeleteConversation(conv.id, displayName)}
+                        >
+                          <IconSymbol name="trash" size={18} color="#FF6B6B" />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <View style={styles.lastMessageContainer}>
                       {conv.lastMessageType === 'image' ? (
@@ -474,9 +516,18 @@ const styles = StyleSheet.create({
   conversationName: {
     fontSize: FONT_SIZES.medium,
     fontWeight: '600',
+    flex: 1,
+  },
+  rightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.small,
   },
   messageTime: {
     fontSize: FONT_SIZES.small,
+  },
+  deleteButton: {
+    padding: SPACING.tiny,
   },
   lastMessageContainer: {
     flexDirection: 'row',
