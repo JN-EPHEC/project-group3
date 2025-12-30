@@ -304,17 +304,19 @@ export default function DepensesScreen() {
         if (budgetDoc.exists()) {
           const data = budgetDoc.data();
           const rules = data.categoryRules || data.categoryLimits || {};
-          const categoryArray = Object.entries(rules).map(([name, value]: any) => {
-            if (typeof value === 'number') {
-              return { name, limit: value, allowOverLimit: false, period: 'monthly' };
-            }
-            return { 
-              name, 
-              limit: value?.limit ?? 0, 
-              allowOverLimit: !!value?.allowOverLimit,
-              period: value?.period || 'monthly'
-            };
-          });
+          const categoryArray = Object.entries(rules)
+            .filter(([_, value]) => value !== null && value !== undefined)
+            .map(([name, value]: any) => {
+              if (typeof value === 'number') {
+                return { name, limit: value, allowOverLimit: false, period: 'monthly' };
+              }
+              return { 
+                name, 
+                limit: value?.limit ?? 0, 
+                allowOverLimit: !!value?.allowOverLimit,
+                period: value?.period || 'monthly'
+              };
+            });
           setCategories(categoryArray);
         } else {
           setCategories([]);
