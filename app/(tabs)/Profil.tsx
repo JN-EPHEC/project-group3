@@ -796,22 +796,22 @@ export default function ProfilScreen() {
                         </Text>
                       </View>
                     </View>
-                    {subscriptionStatus.subscription?.trialEnd && (
+                    {subscriptionStatus.subscription?.trialEnd || subscriptionStatus.subscription?.currentPeriodEnd ? (
                       <>
                         <View style={[styles.separator, { backgroundColor: colors.border }]} />
                         <View style={styles.infoRow}>
                           <IconSymbol name="calendar" size={20} color={colors.textSecondary} />
                           <View style={styles.infoText}>
                             <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
-                              {subscriptionStatus.subscription?.status === 'trialing' ? 'Essai jusqu\'au' : 'Fin de la période'}
+                              {subscriptionStatus.subscription?.status === 'trialing' ? 'Essai jusqu\'au' : 'Actif jusqu\'au'}
                             </Text>
                             <Text style={[styles.infoValue, { color: colors.text }]}>
-                              {new Date(subscriptionStatus.subscription.trialEnd * 1000).toLocaleDateString('fr-FR')}
+                              {new Date((subscriptionStatus.subscription?.trialEnd || subscriptionStatus.subscription?.currentPeriodEnd) * 1000).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
                             </Text>
                           </View>
                         </View>
                       </>
-                    )}
+                    ) : null}
                     <View style={[styles.separator, { backgroundColor: colors.border }]} />
                     <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground, marginHorizontal: 0 }]}>
                       <Text style={[styles.settingText, { color: colors.tint }]}>Gérer mon abonnement</Text>
@@ -1220,10 +1220,11 @@ export default function ProfilScreen() {
         transparent={false}
         onRequestClose={() => setMedicalModalVisible(false)}
       >
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['bottom']}>
           <View style={{ 
             paddingHorizontal: SPACING.large, 
-            paddingVertical: V_SPACING.medium,
+            paddingTop: SPACING.large,
+            paddingBottom: V_SPACING.medium,
             borderBottomWidth: 1,
             borderBottomColor: colors.border,
             flexDirection: 'row',
