@@ -1220,14 +1220,30 @@ export default function ProfilScreen() {
         transparent={false}
         onRequestClose={() => setMedicalModalVisible(false)}
       >
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}> 
-          <View style={{ paddingHorizontal: SPACING.large, paddingTop: V_SPACING.small }}>
-            <TouchableOpacity onPress={() => setMedicalModalVisible(false)} style={{ marginBottom: V_SPACING.medium }}>
-              <IconSymbol name="chevron.left" size={hs(24)} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '700', marginBottom: V_SPACING.medium }}>
-              Fiche médicale {selectedChildForMedical ? `- ${selectedChildForMedical.name}` : ''}
-            </Text>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'bottom']}> 
+          <View style={{ 
+            paddingHorizontal: SPACING.large, 
+            paddingTop: V_SPACING.medium,
+            paddingBottom: V_SPACING.small,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: V_SPACING.small }}>
+              <TouchableOpacity 
+                onPress={() => setMedicalModalVisible(false)} 
+                style={{ 
+                  padding: hs(8),
+                  marginLeft: -hs(8),
+                  marginRight: hs(12)
+                }}
+                activeOpacity={0.7}
+              >
+                <IconSymbol name="chevron.left" size={hs(28)} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '700', flex: 1 }}>
+                Fiche médicale {selectedChildForMedical ? `- ${selectedChildForMedical.name}` : ''}
+              </Text>
+            </View>
           </View>
           <View style={{ flex: 1 }}>
             <ChildMedicalRecord
