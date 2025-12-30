@@ -639,8 +639,7 @@ export default function DepensesScreen() {
                     setShowSortMenu(false);
                   }}
                 >
-                  <IconSymbol name="line.3.horizontal.decrease.circle" size={18} color={colors.tint} />
-                  <Text style={[styles.sortButtonText, { color: colors.tint }]}>Filtrer</Text>
+                  <IconSymbol name="line.3.horizontal.decrease.circle" size={20} color={colors.tint} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.sortButton, { backgroundColor: colors.cardBackground }]}
@@ -649,8 +648,7 @@ export default function DepensesScreen() {
                     setShowFilterMenu(false);
                   }}
                 >
-                  <IconSymbol name="arrow.up.arrow.down" size={18} color={colors.tint} />
-                  <Text style={[styles.sortButtonText, { color: colors.tint }]}>Trier</Text>
+                  <IconSymbol name="arrow.up.arrow.down" size={20} color={colors.tint} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1160,9 +1158,10 @@ const styles = StyleSheet.create({
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: SPACING.tiny,
-    paddingHorizontal: SPACING.regular,
-    paddingVertical: vs(8),
+    paddingHorizontal: SPACING.medium,
+    paddingVertical: vs(10),
     borderRadius: BORDER_RADIUS.medium,
   },
   sortButtonText: {

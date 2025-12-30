@@ -3,7 +3,7 @@ import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constan
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteField, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
@@ -408,7 +408,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
         // Supprimer la catégorie du budget
         const budgetRef = doc(db, 'budgets', familyId);
         await updateDoc(budgetRef, {
-          [`categoryRules.${request.categoryName}`]: null,
+          [`categoryRules.${request.categoryName}`]: deleteField(),
         });
 
         // Mettre à jour toutes les dépenses qui utilisent cette catégorie
