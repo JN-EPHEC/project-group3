@@ -3,7 +3,7 @@ import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING, vs } from '@/constan
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { addDoc, collection, doc, getDoc, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
@@ -44,13 +44,15 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
           });
           await setDoc(budgetRef, { categoryRules: seed }, { merge: true });
         }
-        const categoryArray = Object.entries(rules).map(([name, value]) => {
-          if (typeof value === 'number') {
-            return { name, limit: value as number, allowOverLimit: true, period: 'monthly' };
-          }
-          const obj = value as any;
-          return { name, limit: obj?.limit ?? 0, allowOverLimit: !!obj?.allowOverLimit, period: obj?.period || 'monthly' };
-        });
+        const categoryArray = Object.entries(rules)
+          .filter(([_, value]) => value !== null && value !== undefined)
+          .map(([name, value]) => {
+            if (typeof value === 'number') {
+              return { name, limit: value as number, allowOverLimit: true, period: 'monthly' };
+            }
+            const obj = value as any;
+            return { name, limit: obj?.limit ?? 0, allowOverLimit: !!obj?.allowOverLimit, period: obj?.period || 'monthly' };
+          });
         setCategories(categoryArray);
       } else {
         // Créer le document avec les catégories par défaut
@@ -402,25 +404,58 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
       return;
     }
     try {
-      // Ajouter la catégorie au budget
-      const budgetRef = doc(db, 'budgets', familyId);
-      await updateDoc(budgetRef, {
-        [`categoryRules.${request.categoryName}`]: {
-          limit: request.limit,
-          allowOverLimit: request.allowOverLimit,
-          period: 'monthly'
-        },
-      });
+      if (request.action === 'DELETE') {
+        // Supprimer la catégorie du budget
+        const budgetRef = doc(db, 'budgets', familyId);
+        await updateDoc(budgetRef, {
+          [`categoryRules.${request.categoryName}`]: null,
+        });
 
-      // Mettre à jour le statut de la demande
-      const requestRef = doc(db, 'categoryApprovals', request.id);
-      await updateDoc(requestRef, {
-        status: 'APPROVED',
-        approvedBy: currentUser.uid,
-        approvedAt: new Date(),
-      });
+        // Mettre à jour toutes les dépenses qui utilisent cette catégorie
+        const expensesQuery = query(
+          collection(db, 'expenses'),
+          where('familyId', '==', familyId),
+          where('category', '==', request.categoryName)
+        );
+        const expensesSnapshot = await getDocs(expensesQuery);
+        
+        const updatePromises = expensesSnapshot.docs.map((docSnapshot) => 
+          updateDoc(doc(db, 'expenses', docSnapshot.id), {
+            category: 'Non catégorisé',
+          })
+        );
+        await Promise.all(updatePromises);
 
-      Alert.alert('Succès', `La catégorie "${request.categoryName}" a été ajoutée.`);
+        // Mettre à jour le statut de la demande
+        const requestRef = doc(db, 'categoryApprovals', request.id);
+        await updateDoc(requestRef, {
+          status: 'APPROVED',
+          approvedBy: currentUser.uid,
+          approvedAt: new Date(),
+        });
+
+        Alert.alert('Succès', `La catégorie "${request.categoryName}" a été supprimée. ${expensesSnapshot.size} dépense(s) ont été reclassées en "Non catégorisé".`);
+      } else {
+        // Ajouter la catégorie au budget
+        const budgetRef = doc(db, 'budgets', familyId);
+        await updateDoc(budgetRef, {
+          [`categoryRules.${request.categoryName}`]: {
+            limit: request.limit,
+            allowOverLimit: request.allowOverLimit,
+            period: 'monthly'
+          },
+        });
+
+        // Mettre à jour le statut de la demande
+        const requestRef = doc(db, 'categoryApprovals', request.id);
+        await updateDoc(requestRef, {
+          status: 'APPROVED',
+          approvedBy: currentUser.uid,
+          approvedAt: new Date(),
+        });
+
+        Alert.alert('Succès', `La catégorie "${request.categoryName}" a été ajoutée.`);
+      }
     } catch (error) {
       console.error('Error approving category request:', error);
       Alert.alert('Erreur', 'Impossible d\'approuver la demande');
@@ -444,6 +479,46 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
       console.error('Error rejecting category request:', error);
       Alert.alert('Erreur', 'Impossible de refuser la demande');
     }
+  };
+
+  const handleRequestDeleteCategory = async (categoryName: string) => {
+    if (!familyId || !currentUser) {
+      Alert.alert('Erreur', 'Vous devez être connecté.');
+      return;
+    }
+
+    Alert.alert(
+      'Supprimer la catégorie',
+      `Voulez-vous demander la suppression de la catégorie "${categoryName}" ? L'autre parent devra approuver.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Demander la suppression',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Créer une demande d'approbation de suppression
+              await addDoc(collection(db, 'categoryApprovals'), {
+                familyId,
+                categoryName,
+                action: 'DELETE',
+                requestedBy: currentUser.uid,
+                status: 'PENDING',
+                createdAt: new Date(),
+              });
+
+              Alert.alert(
+                'Demande envoyée',
+                'Votre demande de suppression a été envoyée. La catégorie sera supprimée une fois approuvée par l\'autre parent.'
+              );
+            } catch (error) {
+              console.error('Error requesting category deletion:', error);
+              Alert.alert('Erreur', 'Impossible de créer la demande de suppression');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleToggleAllow = async (categoryName: string, allow: boolean) => {
@@ -646,15 +721,25 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
             </Text>
           </View>
           {pendingCategoryRequests.map((request) => (
-            <View key={request.id} style={[styles.requestCard, { backgroundColor: colors.cardBackground, borderColor: '#2196F3' }]}>
+            <View key={request.id} style={[styles.requestCard, { backgroundColor: colors.cardBackground, borderColor: request.action === 'DELETE' ? '#FF3B30' : '#2196F3' }]}>
               <View style={styles.requestInfo}>
-                <Text style={[styles.requestCategory, { color: colors.text }]}>{request.categoryName}</Text>
-                <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
-                  Limite: {request.limit.toFixed(2)} €
+                <Text style={[styles.requestCategory, { color: colors.text }]}>
+                  {request.action === 'DELETE' ? '🗑️ ' : ''}{request.categoryName}
                 </Text>
-                <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
-                  Dépassement autorisé: {request.allowOverLimit ? 'Oui' : 'Non'}
-                </Text>
+                {request.action === 'DELETE' ? (
+                  <Text style={[styles.requestChange, { color: '#FF3B30' }]}>
+                    Demande de suppression
+                  </Text>
+                ) : (
+                  <>
+                    <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
+                      Limite: {request.limit.toFixed(2)} €
+                    </Text>
+                    <Text style={[styles.requestChange, { color: colors.textSecondary }]}>
+                      Dépassement autorisé: {request.allowOverLimit ? 'Oui' : 'Non'}
+                    </Text>
+                  </>
+                )}
                 <Text style={[styles.requestedBy, { color: colors.textSecondary }]}>
                   Demandé par {request.requestedByName}
                 </Text>
@@ -760,16 +845,25 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
             ) : (
               <View style={styles.categoryNameRow}>
                 <Text style={[styles.categoryLimitName, { color: colors.text }]}>{cat.name}</Text>
-                <TouchableOpacity
-                  style={styles.editNameButton}
-                  onPress={() => {
-                    setEditingCategoryName(cat.name);
-                    setEditNameValue(cat.name);
-                  }}
-                >
-                  <IconSymbol name="pencil" size={16} color={colors.tint} />
-                  <Text style={[styles.editNameButtonText, { color: colors.tint }]}>Modifier</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: SPACING.small }}>
+                  <TouchableOpacity
+                    style={styles.editNameButton}
+                    onPress={() => {
+                      setEditingCategoryName(cat.name);
+                      setEditNameValue(cat.name);
+                    }}
+                  >
+                    <IconSymbol name="pencil" size={16} color={colors.tint} />
+                    <Text style={[styles.editNameButtonText, { color: colors.tint }]}>Modifier</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.editNameButton, { borderColor: '#FF3B30' }]}
+                    onPress={() => handleRequestDeleteCategory(cat.name)}
+                  >
+                    <IconSymbol name="trash" size={16} color="#FF3B30" />
+                    <Text style={[styles.editNameButtonText, { color: '#FF3B30' }]}>Supprimer</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
             {editingCategory === cat.name ? (
