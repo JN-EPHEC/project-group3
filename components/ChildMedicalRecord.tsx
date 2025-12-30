@@ -608,7 +608,7 @@ const getSeverityColor = (s: SeverityLevel) => {
 // --- STYLES XL ---
 const styles = StyleSheet.create({
   // Utilisation de SafeAreaView en amont, mais padding au cas où
-  scrollContent: { paddingHorizontal: 0, paddingBottom: 10, paddingTop: 5 },
+  scrollContent: { paddingHorizontal: 0, paddingBottom: 80, paddingTop: 10 },
   
   // Header
   profileHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, marginTop: 10 },
