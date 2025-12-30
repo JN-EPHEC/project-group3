@@ -3,9 +3,10 @@
  * Permet à l'utilisateur de choisir entre abonnement mensuel ou annuel
  */
 
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -26,7 +27,6 @@ export default function SubscriptionScreen() {
   const [hasSubscription, setHasSubscription] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [checkDone, setCheckDone] = useState(false);
 
   useEffect(() => {
     // Détecter le retour de Stripe via les query params
@@ -63,17 +63,25 @@ export default function SubscriptionScreen() {
       }
     }
     
-    // Vérifier le statut une seule fois au montage
-    if (!checkDone) {
-      checkSubscriptionStatus();
-      setCheckDone(true);
-    }
+    checkSubscriptionStatus(true);
 
     return () => {};
   }, []);
 
-  const checkSubscriptionStatus = async () => {
+  useFocusEffect(
+    useCallback(() => {
+      // Re-vérifier quand l'écran revient en focus (utile après un retour de Stripe sur Expo Go)
+      if (!isRedirecting) {
+        checkSubscriptionStatus();
+      }
+    }, [isRedirecting])
+  );
+
+  const checkSubscriptionStatus = async (showLoader = false) => {
     try {
+      if (showLoader) {
+        setCheckingStatus(true);
+      }
       const auth = getAuth();
       const user = auth.currentUser;
       

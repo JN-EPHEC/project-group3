@@ -75,7 +75,7 @@ app.get('/test-firebase', async (_req, res) => {
  */
 app.post('/api/create-checkout-session', async (req, res) => {
   try {
-    const { priceId, userId, userEmail } = req.body;
+    const { priceId, userId, userEmail, successUrl, cancelUrl } = req.body;
 
     // Validation
     if (!priceId) {
@@ -113,6 +113,14 @@ app.post('/api/create-checkout-session', async (req, res) => {
       });
     }
 
+    const sanitizeUrl = (url?: string) => {
+      if (!url || typeof url !== 'string') return undefined;
+      return /^https?:\/\//i.test(url) ? url : undefined;
+    };
+
+    const resolvedSuccessUrl = sanitizeUrl(successUrl) || process.env.SUCCESS_URL || `http://localhost:8081/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`;
+    const resolvedCancelUrl = sanitizeUrl(cancelUrl) || process.env.CANCEL_URL || `http://localhost:8081/subscription?cancelled=true`;
+
     // Créer la Checkout Session
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
@@ -138,8 +146,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
       payment_method_collection: 'always',
 
       // URLs de redirection - utiliser des URLs web pour dev, deep links pour mobile
-      success_url: process.env.SUCCESS_URL || `http://localhost:8081/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: process.env.CANCEL_URL || `http://localhost:8081/subscription?cancelled=true`,
+      success_url: resolvedSuccessUrl,
+      cancel_url: resolvedCancelUrl,
 
       // Permettre les codes promo (optionnel)
       allow_promotion_codes: true,

@@ -80,7 +80,36 @@ export class StripeService {
     return configured;
   }
 
-  private static apiUrl = 'https://momentously-involucral-hal.ngrok-free.dev'
+  private static apiUrl = StripeService.resolveApiUrl();
+
+  private static buildReturnUrls() {
+    const envSuccess = process.env.EXPO_PUBLIC_SUCCESS_URL
+      || (Constants as any)?.expoConfig?.extra?.EXPO_PUBLIC_SUCCESS_URL
+      || (Constants as any)?.manifest?.extra?.EXPO_PUBLIC_SUCCESS_URL;
+    const envCancel = process.env.EXPO_PUBLIC_CANCEL_URL
+      || (Constants as any)?.expoConfig?.extra?.EXPO_PUBLIC_CANCEL_URL
+      || (Constants as any)?.manifest?.extra?.EXPO_PUBLIC_CANCEL_URL;
+
+    // Utiliser l'origine courante sur le web pour respecter le port en cours
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const origin = window.location.origin.replace(/\/$/, '');
+      return {
+        successUrl: envSuccess || `${origin}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: envCancel || `${origin}/subscription?cancelled=true`,
+      };
+    }
+
+    // Fallback natif : utiliser une URL configurée (ngrok/production) accessible depuis Expo Go
+    const fallbackBase = (envSuccess || STRIPE_CONFIG.API_URL || '').replace(/\/$/, '');
+    return {
+      successUrl: fallbackBase
+        ? `${fallbackBase}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`
+        : undefined,
+      cancelUrl: (envCancel || fallbackBase)
+        ? `${(envCancel || fallbackBase).replace(/\/$/, '')}/subscription?cancelled=true`
+        : undefined,
+    };
+  }
 
   /**
    * Crée une session Stripe Checkout et ouvre le navigateur
@@ -98,6 +127,8 @@ export class StripeService {
         throw new Error("Votre compte n'a pas d'email. Veuillez ajouter un email à votre profil.");
       }
 
+      const returnUrls = this.buildReturnUrls();
+
       // Appeler l'API backend
       const response = await fetch(`${this.apiUrl}/api/create-checkout-session`, {
         method: 'POST',
@@ -108,6 +139,8 @@ export class StripeService {
           priceId,
           userId: user.uid,
           userEmail: user.email,
+          successUrl: returnUrls.successUrl,
+          cancelUrl: returnUrls.cancelUrl,
         }),
       });
 
