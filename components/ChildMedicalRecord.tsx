@@ -1,5 +1,5 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { BORDER_RADIUS, FONT_SIZES, hs, SPACING, V_SPACING } from '@/constants/responsive';
+import { BORDER_RADIUS, FONT_SIZES, SPACING, V_SPACING } from '@/constants/responsive';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as DocumentPicker from 'expo-document-picker';
@@ -612,6 +612,7 @@ export default function ChildMedicalRecord({ childName, initialRecord, onConfirm
             </TouchableOpacity>
           </>
         )}
+      </View>
     </View>
   );
 }
