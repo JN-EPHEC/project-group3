@@ -54,25 +54,53 @@ export default function ConversationScreen() {
   const isProfessionalConv = typeof isProfessionalConversation === 'string' ? isProfessionalConversation === 'true' : false;
 
   const moderateText = (text: string) => {
-    const banned = [
-      'merde','con','connard','salope','pute','fdp','batard','bâtard','enculé','enfoiré','ta gueule','ferme ta gueule','putain',
-      'va te faire foutre','foutre','nique ta mere','nique ta mère','ntm','tg','ta mere','ta mère',
-      'fuck','shit','bitch','asshole','motherfucker','stupid','idiot'
+    const toxicWords = [
+      'merde','con','connard','conne','gros con','sale con','salope','pute','putain','put***',
+      'fdp','batard','bâtard','encule','enculé','enfoire','enfoiré','ta gueule','ferme ta gueule','tg',
+      'va te faire foutre','foutre','nique ta mere','nique ta mère','ntm','ta mere','ta mère',
+      'bouffon','clochard','clodo','abruti','idiot','imbecile','imbécile','stupide','debile','débile',
+      'pute','pouffiasse','ordure','racaille','sale','pourri','barge','taré','barjo',
+      'fuck','shit','bitch','asshole','motherfucker','jerk','loser','dumb','stupid'
     ];
-    const lower = text.toLowerCase();
-    const hasBad = banned.some(w => lower.includes(w));
+
+    const toxicPhrases = [
+      'je vais te tuer','je vais te frapper','je vais te casser la gueule','je te hais','je te deteste','je te déteste',
+      'tu ne sers a rien','tu ne sers à rien','tu es nul','t es nul','t es qu un nul','tais toi','taisez vous',
+      'ferme ta bouche','ferme la','ferme-la','degage','dégage','fous le camp','casse toi','casse-toi'
+    ];
+
+    const normalizeBase = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const sanitize = (value: string) => normalizeBase(value).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const normalizedText = sanitize(text);
+    if (!normalizedText) return { allowed: true, suggestion: text };
+
+    const tokens = normalizedText.split(' ').filter(Boolean);
+    const tokenSet = new Set(tokens);
+    const normalizedWords = toxicWords.map(sanitize);
+    const normalizedPhrases = toxicPhrases.map(sanitize);
+
+    const wordHitIndex = normalizedWords.findIndex(w => tokenSet.has(w));
+    const phraseHitIndex = normalizedPhrases.findIndex(p => p && normalizedText.includes(p));
+    const hasBad = wordHitIndex !== -1 || phraseHitIndex !== -1;
+
     if (!hasBad) return { allowed: true, suggestion: text };
 
-    // Propose a softer rephrase by masking banned words
+    // Propose a softer rephrase by masking banned terms; fallback to a polite sentence
     let suggestion = text;
-    banned.forEach(w => {
-      const re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const termsToMask = [...toxicPhrases, ...toxicWords];
+    termsToMask.forEach(term => {
+      if (!term) return;
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+      const re = new RegExp(escaped, 'gi');
       suggestion = suggestion.replace(re, '***');
     });
+
     const cleaned = suggestion.replace(/\*/g, '').trim();
     if (!cleaned || cleaned.length < 3) {
       suggestion = "Je préfère en parler calmement. Peux-tu m'expliquer ce qui ne va pas ?";
     }
+
     return { allowed: false, suggestion: suggestion.trim() };
   };
 
@@ -391,8 +419,8 @@ export default function ConversationScreen() {
     if ((!inputText.trim() && selectedImages.length === 0 && selectedFiles.length === 0) || !currentConversationId || !currentUser) return;
 
     const messageText = inputText.trim();
-    // Block toxic parent-to-parent messages and propose a softer variant
-    if (!isProfessionalConv && messageText) {
+    // Moderate every outgoing text message
+    if (messageText) {
       const result = moderateText(messageText);
       if (!result.allowed) {
         Alert.alert(
