@@ -248,6 +248,7 @@ export default function ProHomeScreen() {
     // --- Conversations (parents -> pro ou familiales) : fonctionne même sans familles
     const conversationsQuery = query(
       collection(db, 'conversations'),
+      where('professionalId', '==', uid),
       where('participants', 'array-contains', uid),
       orderBy('lastMessageTime', 'desc')
     );
@@ -372,7 +373,12 @@ export default function ProHomeScreen() {
               <Text style={[styles.greeting, { color: colors.textSecondary }]}>Bonjour {firstName}</Text>
             </View>
             {dualRole && (
-              <RoleSwitcher activeRole={activeRole} onToggle={handleToggleRole} />
+              <RoleSwitcher
+                activeRole={activeRole}
+                targetRole="parent"
+                accentColor={PRO_COLOR}
+                onToggle={handleToggleRole}
+              />
             )}
           </View>
 

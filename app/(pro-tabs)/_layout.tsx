@@ -18,6 +18,7 @@ export default function ProTabLayout() {
 
     const conversationsQuery = query(
       collection(db, 'conversations'),
+      where('professionalId', '==', currentUser.uid),
       where('participants', 'array-contains', currentUser.uid)
     );
 

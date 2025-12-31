@@ -7,7 +7,7 @@ import { User } from 'firebase/auth';
 import { collection, doc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { auth, db, getUserFamilies, hideConversationForUser } from '../../constants/firebase';
+import { auth, db, hideConversationForUser } from '../../constants/firebase';
 
 const PRO_COLOR = '#FFCEB0'; // Professional accent color (salmon/peach)
 
@@ -52,34 +52,17 @@ export default function ProMessageScreen() {
     });
 
     let unsubConversations = () => {};
-    let unsubMembers = () => {};
 
     const setupListeners = async () => {
       setLoading(true);
       try {
-        const userFamilies = await getUserFamilies(uid);
+        // Mode pro: afficher uniquement les conversations où ce professionnel est explicitement ciblé
+        setFamilyMembers([]); // Pas de contacts familiaux dans la vue pro
+        setMembersWithoutConversation([]);
 
-        // Suivre les membres de famille pour permettre la création de nouvelles conversations
-        if (userFamilies && userFamilies.length > 0) {
-          const allMemberIds = userFamilies.flatMap((f: any) => f.members || []);
-          const uniqueMemberIds = [...new Set(allMemberIds)].filter(id => id !== uid);
-
-          if (uniqueMemberIds.length > 0) {
-            const membersQuery = query(collection(db, 'users'), where('__name__', 'in', uniqueMemberIds));
-            unsubMembers = onSnapshot(membersQuery, (snapshot) => {
-              const members = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
-              setFamilyMembers(members);
-            });
-          } else {
-            setFamilyMembers([]);
-          }
-        } else {
-          setFamilyMembers([]);
-        }
-
-        // Conversations du professionnel : tout échange où il est participant
         const conversationsQuery = query(
           collection(db, 'conversations'),
+          where('professionalId', '==', uid),
           where('participants', 'array-contains', uid),
           orderBy('lastMessageTime', 'desc')
         );
@@ -137,7 +120,6 @@ export default function ProMessageScreen() {
     return () => {
       unsubUser();
       unsubConversations();
-      unsubMembers();
     };
   }, [router]);
 

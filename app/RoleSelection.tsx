@@ -61,7 +61,25 @@ export default function RoleSelectionScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>\n      <Text style={[styles.title, { color: colors.tint }]}>Choisissez votre mode</Text>\n      <View style={styles.cardContainer}>\n        <TouchableOpacity style={[styles.card, { backgroundColor: colors.cardBackground }]} onPress={() => handleSelect('parent')}>\n          <Text style={[styles.cardTitle, { color: colors.text }]}>Continuer en tant que Parent</Text>\n          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Accéder à l'espace famille</Text>\n        </TouchableOpacity>\n        <TouchableOpacity style={[styles.card, { backgroundColor: colors.cardBackground }]} onPress={() => handleSelect('professionnel')}>\n          <Text style={[styles.cardTitle, { color: colors.text }]}>Continuer en tant que Professionnel</Text>\n          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Accéder à l'espace Pro</Text>\n        </TouchableOpacity>\n      </View>\n    </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.title, { color: colors.tint }]}>Choisissez votre mode</Text>
+      <View style={styles.cardContainer}>
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.cardBackground }]}
+          onPress={() => handleSelect('parent')}
+        >
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Continuer en tant que Parent</Text>
+          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Accéder à l'espace famille</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.cardBackground }]}
+          onPress={() => handleSelect('professionnel')}
+        >
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Continuer en tant que Professionnel</Text>
+          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Accéder à l'espace Pro</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 

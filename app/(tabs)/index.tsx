@@ -226,7 +226,12 @@ export default function HomeScreen() {
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.tint }]}>Accueil</Text>
             {dualRole && (
-              <RoleSwitcher activeRole={activeRole} onToggle={handleToggleRole} />
+              <RoleSwitcher
+                activeRole={activeRole}
+                targetRole="professionnel"
+                accentColor="#1E88E5"
+                onToggle={handleToggleRole}
+              />
             )}
           </View>
 

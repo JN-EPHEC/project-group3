@@ -5,16 +5,22 @@ export type Role = 'parent' | 'professionnel';
 
 interface Props {
   activeRole: Role;
+  targetRole: Role; // Only allow switching to this role in the current screen
+  accentColor: string; // Button color depends on current interface (pro vs parent)
   onToggle: (nextRole: Role) => void;
 }
 
-export const RoleSwitcher: React.FC<Props> = ({ activeRole, onToggle }) => {
-  const nextRole: Role = activeRole === 'parent' ? 'professionnel' : 'parent';
-  const label = nextRole === 'professionnel' ? 'Passer en mode Pro' : 'Passer en mode Parent';
+export const RoleSwitcher: React.FC<Props> = ({ activeRole, targetRole, accentColor, onToggle }) => {
+  const label = targetRole === 'professionnel' ? 'Passer en mode Pro' : 'Passer en mode Parent';
+  const isDisabled = activeRole === targetRole; // Already on that role (defensive)
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.button} onPress={() => onToggle(nextRole)}>
+      <TouchableOpacity
+        disabled={isDisabled}
+        style={[styles.button, { backgroundColor: accentColor, opacity: isDisabled ? 0.6 : 1 }]}
+        onPress={() => onToggle(targetRole)}
+      >
         <Text style={styles.text}>{label}</Text>
       </TouchableOpacity>
     </View>
@@ -27,7 +33,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 12,
-    backgroundColor: '#1E88E5',
   },
   text: { color: '#fff', fontWeight: '700' },
 });
