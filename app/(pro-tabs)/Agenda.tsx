@@ -238,39 +238,21 @@ export default function ProAgendaScreen() {
         const endTime = new Date(appointmentDate);
         endTime.setHours(endHour, endMinute, 0, 0);
 
-        // Créer l'événement pour le professionnel (dans toutes ses familles)
-        if (families.length > 0) {
-          for (const family of families) {
-            await addDoc(collection(db, 'events'), {
-              title: `Rendez-vous - ${appointment.parentName || 'Parent'}`,
-              date: appointmentDate,
-              startTime: startTime,
-              endTime: endTime,
-              location: 'Cabinet',
-              isAllDay: false,
-              familyId: family.id,
-              createdBy: currentUser.uid,
-              appointmentId: appointment.id,
-              description: `Rendez-vous avec ${appointment.parentName || 'un parent'}\nType: Consultation${noteLine}`,
-              createdAt: serverTimestamp()
-            });
-          }
-        } else {
-          // Si le professionnel n'a pas de famille, créer un événement personnel
-          await addDoc(collection(db, 'events'), {
-            title: `Rendez-vous - ${appointment.parentName || 'Parent'}`,
-            date: appointmentDate,
-            startTime: startTime,
-            endTime: endTime,
-            location: 'Cabinet',
-            isAllDay: false,
-            userId: currentUser.uid,
-            createdBy: currentUser.uid,
-            appointmentId: appointment.id,
-            description: `Rendez-vous avec ${appointment.parentName || 'un parent'}\nType: Consultation${noteLine}`,
-            createdAt: serverTimestamp()
-          });
-        }
+        // Créer l'événement pour le professionnel (événement personnel uniquement)
+        // Ne pas créer d'événement avec familyId car cela le rendrait visible à tous les membres de la famille
+        await addDoc(collection(db, 'events'), {
+          title: `Rendez-vous - ${appointment.parentName || 'Parent'}`,
+          date: appointmentDate,
+          startTime: startTime,
+          endTime: endTime,
+          location: 'Cabinet',
+          isAllDay: false,
+          userId: currentUser.uid,
+          createdBy: currentUser.uid,
+          appointmentId: appointment.id,
+          description: `Rendez-vous avec ${appointment.parentName || 'un parent'}\nType: Consultation${noteLine}`,
+          createdAt: serverTimestamp()
+        });
 
         // Créer l'événement uniquement pour le parent (pas visible par les autres membres de la famille)
         await addDoc(collection(db, 'events'), {
