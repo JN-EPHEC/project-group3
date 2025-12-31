@@ -139,43 +139,10 @@ export default function ConversationScreen() {
         let convId = currentConversationId;
 
         if (!convId) {
-          // Cas 1: Conversation familiale (avec familyId)
           const userFamily = await getUserFamily(currentUser.uid);
-          
-          if (userFamily?.id) {
-            const convQuery = query(
-              collection(db, 'conversations'),
-              where('familyId', '==', userFamily.id),
-              where('participants', 'array-contains', currentUser.uid)
-            );
-            const convSnapshot = await getDocs(convQuery);
-            
-            const existingConv = convSnapshot.docs.find(doc => {
-              const data = doc.data();
-              return data.participants?.includes(otherUserId);
-            });
 
-            if (existingConv) {
-              convId = existingConv.id;
-            } else {
-              // Créer une nouvelle conversation familiale
-              const newConvRef = await addDoc(collection(db, 'conversations'), {
-                familyId: userFamily.id,
-                participants: [currentUser.uid, otherUserId],
-                createdAt: serverTimestamp(),
-                lastMessage: '',
-                lastMessageTime: serverTimestamp(),
-                unreadCount: {
-                  [currentUser.uid]: 0,
-                  [String(otherUserId)]: 0
-                }
-              });
-              convId = newConvRef.id;
-            }
-          } else {
-            // Cas 2: Conversation avec professionnel (sans familyId, avec professionalId)
-            // Un parent ne doit avoir QU'UNE seule conversation avec un professionnel
-            // Créer un ID de conversation unique et déterministe basé sur les deux IDs
+          if (isProfessionalConv) {
+            // Conversation parent ↔ professionnel : ID déterministe pour éviter les doublons
             const uniqueConversationId = [currentUser.uid, otherUserId].sort().join('_');
             const convRef = doc(db, 'conversations', uniqueConversationId);
             const convSnap = await getDoc(convRef);
@@ -195,7 +162,6 @@ export default function ConversationScreen() {
               const professionalPhotoUrl = proDoc.exists() ? (proDoc.data().photoUrl || '') : '';
               const professionalName = `${professionalFirstName} ${professionalLastName}`.trim() || 'Professionnel';
 
-              // Créer la conversation avec l'ID déterministe
               await setDoc(convRef, {
                 conversationId: uniqueConversationId,
                 participants: [currentUser.uid, otherUserId],
@@ -207,6 +173,52 @@ export default function ConversationScreen() {
                 professionalId: otherUserId,
                 professionalName,
                 professionalPhotoUrl,
+                createdAt: serverTimestamp(),
+                lastMessage: null,
+                lastMessageTime: serverTimestamp()
+              });
+            }
+            convId = uniqueConversationId;
+          } else if (userFamily?.id) {
+            // Conversation familiale (parent ↔ parent) liée à la famille
+            const convQuery = query(
+              collection(db, 'conversations'),
+              where('familyId', '==', userFamily.id),
+              where('participants', 'array-contains', currentUser.uid)
+            );
+            const convSnapshot = await getDocs(convQuery);
+
+            const existingConv = convSnapshot.docs.find(doc => {
+              const data = doc.data();
+              return data.participants?.includes(otherUserId);
+            });
+
+            if (existingConv) {
+              convId = existingConv.id;
+            } else {
+              const newConvRef = await addDoc(collection(db, 'conversations'), {
+                familyId: userFamily.id,
+                participants: [currentUser.uid, otherUserId],
+                createdAt: serverTimestamp(),
+                lastMessage: '',
+                lastMessageTime: serverTimestamp(),
+                unreadCount: {
+                  [currentUser.uid]: 0,
+                  [String(otherUserId)]: 0
+                }
+              });
+              convId = newConvRef.id;
+            }
+          } else {
+            // Fallback: conversation à deux avec ID déterministe pour éviter les doublons hors famille
+            const uniqueConversationId = [currentUser.uid, otherUserId].sort().join('_');
+            const convRef = doc(db, 'conversations', uniqueConversationId);
+            const convSnap = await getDoc(convRef);
+
+            if (!convSnap.exists()) {
+              await setDoc(convRef, {
+                conversationId: uniqueConversationId,
+                participants: [currentUser.uid, otherUserId],
                 createdAt: serverTimestamp(),
                 lastMessage: null,
                 lastMessageTime: serverTimestamp()
