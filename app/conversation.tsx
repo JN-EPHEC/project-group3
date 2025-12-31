@@ -31,7 +31,7 @@ export default function ConversationScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { conversationId, otherUserId, otherUserName, otherUserPhotoURL } = useLocalSearchParams();
+  const { conversationId, otherUserId, otherUserName, otherUserPhotoURL, isProfessionalConversation } = useLocalSearchParams();
   const [otherUser, setOtherUser] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
@@ -51,6 +51,30 @@ export default function ConversationScreen() {
   const flatListRef = useRef<FlatList>(null);
   const currentUser = auth.currentUser;
   const storage = getStorage();
+  const isProfessionalConv = typeof isProfessionalConversation === 'string' ? isProfessionalConversation === 'true' : false;
+
+  const moderateText = (text: string) => {
+    const banned = [
+      'merde','con','connard','salope','pute','fdp','batard','bâtard','enculé','enfoiré','ta gueule','ferme ta gueule','putain',
+      'va te faire foutre','foutre','nique ta mere','nique ta mère','ntm','tg','ta mere','ta mère',
+      'fuck','shit','bitch','asshole','motherfucker','stupid','idiot'
+    ];
+    const lower = text.toLowerCase();
+    const hasBad = banned.some(w => lower.includes(w));
+    if (!hasBad) return { allowed: true, suggestion: text };
+
+    // Propose a softer rephrase by masking banned words
+    let suggestion = text;
+    banned.forEach(w => {
+      const re = new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      suggestion = suggestion.replace(re, '***');
+    });
+    const cleaned = suggestion.replace(/\*/g, '').trim();
+    if (!cleaned || cleaned.length < 3) {
+      suggestion = "Je préfère en parler calmement. Peux-tu m'expliquer ce qui ne va pas ?";
+    }
+    return { allowed: false, suggestion: suggestion.trim() };
+  };
 
   useEffect(() => {
     const fetchOtherUserData = async () => {
@@ -367,6 +391,21 @@ export default function ConversationScreen() {
     if ((!inputText.trim() && selectedImages.length === 0 && selectedFiles.length === 0) || !currentConversationId || !currentUser) return;
 
     const messageText = inputText.trim();
+    // Block toxic parent-to-parent messages and propose a softer variant
+    if (!isProfessionalConv && messageText) {
+      const result = moderateText(messageText);
+      if (!result.allowed) {
+        Alert.alert(
+          'Message non envoyé',
+          'Votre message contient des propos inappropriés. Voici une reformulation proposée :\n\n' + result.suggestion,
+          [
+            { text: 'OK', onPress: () => setInputText(result.suggestion) }
+          ]
+        );
+        return;
+      }
+    }
+
     const imagesToSend = [...selectedImages];
     const filesToSend = [...selectedFiles];
     
