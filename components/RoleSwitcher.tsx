@@ -12,13 +12,11 @@ interface Props {
 
 export const RoleSwitcher: React.FC<Props> = ({ activeRole, targetRole, accentColor, onToggle }) => {
   const label = targetRole === 'professionnel' ? 'Passer en mode Pro' : 'Passer en mode Parent';
-  const isDisabled = activeRole === targetRole; // Already on that role (defensive)
 
   return (
     <View style={styles.container}>
       <TouchableOpacity
-        disabled={isDisabled}
-        style={[styles.button, { backgroundColor: accentColor, opacity: isDisabled ? 0.6 : 1 }]}
+        style={[styles.button, { backgroundColor: accentColor }]}
         onPress={() => onToggle(targetRole)}
       >
         <Text style={styles.text}>{label}</Text>
