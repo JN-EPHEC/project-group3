@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { User } from 'firebase/auth';
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Keyboard, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { getCurrencySymbol } from '../../constants/currencies';
 import { auth, db, getUserFamilies } from '../../constants/firebase';
 
@@ -230,7 +230,7 @@ export default function DepensesScreen() {
               membersMap[doc.id] = {
                 firstName: doc.data().firstName || 'Membre',
                 lastName: doc.data().lastName || '',
-                profileImage: doc.data().profileImage
+                profileImage: doc.data().profileImage || doc.data().photoURL
               };
             });
             setFamilyMembersData(membersMap);
@@ -837,8 +837,13 @@ export default function DepensesScreen() {
                       onPress={() => router.push(`/expense-details?expenseId=${expense.id}`)}
                     >
                       <View style={[styles.avatarBubble, { backgroundColor: isPending ? '#FF9500' : colors.tint }]}>
-                        {isPending && <IconSymbol name="clock" size={24} color="#fff" />}
-                        {!isPending && <Text style={styles.avatarText}>{payerInitials}</Text>}
+                        {isPending ? (
+                          <IconSymbol name="clock" size={24} color="#fff" />
+                        ) : payer?.profileImage ? (
+                          <Image source={{ uri: payer.profileImage }} style={styles.avatarImage} />
+                        ) : (
+                          <Text style={styles.avatarText}>{payerInitials}</Text>
+                        )}
                       </View>
                       <View style={styles.expenseDetails}>
                         <View style={styles.expenseTopRow}>
@@ -1329,6 +1334,7 @@ const styles = StyleSheet.create({
   expenseCard: { borderRadius: BORDER_RADIUS.large, padding: SPACING.regular, marginBottom: V_SPACING.medium, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: vs(2) }, shadowRadius: hs(8), elevation: 2 },
   avatarBubble: { width: hs(50), height: hs(50), borderRadius: hs(25), justifyContent: 'center', alignItems: 'center', marginRight: SPACING.regular },
   avatarText: { color: '#fff', fontSize: FONT_SIZES.medium, fontWeight: '700' },
+  avatarImage: { width: hs(50), height: hs(50), borderRadius: hs(25) },
   expenseDetails: { flex: 1 },
   expenseTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: V_SPACING.tiny },
   expenseTitle: { fontSize: FONT_SIZES.medium, fontWeight: '600', flex: 1 },
