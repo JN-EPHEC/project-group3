@@ -35,6 +35,14 @@ export default function RootLayout() {
           <Stack.Screen name="RoleSelection" options={{ headerShown: false }} />
           <Stack.Screen name="subscription" options={{ headerShown: false }} />
           <Stack.Screen name="AddProfessionalRole" options={{ headerShown: false }} />
+          <Stack.Screen 
+            name="helpcenter-pro" 
+            options={{ 
+              headerShown: false,
+              presentation: 'card',
+              animation: 'slide_from_right'
+            }} 
+          />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
