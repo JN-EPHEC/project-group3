@@ -81,6 +81,24 @@ export default function AdminAccessScreen() {
             <View style={styles.menuContainer}>
                 <TouchableOpacity
                     style={[styles.menuItem, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
+                    onPress={() => router.push('/admin-messages')}
+                >
+                    <View style={styles.menuItemContent}>
+                        <IconSymbol name="message.fill" size={24} color="#2196F3" />
+                        <View style={styles.menuItemText}>
+                            <Text style={[styles.menuItemTitle, { color: colors.text }]}>
+                                Modération des messages
+                            </Text>
+                            <Text style={[styles.menuItemDescription, { color: colors.textSecondary }]}>
+                                Examiner et modérer tous les messages
+                            </Text>
+                        </View>
+                    </View>
+                    <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.menuItem, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}
                     onPress={() => router.push('/admin-message-reports')}
                 >
                     <View style={styles.menuItemContent}>

@@ -713,7 +713,17 @@ export default function ConversationScreen() {
         }
       }
 
-      await addDoc(collection(db, 'conversations', currentConversationId, 'messages'), messageData);
+      // Ajouter le message à la conversation
+      const messageDocRef = await addDoc(collection(db, 'conversations', currentConversationId, 'messages'), messageData);
+
+      // Aussi ajouter à la collection centralisée pour la modération admin
+      await addDoc(collection(db, 'allMessages'), {
+        ...messageData,
+        conversationId: currentConversationId,
+        messageId: messageDocRef.id,
+        flagged: false,
+        flagReason: '',
+      });
 
       await updateDoc(doc(db, 'conversations', currentConversationId), {
         lastMessage: lastMessageText,
