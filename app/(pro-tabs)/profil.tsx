@@ -5,8 +5,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { arrayUnion, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { auth, db, deleteProfessionalPhoto, signOut, uploadProfessionalPhoto } from '../../constants/firebase';
+import { ActivityIndicator, Alert, Image, Linking, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { acceptRgpdConsent, auth, db, deleteProfessionalPhoto, requestDataExport, signOut, uploadProfessionalPhoto } from '../../constants/firebase';
 import { Colors } from '../../constants/theme';
 
 type ProfessionalType = 'avocat' | 'psychologue' | '';
@@ -65,6 +65,8 @@ export default function ProProfilScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const accentColor = '#FFCEB0';
+  const privacyUrl = 'https://wekid.fr/politique-de-confidentialite';
+  const consentVersion = '2024-12-06';
   const handleUploadDiploma = async () => {
     try {
       // Open document picker
@@ -140,6 +142,48 @@ export default function ProProfilScreen() {
     );
   };
 
+  const handleAcceptConsent = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      setIsSavingConsent(true);
+      const res = await acceptRgpdConsent(currentUser.uid, currentUser.email || undefined);
+      if (!res.success) {
+        Alert.alert('Erreur', res.error || 'Enregistrement du consentement impossible');
+        return;
+      }
+      setHasRgpdConsent(true);
+      setConsentChecked(true);
+      setShowConsentModal(false);
+    } catch (error) {
+      console.error('Consent error:', error);
+      Alert.alert('Erreur', 'Impossible de valider votre consentement');
+    } finally {
+      setIsSavingConsent(false);
+    }
+  };
+
+  const handleRequestExport = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    try {
+      setExportLoading(true);
+      const res = await requestDataExport(currentUser.uid, currentUser.email || undefined);
+      if (!res.success) {
+        Alert.alert('Erreur', res.error || 'Demande non créée');
+        return;
+      }
+      Alert.alert('Demande envoyée', 'Nous préparons votre export de données. Un lien sécurisé sera envoyé par email.');
+    } catch (error) {
+      console.error('Export request error:', error);
+      Alert.alert('Erreur', 'Impossible de demander l\'export pour le moment');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   const handleAddMissingRole = async () => {
     const current = auth.currentUser;
     if (!current) return;
@@ -193,6 +237,11 @@ export default function ProProfilScreen() {
   const [specialty, setSpecialty] = useState('');
   const [description, setDescription] = useState('');
   const [availability, setAvailability] = useState<AvailabilitySchedule>(DEFAULT_AVAILABILITY);
+  const [hasRgpdConsent, setHasRgpdConsent] = useState(false);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [isSavingConsent, setIsSavingConsent] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   
   // Edit modal states
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -226,6 +275,10 @@ export default function ProProfilScreen() {
             setLastName(userData.lastName || '');
             setParentId(userData.parent_id ?? (userData.userType === 'parent' ? uid : null));
             setProfessionalId(userData.professional_id ?? (userData.userType === 'professionnel' ? uid : null));
+            const userConsent = !!userData.rgpdConsent?.accepted;
+            setHasRgpdConsent(userConsent);
+            setConsentChecked(userConsent);
+            setShowConsentModal(!userConsent);
           }
           
           // Get professional profile
@@ -239,6 +292,11 @@ export default function ProProfilScreen() {
             setSpecialty(profData.specialty || '');
             setDescription(profData.description || '');
             setPhotoUrl(profData.photoUrl || null);
+            const consentAccepted = !!(profData.rgpdConsent && profData.rgpdConsent.accepted);
+            const finalConsent = consentAccepted || hasRgpdConsent;
+            setHasRgpdConsent(finalConsent);
+            setConsentChecked(finalConsent);
+            setShowConsentModal(!finalConsent);
             
             // Handle availability - support both old (string) and new (object) format
             if (profData.availability) {
@@ -759,6 +817,34 @@ export default function ProProfilScreen() {
             </View>
           </View>
 
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: accentColor }]}>Mes données</Text>
+            </View>
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
+              <Text style={[styles.descriptionText, { color: colors.text, marginBottom: 12 }]}>Exportez vos données personnelles ou consultez la politique de confidentialité.</Text>
+              <View style={styles.dataActionsRow}>
+                <TouchableOpacity
+                  style={[styles.dataActionButton, { backgroundColor: accentColor }]}
+                  onPress={handleRequestExport}
+                  disabled={exportLoading}
+                >
+                  {exportLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.dataActionText}>Demander l'export</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.dataActionButton, { backgroundColor: colors.cardBackground, borderWidth: 1, borderColor: accentColor }]}
+                  onPress={() => Linking.openURL(privacyUrl)}
+                >
+                  <Text style={[styles.dataActionText, { color: accentColor }]}>Politique RGPD</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <IconSymbol name="arrow.right.square" size={20} color="#fff" />
             <Text style={styles.logoutText}>Se déconnecter</Text>
@@ -774,6 +860,52 @@ export default function ProProfilScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showConsentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (hasRgpdConsent) setShowConsentModal(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground, padding: 24 }]}
+          >
+            <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 12 }]}>Consentement RGPD</Text>
+            <Text style={[styles.descriptionText, { color: colors.text, marginBottom: 12 }]}>
+              Avant d'accéder à votre espace professionnel, merci de valider la politique de confidentialité et l'usage de vos données.
+            </Text>
+            <TouchableOpacity
+              style={[styles.consentRow, { marginBottom: 12 }]}
+              onPress={() => setConsentChecked(!consentChecked)}
+            >
+              <View style={[styles.checkbox, { borderColor: accentColor, backgroundColor: consentChecked ? accentColor : 'transparent' }]}>
+                {consentChecked && <Text style={styles.checkboxMark}>✓</Text>}
+              </View>
+              <Text style={[styles.consentText, { color: colors.text }]}>
+                J'accepte la Politique de confidentialité et les conditions RGPD (version {consentVersion}).
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => Linking.openURL(privacyUrl)}>
+              <Text style={[styles.dataActionText, { color: accentColor, textAlign: 'left' }]}>Lire la politique</Text>
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', marginTop: 18 }}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: consentChecked ? accentColor : '#ddd' }]}
+                disabled={!consentChecked || isSavingConsent}
+                onPress={handleAcceptConsent}
+              >
+                {isSavingConsent ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Valider et continuer</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Delete Profile Modal */}
       <DeleteProfileModal
@@ -1088,6 +1220,13 @@ const styles = StyleSheet.create({
   slotsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   slotChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, marginRight: 4, marginBottom: 4 },
   slotText: { fontSize: 12, fontWeight: '500' },
+  dataActionsRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  dataActionButton: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  dataActionText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  consentRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  consentText: { flex: 1, fontSize: 14, fontWeight: '500' },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  checkboxMark: { color: '#fff', fontWeight: '700' },
   daySelector: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   dayTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   dayTabText: { fontSize: 13, fontWeight: '600' },

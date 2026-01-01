@@ -9,7 +9,8 @@
     "start": "node dist/stripe-api.js",
     "webhook": "tsx watch stripe-webhook.ts",
     "setup": "node setup-backend.js",
-    "test": "node setup-backend.js && npm run dev"
+    "test": "node setup-backend.js && npm run dev",
+    "rgpd:cron": "tsx rgpd-cron.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

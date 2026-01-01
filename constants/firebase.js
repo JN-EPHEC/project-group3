@@ -20,6 +20,7 @@ import {
     getDocs,
     getFirestore,
     query,
+    serverTimestamp,
     setDoc,
     updateDoc,
     where
@@ -34,6 +35,9 @@ import {
 import { Platform } from 'react-native';
 
 import firebaseConfig from './firebaseenv.js';
+
+const RGPD_VERSION = '2024-12-06';
+const RGPD_PRIVACY_URL = 'https://wekid.fr/politique-de-confidentialite';
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 // Use persistent storage for React Native, fall back to web
@@ -529,6 +533,119 @@ export async function getDeleteProfileSummary(uid) {
       userFound: false,
       error
     };
+  }
+}
+
+/**
+ * Enregistre le consentement RGPD de l'utilisateur et du profil professionnel associé.
+ * Écrit dans users/{uid}.rgpdConsent et professionals/{uid}.rgpdConsent.
+ */
+export async function acceptRgpdConsent(uid, email) {
+  try {
+    if (!uid) {
+      throw new Error('UID requis');
+    }
+
+    const consentPayload = {
+      accepted: true,
+      version: RGPD_VERSION,
+      privacyUrl: RGPD_PRIVACY_URL,
+      acceptedAt: serverTimestamp(),
+      emailAtAcceptance: email?.toLowerCase() || null,
+      source: 'app',
+    };
+
+    const userRef = doc(db, 'users', uid);
+    const professionalRef = doc(db, 'professionals', uid);
+
+    await setDoc(userRef, { rgpdConsent: consentPayload }, { merge: true });
+    await setDoc(professionalRef, { rgpdConsent: consentPayload }, { merge: true });
+
+    return { success: true, consent: consentPayload };
+  } catch (error) {
+    console.error('[RGPD] Erreur lors de l\'enregistrement du consentement:', error);
+    return { success: false, error: error.message || 'Impossible d\'enregistrer le consentement' };
+  }
+}
+
+/**
+ * Crée une demande d'export des données personnelles (JSON + historique de messages).
+ * Un traitement backend doit générer le fichier et envoyer un lien sécurisé par email.
+ */
+export async function requestDataExport(uid, email) {
+  try {
+    if (!uid) {
+      throw new Error('UID requis');
+    }
+
+    const exportRef = await addDoc(collection(db, 'rgpd_exports'), {
+      uid,
+      email: email?.toLowerCase() || null,
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      lastUpdate: serverTimestamp(),
+      type: 'professional',
+      delivery: 'email-link',
+      requestedFrom: 'app',
+      version: RGPD_VERSION,
+    });
+
+    return { success: true, exportRequestId: exportRef.id };
+  } catch (error) {
+    console.error('[RGPD] Erreur lors de la demande d\'export:', error);
+    return { success: false, error: error.message || 'Impossible de créer la demande d\'export' };
+  }
+}
+
+/**
+ * Anonymise un compte professionnel (Firestore uniquement; la suppression Auth doit être faite côté admin).
+ * Efface les PII, marque le compte comme anonymisé et conserve une trace minimale.
+ */
+export async function anonymizeProfessionalAccount(uid) {
+  try {
+    if (!uid) {
+      throw new Error('UID requis');
+    }
+
+    const anonymizedAt = serverTimestamp();
+    const placeholderEmail = `anonymized-${uid}@wekid.local`;
+
+    const professionalRef = doc(db, 'professionals', uid);
+    await setDoc(professionalRef, {
+      accountStatus: 'anonymized',
+      anonymizedAt,
+      address: null,
+      phone: null,
+      specialty: null,
+      description: null,
+      availability: {},
+      photoUrl: null,
+      diplomaUrl: null,
+      rgpdConsent: {
+        accepted: false,
+        anonymized: true,
+        anonymizedAt,
+      },
+    }, { merge: true });
+
+    const userRef = doc(db, 'users', uid);
+    await setDoc(userRef, {
+      anonymized: true,
+      anonymizedAt,
+      email: placeholderEmail,
+      firstName: 'Utilisateur',
+      lastName: 'Anonymisé',
+      phone: null,
+      address: null,
+      roles: [],
+      professional_id: null,
+      parent_id: null,
+    }, { merge: true });
+
+    return { success: true };
+  } catch (error) {
+    console.error('[RGPD] Erreur lors de l\'anonymisation:', error);
+    return { success: false, error: error.message || 'Impossible d\'anonymiser le compte' };
   }
 }
 

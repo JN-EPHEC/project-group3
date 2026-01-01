@@ -16,6 +16,7 @@ import {
     Alert,
     Image,
     KeyboardAvoidingView,
+    Linking,
     Platform,
     ScrollView,
     StyleSheet,
@@ -65,10 +66,14 @@ export default function AddProfessionalRole() {
   const [specialty, setSpecialty] = useState('');
   const [description, setDescription] = useState('');
   const [availability] = useState(DEFAULT_AVAILABILITY);
+  const [hasRgpdConsent, setHasRgpdConsent] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(1); // 1: Professional info, 2: Photo, 3: Diploma
+
+  const privacyUrl = 'https://wekid.fr/politique-de-confidentialite';
+  const consentVersion = '2024-12-06';
 
   const auth = getAuth();
   const db = getFirestore();
@@ -81,7 +86,7 @@ export default function AddProfessionalRole() {
       const cleanSpecialty = specialty.trim();
       const cleanDescription = description.trim();
       const phoneLooksOk = cleanPhone.length >= 8;
-      return !!professionalType && !!cleanAddress && phoneLooksOk && !!cleanSpecialty && cleanDescription.length >= 10;
+      return !!professionalType && !!cleanAddress && phoneLooksOk && !!cleanSpecialty && cleanDescription.length >= 10 && hasRgpdConsent;
     }
     if (step === 2) {
       // Photo optionnelle
@@ -102,6 +107,7 @@ export default function AddProfessionalRole() {
       if (phone.trim().length < 8) hints.push('Téléphone trop court (8+ chiffres).');
       if (!specialty.trim()) hints.push('Indiquez votre spécialité.');
       if (description.trim().length < 10) hints.push('Description trop courte (10+ caractères).');
+      if (!hasRgpdConsent) hints.push('Validez le consentement RGPD.');
     }
 
     if (step === 3) {
@@ -162,6 +168,12 @@ export default function AddProfessionalRole() {
         return;
       }
 
+      if (!hasRgpdConsent) {
+        setError('Vous devez accepter la politique de confidentialité.');
+        setLoading(false);
+        return;
+      }
+
       // Upload photo
       let photoUrl = null;
       if (imageUri) {
@@ -191,6 +203,14 @@ export default function AddProfessionalRole() {
       }
 
       // Créer le document professionnel lié au user.uid (PAS parent_id)
+      const consentPayload = {
+        accepted: true,
+        version: consentVersion,
+        privacyUrl,
+        acceptedAt: serverTimestamp(),
+        source: 'professional-onboarding',
+      };
+
       const professionalDoc = {
         userId: user.uid, // Lié au user.uid pour éviter les mélanges
         email: user.email?.toLowerCase(),
@@ -202,6 +222,8 @@ export default function AddProfessionalRole() {
         availability,
         photoUrl: photoUrl || null,
         diplomaUrl: diplomaUrl || null,
+        accountStatus: 'active',
+        rgpdConsent: consentPayload,
         createdAt: serverTimestamp(),
       };
 
@@ -212,6 +234,8 @@ export default function AddProfessionalRole() {
       await updateDoc(userRef, {
         professional_id: user.uid, // Utiliser user.uid comme professional_id
         roles: arrayUnion('professionnel'),
+        rgpdConsent: consentPayload,
+        accountStatus: 'active',
       });
 
       Alert.alert('Succès', 'Rôle professionnel ajouté avec succès');
@@ -303,6 +327,22 @@ export default function AddProfessionalRole() {
         editable={!loading}
         textAlignVertical="top"
       />
+
+      <View style={[styles.consentBox, { backgroundColor: colors.cardBackground, borderColor: colors.tint }]}>
+        <TouchableOpacity
+          style={styles.consentRow}
+          onPress={() => setHasRgpdConsent(!hasRgpdConsent)}
+          disabled={loading}
+        >
+          <View style={[styles.checkbox, { borderColor: colors.tint, backgroundColor: hasRgpdConsent ? colors.tint : 'transparent' }]}>
+            {hasRgpdConsent && <Text style={styles.checkboxMark}>✓</Text>}
+          </View>
+          <Text style={[styles.consentText, { color: colors.text }]}>J'accepte la Politique de confidentialité et les conditions RGPD.</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => Linking.openURL(privacyUrl)}>
+          <Text style={[styles.privacyLink, { color: colors.tint }]}>Consulter la politique</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -467,6 +507,39 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     minHeight: 100,
+  },
+  consentBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  consentText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxMark: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  privacyLink: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   typeButtonsContainer: {
     flexDirection: 'row',
