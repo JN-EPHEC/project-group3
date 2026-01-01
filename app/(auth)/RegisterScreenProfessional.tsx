@@ -4,12 +4,13 @@ import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, getAuth, sendEmailVerification } from 'firebase/auth';
 import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     Image,
     KeyboardAvoidingView,
+    Linking,
     Platform,
     ScrollView,
     StyleSheet,
@@ -78,8 +79,13 @@ export default function RegisterScreenProfessional() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const passwordRef = useRef('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [diplomaUri, setDiplomaUri] = useState<string | null>(null);
+
+    // RGPD
+    const [consentChecked, setConsentChecked] = useState(false);
 
   // Professional info
   const [professionalType, setProfessionalType] = useState<'avocat' | 'psychologue' | ''>('');
@@ -105,7 +111,7 @@ export default function RegisterScreenProfessional() {
       const cleanLastName = lastName.trim();
       const cleanEmail = email.trim();
       const pwdError = getPasswordError(password);
-      return !!cleanFirstName && !!cleanLastName && !!cleanEmail && isValidEmail(cleanEmail) && !pwdError;
+      return !!cleanFirstName && !!cleanLastName && !!cleanEmail && isValidEmail(cleanEmail) && !pwdError && consentChecked;
     }
     if (step === 2) {
       const cleanAddress = address.trim();
@@ -135,6 +141,7 @@ export default function RegisterScreenProfessional() {
       else if (!isValidEmail(email)) hints.push('Utilisez un email valide.');
       const pwdError = getPasswordError(password);
       if (pwdError) hints.push(pwdError);
+      if (!consentChecked) hints.push('Vous devez accepter la politique de confidentialité.');
     }
 
     if (step === 2) {
@@ -202,6 +209,12 @@ export default function RegisterScreenProfessional() {
 
       if (!professionalType) {
         setError('Veuillez sélectionner votre profession.');
+        setLoading(false);
+        return;
+      }
+
+      if (!consentChecked) {
+        setError('Vous devez accepter la politique de confidentialité.');
         setLoading(false);
         return;
       }
@@ -292,6 +305,12 @@ export default function RegisterScreenProfessional() {
         email: cleanEmail.toLowerCase(),
         userType: 'professionnel',
         createdAt: serverTimestamp(),
+        rgpdConsent: {
+          accepted: true,
+          acceptedAt: serverTimestamp(),
+          version: '2024-12-06',
+          privacyUrl: 'https://wekid.fr/politique-de-confidentialite',
+        },
       };
 
       await setDoc(doc(db, 'users', user.uid), userDoc);
@@ -311,6 +330,12 @@ export default function RegisterScreenProfessional() {
         photoUrl: photoUrl || null,
         diplomaUrl: diplomaUrl || null,
         createdAt: serverTimestamp(),
+        rgpdConsent: {
+          accepted: true,
+          acceptedAt: serverTimestamp(),
+          version: '2024-12-06',
+          privacyUrl: 'https://wekid.fr/politique-de-confidentialite',
+        },
       };
 
       await setDoc(doc(db, 'professionals', user.uid), professionalDoc);
@@ -369,15 +394,50 @@ export default function RegisterScreenProfessional() {
       />
 
       <Text style={[styles.label, { color: colors.text }]}>Mot de passe*</Text>
-      <TextInput
-        style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-        placeholder="Min 8 caractères avec majuscule, chiffre et caractère spécial"
-        placeholderTextColor={colors.textSecondary}
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        editable={!loading}
-      />
+      <View style={styles.passwordWrapper}>
+        <TextInput
+          ref={passwordRef}
+          style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text, paddingRight: 110 }]}
+          placeholder="Min 8 caractères avec majuscule, chiffre et caractère spécial"
+          placeholderTextColor={colors.textSecondary}
+          secureTextEntry={!showPassword}
+          defaultValue={password}
+          onChangeText={(text) => {
+            passwordRef.current = text;
+            setPassword(text);
+          }}
+          editable={!loading}
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="none"
+          autoComplete="off"
+          importantForAutofill="no"
+        />
+        <TouchableOpacity
+          style={styles.passwordToggle}
+          onPress={() => {
+            setShowPassword((prev) => !prev);
+          }}
+          disabled={loading}
+        >
+          <Text style={[styles.passwordToggleText, { color: colors.tint }]}>{showPassword ? 'Masquer' : 'Afficher'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        style={styles.consentRow}
+        activeOpacity={0.8}
+        onPress={() => setConsentChecked((prev) => !prev)}
+        disabled={loading}
+      >
+        <View style={[styles.checkbox, { borderColor: colors.text }]}> 
+          {consentChecked ? <Text style={styles.checkboxMark}>✓</Text> : null}
+        </View>
+        <Text style={[styles.consentText, { color: colors.textSecondary }]}>J'accepte la politique de confidentialité</Text>
+        <TouchableOpacity onPress={() => Linking.openURL('https://wekid.fr/politique-de-confidentialite')}>
+          <Text style={[styles.consentLink, { color: colors.tint }]}>Voir</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </View>
   );
 
@@ -729,6 +789,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  passwordWrapper: { position: 'relative' },
+  passwordToggle: { position: 'absolute', right: 10, top: 12, paddingHorizontal: 8, paddingVertical: 4 },
+  passwordToggleText: { fontSize: 14, fontWeight: '700' },
+  consentRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  checkboxMark: { color: '#fff', fontWeight: '700' },
+  consentText: { flex: 1, fontSize: 14, fontWeight: '500' },
+  consentLink: { fontSize: 14, fontWeight: '700' },
   buttonsContainer: {
     flexDirection: 'row',
     gap: 12,

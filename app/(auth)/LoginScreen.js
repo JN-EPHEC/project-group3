@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View, useColorScheme } from 'react-native';
 import { db } from '../../constants/firebase';
 import { createAndPersistSession } from '../../constants/sessionManager';
@@ -13,6 +13,8 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const passwordRef = useRef('');
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
@@ -118,14 +120,35 @@ const LoginScreen = () => {
           />
           
           <Text style={[styles.label, { color: colors.text }]}>Mot de passe*</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-            placeholder="Mot de passe"
-            placeholderTextColor={colors.textSecondary}
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+          <View style={styles.passwordWrapper}>
+            <TextInput
+              ref={passwordRef}
+              style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text, paddingRight: 90 }]}
+              placeholder="Mot de passe"
+              placeholderTextColor={colors.textSecondary}
+              secureTextEntry={!showPassword}
+              defaultValue={password}
+              onChangeText={(text) => {
+                passwordRef.current = text;
+                setPassword(text);
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="none"
+              autoComplete="off"
+              importantForAutofill="no"
+            />
+            <TouchableOpacity
+              style={styles.passwordToggle}
+              onPress={() => {
+                setShowPassword((prev) => !prev);
+              }}
+            >
+              <Text style={[styles.passwordToggleText, { color: colors.tint }]}>
+                {showPassword ? 'Masquer' : 'Afficher'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity onPress={() => router.push('ForgotPasswordScreen')} style={styles.linkButton}>
             <Text style={[styles.linkText, { color: colors.tint }]}>Mot de passe oublié ?</Text>
@@ -187,6 +210,10 @@ const styles = StyleSheet.create({
   formContainer: {
     width: '100%'
   },
+    passwordWrapper: {
+      position: 'relative',
+      width: '100%'
+    },
   label: {
     color: '#FFFFFF',
     fontSize: 16,
@@ -238,6 +265,17 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   linkText: {
+    passwordToggle: {
+      position: 'absolute',
+      right: 12,
+      top: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    passwordToggleText: {
+      fontSize: 14,
+      fontWeight: '700'
+    },
     fontSize: 14,
     textDecorationLine: 'underline'
   }
