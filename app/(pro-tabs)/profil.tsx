@@ -3,9 +3,10 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import * as StoreReview from 'expo-store-review';
 import { arrayUnion, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { acceptRgpdConsent, auth, db, deleteProfessionalPhoto, requestDataExport, signOut, uploadProfessionalPhoto } from '../../constants/firebase';
 import { Colors } from '../../constants/theme';
 
@@ -242,6 +243,55 @@ export default function ProProfilScreen() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [isSavingConsent, setIsSavingConsent] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+
+  const handleOpenPrivacy = async () => {
+    try {
+      await Linking.openURL(privacyUrl);
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'ouvrir la politique de confidentialité');
+    }
+  };
+
+  const handleOpenNotifications = async () => {
+    try {
+      const opened = await Linking.openSettings();
+      if (!opened) {
+        Alert.alert('Info', 'Ouvrez les réglages système pour ajuster les notifications.');
+      }
+    } catch (error) {
+      Alert.alert('Info', 'Ouvrez les réglages système pour ajuster les notifications.');
+    }
+  };
+
+  const handleContactSupport = async () => {
+    const mailto = 'mailto:support@wekid.fr?subject=Support%20WeKid%20Pro&body=Décrivez votre demande:';
+    const canOpen = await Linking.canOpenURL(mailto);
+    if (!canOpen) {
+      Alert.alert('Info', 'Envoyez-nous un email à support@wekid.fr');
+      return;
+    }
+    await Linking.openURL(mailto);
+  };
+
+  const handleRateApp = async () => {
+    try {
+      const available = await StoreReview.isAvailableAsync();
+      if (available) {
+        await StoreReview.requestReview();
+        return;
+      }
+    } catch (error) {
+      // fallback to store links
+    }
+    const storeUrl = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/app/id000000000'
+      : 'https://play.google.com/store/apps/details?id=com.wekid.app';
+    try {
+      await Linking.openURL(storeUrl);
+    } catch (error) {
+      Alert.alert('Info', 'Recherchez "WeKid" dans votre store pour laisser un avis.');
+    }
+  };
   
   // Edit modal states
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -845,6 +895,50 @@ export default function ProProfilScreen() {
             </View>
           </View>
 
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: accentColor }]}>Sécurité & notifications</Text>
+            </View>
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}> 
+              <TouchableOpacity style={styles.supportRow} onPress={handleOpenPrivacy}>
+                <IconSymbol name="lock" size={22} color={colors.textSecondary} />
+                <Text style={[styles.supportText, { color: colors.text }]}>Sécurités et confidentialité</Text>
+                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
+              <TouchableOpacity style={styles.supportRow} onPress={handleOpenNotifications}>
+                <IconSymbol name="bell" size={22} color={colors.textSecondary} />
+                <Text style={[styles.supportText, { color: colors.text }]}>Notifications</Text>
+                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: accentColor }]}>Support</Text>
+            </View>
+            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}> 
+              <TouchableOpacity style={styles.supportRow} onPress={() => router.push('/(tabs)/Aide')}>
+                <IconSymbol name="questionmark.circle" size={22} color={colors.textSecondary} />
+                <Text style={[styles.supportText, { color: colors.text }]}>Centre d'aide</Text>
+                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
+              <TouchableOpacity style={styles.supportRow} onPress={handleContactSupport}>
+                <IconSymbol name="envelope" size={22} color={colors.textSecondary} />
+                <Text style={[styles.supportText, { color: colors.text }]}>Nous contacter</Text>
+                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />
+              <TouchableOpacity style={styles.supportRow} onPress={handleRateApp}>
+                <IconSymbol name="star" size={22} color={colors.textSecondary} />
+                <Text style={[styles.supportText, { color: colors.text }]}>Evaluer l'application</Text>
+                <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <IconSymbol name="arrow.right.square" size={20} color="#fff" />
             <Text style={styles.logoutText}>Se déconnecter</Text>
@@ -1239,6 +1333,9 @@ const styles = StyleSheet.create({
   logoutText: { color: '#fff', fontSize: 16, fontWeight: '700', marginLeft: 10 },
   deleteProfileButton: { backgroundColor: '#C0392B', borderRadius: 20, paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowOffset: { width: 0, height: 4 }, shadowRadius: 10, elevation: 3 },
   deleteProfileText: { color: '#fff', fontSize: 16, fontWeight: '700', marginLeft: 10 },
+  supportRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
+  supportText: { flex: 1, marginLeft: 12, fontSize: 15, fontWeight: '600' },
+  rowDivider: { height: 1, width: '100%' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', maxHeight: '80%', borderRadius: 20, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },

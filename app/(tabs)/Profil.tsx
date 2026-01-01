@@ -4,10 +4,11 @@ import { BORDER_RADIUS, FONT_SIZES, hs, SAFE_BOTTOM_SPACING, SPACING, V_SPACING,
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as StoreReview from 'expo-store-review';
 import { User } from 'firebase/auth';
 import { arrayUnion, collection, doc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db, getUserFamilies, joinFamilyByCode, leaveFamilyById, signOut } from '../../constants/firebase';
 
@@ -59,6 +60,57 @@ export default function ProfilScreen() {
   const selectedChildFull = selectedChildForMedical
     ? children.find((c) => c.id === selectedChildForMedical.id) || null
     : null;
+
+  const privacyUrl = 'https://wekid.fr/politique-de-confidentialite';
+
+  const handleOpenPrivacy = async () => {
+    try {
+      await Linking.openURL(privacyUrl);
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'ouvrir la politique de confidentialité');
+    }
+  };
+
+  const handleOpenNotifications = async () => {
+    try {
+      const opened = await Linking.openSettings();
+      if (!opened) {
+        Alert.alert('Info', 'Ouvrez les réglages système pour ajuster les notifications.');
+      }
+    } catch (error) {
+      Alert.alert('Info', 'Ouvrez les réglages système pour ajuster les notifications.');
+    }
+  };
+
+  const handleContactSupport = async () => {
+    const mailto = 'mailto:support@wekid.fr?subject=Support%20WeKid&body=Décrivez votre demande:';
+    const canOpen = await Linking.canOpenURL(mailto);
+    if (!canOpen) {
+      Alert.alert('Info', 'Envoyez-nous un email à support@wekid.fr');
+      return;
+    }
+    await Linking.openURL(mailto);
+  };
+
+  const handleRateApp = async () => {
+    try {
+      const available = await StoreReview.isAvailableAsync();
+      if (available) {
+        await StoreReview.requestReview();
+        return;
+      }
+    } catch (error) {
+      // fall back to store links below
+    }
+    const storeUrl = Platform.OS === 'ios'
+      ? 'https://apps.apple.com/app/id000000000'
+      : 'https://play.google.com/store/apps/details?id=com.wekid.app';
+    try {
+      await Linking.openURL(storeUrl);
+    } catch (error) {
+      Alert.alert('Info', 'Recherchez "WeKid" dans votre store pour laisser un avis.');
+    }
+  };
 
   const handleConfirmMedicalRecord = async (updatedRecord: ChildMedicalRecordData) => {
     if (!currentFamilyId || !selectedChildForMedical) return;
@@ -772,13 +824,13 @@ export default function ProfilScreen() {
               </View>
             )}
 
-            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]} onPress={handleOpenPrivacy}>
               <IconSymbol name="lock" size={24} color={colors.textSecondary} />
               <Text style={[styles.settingText, { color: colors.text }]}>Sécurités et confidentialité</Text>
               <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]} onPress={handleOpenNotifications}>
               <IconSymbol name="bell" size={24} color={colors.textSecondary} />
               <Text style={[styles.settingText, { color: colors.text }]}>Notifications</Text>
               <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
@@ -1179,13 +1231,13 @@ export default function ProfilScreen() {
               <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]} onPress={handleContactSupport}>
               <IconSymbol name="envelope" size={24} color={colors.textSecondary} />
               <Text style={[styles.settingText, { color: colors.text }]}>Nous contacter</Text>
               <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]}>
+            <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground }]} onPress={handleRateApp}>
               <IconSymbol name="star" size={24} color={colors.textSecondary} />
               <Text style={[styles.settingText, { color: colors.text }]}>Evaluer l'application</Text>
               <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
