@@ -919,7 +919,7 @@ export default function ProProfilScreen() {
               <Text style={[styles.sectionTitle, { color: accentColor }]}>Support</Text>
             </View>
             <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}> 
-              <TouchableOpacity style={styles.supportRow} onPress={() => router.push('/(tabs)/Aide')}>
+              <TouchableOpacity style={styles.supportRow} onPress={() => router.push('/helpcenter-pro')}>
                 <IconSymbol name="questionmark.circle" size={22} color={colors.textSecondary} />
                 <Text style={[styles.supportText, { color: colors.text }]}>Centre d'aide</Text>
                 <IconSymbol name="chevron.right" size={18} color={colors.textSecondary} />
