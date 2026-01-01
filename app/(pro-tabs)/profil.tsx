@@ -64,6 +64,7 @@ export default function ProProfilScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const accentColor = '#FFCEB0';
   const handleUploadDiploma = async () => {
     try {
       // Open document picker
@@ -466,7 +467,7 @@ export default function ProProfilScreen() {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.containerCentered}>
-          <ActivityIndicator size="large" color={colors.tint} />
+          <ActivityIndicator size="large" color={accentColor} />
         </View>
       </SafeAreaView>
     );
@@ -478,11 +479,11 @@ export default function ProProfilScreen() {
         <View style={styles.container}>
           <View style={styles.header}>
             <View style={styles.headerTop}>
-              <Text style={[styles.title, { color: colors.tint }]} numberOfLines={1} ellipsizeMode="tail">Profil </Text>
+              <Text style={[styles.title, { color: accentColor }]} numberOfLines={1} ellipsizeMode="tail">Profil </Text>
               {(!parentId || !professionalId) && (
                 <TouchableOpacity style={[styles.addRoleButton, { backgroundColor: colors.cardBackground }]} onPress={handleAddMissingRole}>
-                  <IconSymbol name="person.badge.plus" size={18} color={colors.tint} />
-                  <Text style={[styles.addRoleText, { color: colors.tint }]}>
+                  <IconSymbol name="person.badge.plus" size={18} color={accentColor} />
+                  <Text style={[styles.addRoleText, { color: accentColor }]}>
                     {!parentId ? 'Ajouter rôle Parent' : 'Ajouter rôle Pro'}
                   </Text>
                 </TouchableOpacity>
@@ -512,12 +513,12 @@ export default function ProProfilScreen() {
               />
             ) : (
               <View style={[styles.avatarCircle, { backgroundColor: colors.secondaryCardBackground }]}>
-                <IconSymbol name="person.fill" size={60} color={colors.tint} />
+                <IconSymbol name="person.fill" size={60} color={accentColor} />
               </View>
             )}
             <View style={styles.photoButtonsContainer}>
               <TouchableOpacity 
-                style={[styles.photoButton, { backgroundColor: colors.tint }]}
+                style={[styles.photoButton, { backgroundColor: accentColor }]}
                 onPress={handleUploadPhoto}
                 disabled={isUploadingPhoto}
               >
@@ -542,13 +543,13 @@ export default function ProProfilScreen() {
           {/* Diplôme */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Diplôme ou Certification</Text>
+              <Text style={[styles.sectionTitle, { color: accentColor }]}>Diplôme ou Certification</Text>
             </View>
 
             {diplomaUrl ? (
               <View style={[styles.diplomaCard, { backgroundColor: colors.cardBackground }]}>
                 <View style={styles.diplomaInfo}>
-                  <IconSymbol name="doc.fill" size={24} color={colors.tint} />
+                  <IconSymbol name="doc.fill" size={24} color={accentColor} />
                   <View style={styles.diplomaTextContainer}>
                     <Text style={[styles.diplomaLabel, { color: colors.textSecondary }]}>Diplôme téléchargé</Text>
                     <Text style={[styles.diplomaValue, { color: colors.text }]}>Document disponible</Text>
@@ -556,7 +557,7 @@ export default function ProProfilScreen() {
                 </View>
                 <View style={styles.diplomaButtonsContainer}>
                   <TouchableOpacity 
-                    style={[styles.diplomaButton, { backgroundColor: colors.tint }]}
+                    style={[styles.diplomaButton, { backgroundColor: accentColor }]}
                     onPress={handleUploadDiploma}
                     disabled={isUploadingDiploma}
                   >
@@ -576,16 +577,16 @@ export default function ProProfilScreen() {
                 </View>
               </View>
             ) : (
-              <View style={[styles.diplomaCard, { backgroundColor: colors.cardBackground, borderStyle: 'dashed', borderWidth: 1, borderColor: colors.tint }]}>
+              <View style={[styles.diplomaCard, { backgroundColor: colors.cardBackground, borderStyle: 'dashed', borderWidth: 1, borderColor: accentColor }]}>
                 <View style={styles.diplomaInfo}>
-                  <IconSymbol name="doc.badge.plus" size={24} color={colors.tint} />
+                  <IconSymbol name="doc.badge.plus" size={24} color={accentColor} />
                   <View style={styles.diplomaTextContainer}>
                     <Text style={[styles.diplomaLabel, { color: colors.textSecondary }]}>Aucun diplôme</Text>
                     <Text style={[styles.diplomaValue, { color: colors.text }]}>Ajoutez un diplôme ou une certification</Text>
                   </View>
                 </View>
                 <TouchableOpacity 
-                  style={[styles.diplomaButton, { backgroundColor: colors.tint }]}
+                  style={[styles.diplomaButton, { backgroundColor: accentColor }]}
                   onPress={handleUploadDiploma}
                   disabled={isUploadingDiploma}
                 >
@@ -602,7 +603,7 @@ export default function ProProfilScreen() {
           {/* Type de professionnel */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Type de professionnel</Text>
+              <Text style={[styles.sectionTitle, { color: accentColor }]}>Type de professionnel</Text>
             </View>
             
             <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
@@ -621,7 +622,7 @@ export default function ProProfilScreen() {
           {/* Informations personnelles */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Informations personnelles</Text>
+              <Text style={[styles.sectionTitle, { color: accentColor }]}>Informations personnelles</Text>
             </View>
             
             <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
@@ -648,10 +649,10 @@ export default function ProProfilScreen() {
           {/* Coordonnées professionnelles */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Coordonnées professionnelles</Text>
+              <Text style={[styles.sectionTitle, { color: accentColor }]}>Coordonnées professionnelles</Text>
               <TouchableOpacity 
                 onPress={() => openEditModal('contact')}
-                style={[styles.editButton, { backgroundColor: colors.tint }]}
+                style={[styles.editButton, { backgroundColor: accentColor }]}
               >
                 <IconSymbol name="pencil" size={18} color="#fff" />
               </TouchableOpacity>
@@ -691,10 +692,10 @@ export default function ProProfilScreen() {
           {/* Description */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Description</Text>
+              <Text style={[styles.sectionTitle, { color: accentColor }]}>Description</Text>
               <TouchableOpacity 
                 onPress={() => openEditModal('description')}
-                style={[styles.editButton, { backgroundColor: colors.tint }]}
+                style={[styles.editButton, { backgroundColor: accentColor }]}
               >
                 <IconSymbol name="pencil" size={18} color="#fff" />
               </TouchableOpacity>
@@ -710,10 +711,10 @@ export default function ProProfilScreen() {
           {/* Disponibilités */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.tint }]}>Disponibilités</Text>
+              <Text style={[styles.sectionTitle, { color: accentColor }]}>Disponibilités</Text>
               <TouchableOpacity 
                 onPress={() => openEditModal('availability')}
-                style={[styles.editButton, { backgroundColor: colors.tint }]}
+                style={[styles.editButton, { backgroundColor: accentColor }]}
               >
                 <IconSymbol name="pencil" size={18} color="#fff" />
               </TouchableOpacity>
@@ -743,8 +744,8 @@ export default function ProProfilScreen() {
                       ) : (
                         <View style={styles.slotsContainer}>
                           {availableSlots.map((slot, idx) => (
-                            <View key={idx} style={[styles.slotChip, { backgroundColor: colors.tint + '20', borderColor: colors.tint }]}>
-                              <Text style={[styles.slotText, { color: colors.tint }]}>
+                            <View key={idx} style={[styles.slotChip, { backgroundColor: accentColor + '20', borderColor: accentColor }]}>
+                              <Text style={[styles.slotText, { color: '#000' }]}>
                                 {slot.start} - {slot.end}
                               </Text>
                             </View>
@@ -830,7 +831,7 @@ export default function ProProfilScreen() {
                   <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Type de professionnel</Text>
                   <TouchableOpacity
                     style={[styles.typeButton, { 
-                      backgroundColor: tempProfessionalType === 'avocat' ? colors.tint : colors.background,
+                      backgroundColor: tempProfessionalType === 'avocat' ? accentColor : colors.background,
                       borderColor: colors.border,
                       borderWidth: 1
                     }]}
@@ -845,7 +846,7 @@ export default function ProProfilScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.typeButton, { 
-                      backgroundColor: tempProfessionalType === 'psychologue' ? colors.tint : colors.background,
+                      backgroundColor: tempProfessionalType === 'psychologue' ? accentColor : colors.background,
                       borderColor: colors.border,
                       borderWidth: 1
                     }]}
@@ -917,7 +918,7 @@ export default function ProProfilScreen() {
                         style={[
                           styles.dayTab,
                           { 
-                            backgroundColor: selectedDay === day ? colors.tint : colors.background,
+                            backgroundColor: selectedDay === day ? accentColor : colors.background,
                             borderColor: colors.border,
                           }
                         ]}
@@ -947,7 +948,7 @@ export default function ProProfilScreen() {
                       <TouchableOpacity
                         style={[
                           styles.toggleButton,
-                          { backgroundColor: tempAvailability[selectedDay].isOpen ? colors.tint : colors.border }
+                          { backgroundColor: tempAvailability[selectedDay].isOpen ? accentColor : colors.border }
                         ]}
                         onPress={() => {
                           setTempAvailability({
@@ -978,8 +979,8 @@ export default function ProProfilScreen() {
                               style={[
                                 styles.slotRow,
                                 {
-                                  backgroundColor: slot.available ? colors.tint + '20' : colors.background,
-                                  borderColor: slot.available ? colors.tint : colors.border,
+                                  backgroundColor: slot.available ? accentColor + '20' : colors.background,
+                                  borderColor: slot.available ? accentColor : colors.border,
                                 }
                               ]}
                               onPress={() => {
@@ -996,12 +997,12 @@ export default function ProProfilScreen() {
                             >
                               <Text style={[
                                 styles.slotTimeText,
-                                { color: slot.available ? colors.tint : colors.textSecondary }
+                                { color: '#000' }
                               ]}>
                                 {slot.start} - {slot.end}
                               </Text>
                               {slot.available && (
-                                <IconSymbol name="checkmark.circle.fill" size={20} color={colors.tint} />
+                                <IconSymbol name="checkmark.circle.fill" size={20} color={accentColor} />
                               )}
                             </TouchableOpacity>
                           ))}
@@ -1021,7 +1022,7 @@ export default function ProProfilScreen() {
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton, { backgroundColor: colors.tint }]}
+                style={[styles.modalButton, styles.saveButton, { backgroundColor: accentColor }]}
                 onPress={handleSaveProfile}
                 disabled={isSaving}
               >
