@@ -6,6 +6,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useStripeDeepLinks } from '@/hooks/useStripeDeepLinks';
 import { LogBox } from 'react-native';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import '../constants/firebase';
 
 LogBox.ignoreLogs([
@@ -22,19 +23,21 @@ export default function RootLayout() {
   useStripeDeepLinks();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack initialRouteName="(auth)">
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="(pro-tabs)" options={{ headerShown: false, title: '' }} />
-        <Stack.Screen name="modal" options={{ headerShown: false }} />
-        <Stack.Screen name="add-expense" options={{ headerShown: false }} />
-        <Stack.Screen name="category-approvals" options={{ headerShown: false }} />
-        <Stack.Screen name="RoleSelection" options={{ headerShown: false }} />
-        <Stack.Screen name="subscription" options={{ headerShown: false }} />
-        <Stack.Screen name="AddProfessionalRole" options={{ headerShown: false }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack initialRouteName="(auth)">
+          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="(pro-tabs)" options={{ headerShown: false, title: '' }} />
+          <Stack.Screen name="modal" options={{ headerShown: false }} />
+          <Stack.Screen name="add-expense" options={{ headerShown: false }} />
+          <Stack.Screen name="category-approvals" options={{ headerShown: false }} />
+          <Stack.Screen name="RoleSelection" options={{ headerShown: false }} />
+          <Stack.Screen name="subscription" options={{ headerShown: false }} />
+          <Stack.Screen name="AddProfessionalRole" options={{ headerShown: false }} />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

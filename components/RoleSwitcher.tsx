@@ -11,7 +11,7 @@ interface Props {
 }
 
 export const RoleSwitcher: React.FC<Props> = ({ activeRole, targetRole, accentColor, onToggle }) => {
-  const label = targetRole === 'professionnel' ? 'Passer en mode Pro' : 'Passer en mode Parent';
+  const label = targetRole === 'professionnel' ? 'Mode professionnel' : 'Mode parent';
 
   return (
     <View style={styles.container}>

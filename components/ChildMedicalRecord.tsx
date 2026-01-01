@@ -4,21 +4,21 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as DocumentPicker from 'expo-document-picker';
 import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  LayoutAnimation,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  UIManager,
-  View
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    LayoutAnimation,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    UIManager,
+    View
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // --- TYPES (Identiques) ---
 export type SeverityLevel = 'Faible' | 'Modérée' | 'Sévère';
@@ -142,6 +142,7 @@ export default function ChildMedicalRecord({
 }) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
   
   const [editMode, setEditMode] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>('general');
@@ -242,10 +243,20 @@ export default function ChildMedicalRecord({
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom', 'left', 'right']}>
       <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentInsetAdjustmentBehavior="always"
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingTop: styles.scrollContent.paddingTop || 0,
+              paddingBottom: (styles.scrollContent.paddingBottom || 0) + insets.bottom,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           
           {/* EN-TÊTE PROFIL */}
           <View style={styles.profileHeader}>
