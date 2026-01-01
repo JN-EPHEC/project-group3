@@ -75,8 +75,8 @@ export default function RoleSelectionScreen() {
           style={[styles.card, { backgroundColor: colors.cardBackground }]}
           onPress={() => handleSelect('professionnel')}
         >
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Continuer en tant que Professionnel</Text>
-          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Accéder à l'espace Pro</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Continuer en tant que professionnel</Text>
+          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Accéder à l'espace professionnel</Text>
         </TouchableOpacity>
       </View>
     </View>
