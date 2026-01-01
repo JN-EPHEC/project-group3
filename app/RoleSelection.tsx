@@ -68,7 +68,7 @@ export default function RoleSelectionScreen() {
           style={[styles.card, { backgroundColor: colors.cardBackground }]}
           onPress={() => handleSelect('parent')}
         >
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Continuer en tant que Parent</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Continuer en tant que parent</Text>
           <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Accéder à l'espace famille</Text>
         </TouchableOpacity>
         <TouchableOpacity
