@@ -20,6 +20,9 @@ import {
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 
+// Hide Expo Go header on this screen
+export const options = { headerShown: false };
+
 const getPasswordError = (password: string) => {
   if (password.length < 8 || password.length > 16) {
     return 'Le mot de passe doit contenir entre 8 et 16 caractères.';
