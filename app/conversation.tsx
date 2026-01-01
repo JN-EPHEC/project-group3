@@ -26,6 +26,7 @@ import {
     useColorScheme
 } from 'react-native';
 import { auth, db, getUserFamily, unhideConversationForUser } from '../constants/firebase';
+import { moderateTextWithAPI } from '../constants/moderationService';
 
 export default function ConversationScreen() {
   const router = useRouter();
@@ -53,21 +54,165 @@ export default function ConversationScreen() {
   const storage = getStorage();
   const isProfessionalConv = typeof isProfessionalConversation === 'string' ? isProfessionalConversation === 'true' : false;
 
-  const moderateText = (text: string) => {
-    const toxicWords = [
-      'merde','con','connard','conne','gros con','sale con','salope','pute','putain','put***',
-      'fdp','batard','bâtard','encule','enculé','enfoire','enfoiré','ta gueule','ferme ta gueule','tg',
-      'va te faire foutre','foutre','nique ta mere','nique ta mère','ntm','ta mere','ta mère',
-      'bouffon','clochard','clodo','abruti','idiot','imbecile','imbécile','stupide','debile','débile',
-      'pute','pouffiasse','ordure','racaille','sale','pourri','barge','taré','barjo',
-      'fuck','shit','bitch','asshole','motherfucker','jerk','loser','dumb','stupid'
-    ];
-
-    const toxicPhrases = [
-      'je vais te tuer','je vais te frapper','je vais te casser la gueule','je te hais','je te deteste','je te déteste',
-      'tu ne sers a rien','tu ne sers à rien','tu es nul','t es nul','t es qu un nul','tais toi','taisez vous',
-      'ferme ta bouche','ferme la','ferme-la','degage','dégage','fous le camp','casse toi','casse-toi'
-    ];
+  const moderateTextLocal = (text: string) => {
+    // Dictionnaire ultra-complet avec variantes orthographiques, verlan, et expressions toxiques
+    const toxicPatterns = {
+      violence: {
+        patterns: [
+          'je vais te tuer','je vais te frapper','je vais te casser la gueule','je vais te buter','je vais te defoncer',
+          'je vais te massacrer','je vais te niquer','creve','crève','va crever','mort','tu vas mourir','drop dead',
+          'je vais te peter','je vais te peté','je vais te peter la gueule','je vais te tabasser','tabasse','tabar',
+          'degommer','je vais te degommer','exploser','je vais t exploser','detruire','je vais te detruire',
+          'casser la figure','peter les dents','eclater','je vais t eclater','bourrer','je vais te bourrer'
+        ],
+        reformulations: [
+          "Je suis très en colère en ce moment. Peux-tu m'expliquer ton point de vue ?",
+          "J'ai besoin de comprendre ce qui s'est passé. On peut en discuter calmement ?",
+          "Je suis frustré(e) par cette situation. Pouvons-nous trouver une solution ensemble ?",
+          "Cette situation me met hors de moi. On peut prendre du recul et en reparler ?",
+          "Je ressens beaucoup de frustration. Peut-on discuter de ce qui ne va pas ?"
+        ]
+      },
+      insultes: {
+        patterns: [
+          'con','connard','connard3','conne','conasse','gros con','sale con','espece de con','pauvre con',
+          'abruti','idiot','imbecile','imbécile','andouille','cretin','crétin','debile','débile','demeure',
+          'stupide','nul','naze','nazes','nullard','tocard','tocarde','minable','branquignol','neuneu',
+          'bouffon','clown','guignol','boloss','baltringue','blaireau','cassos','loser','looser','lourd',
+          'teubé','teube','tepu','teub','boulet','pignouf','plouc','bouseux','pecno','pecnot','beauf'
+        ],
+        reformulations: [
+          "Je ne suis pas d'accord avec toi sur ce point.",
+          "Je pense qu'on ne se comprend pas bien. Peux-tu m'expliquer ?",
+          "J'ai du mal à comprendre ton raisonnement. On peut en reparler ?",
+          "Nos points de vue semblent diverger. Pouvons-nous clarifier ?",
+          "Je ne partage pas ton avis. On peut discuter calmement ?",
+          "Je trouve qu'il y a un malentendu. On peut en discuter ?"
+        ]
+      },
+      vulgarite: {
+        patterns: [
+          'merde','putain','bordel','chier','chiasse','foutre','va te faire foutre','j en ai rien a foutre',
+          'j en ai rien à foutre','j en ai rien a branler','rien a foutre','rien a branler','merdique','merdeux',
+          'emmerde','va chier','fait chier','ca me fait chier','ça me fait chier','branler','branleur','branleuse',
+          'pisse','pisser','gogole','gland','couille','couilles','burne','burnes','bite','bites','zob','queue',
+          'pine','teub','nik','niquer','nique','enculer','enc','pd','pede','pédé','tapette','tantouze'
+        ],
+        reformulations: [
+          "Je suis vraiment contrarié(e) par cette situation.",
+          "Ça ne me convient pas du tout.",
+          "Je ne suis pas satisfait(e) de ce qui se passe.",
+          "Cette situation me dérange beaucoup.",
+          "Je trouve ça vraiment frustrant.",
+          "Je ne suis pas à l'aise avec ça.",
+          "Ça me pose un problème."
+        ]
+      },
+      sexiste: {
+        patterns: [
+          'salope','pute','putain','pouffiasse','connasse','petasse','garce','trainee','traînée','catin',
+          'chienne','truie','sac','thon','grosse vache','vache','taupe','dondon','boudin','cageot','laideron',
+          'sale pute','sale salope','fils de pute','batard','bâtard','femme de joie','prostituée'
+        ],
+        reformulations: [
+          "Je ne suis pas d'accord avec ton comportement.",
+          "Je trouve que tu as agi de manière inappropriée.",
+          "Ton attitude me dérange. Pouvons-nous en discuter ?",
+          "Je ne suis pas à l'aise avec ce qui s'est passé.",
+          "Je pense qu'on devrait parler de nos désaccords calmement."
+        ]
+      },
+      haine: {
+        patterns: [
+          'je te hais','je te deteste','je te déteste','ta gueule','ferme ta gueule','tg','ftg','tais toi','tais-toi',
+          'taisez vous','taisez-vous','ferme ta bouche','ferme la','ferme-la','degage','dégage','fous le camp',
+          'casse toi','casse-toi','dégagé','tire toi','tire-toi','va t en','va-t-en','barre toi','barre-toi',
+          'fuck off','shut up','shut the fuck up','stfu','piss off','get lost','get out'
+        ],
+        reformulations: [
+          "J'ai besoin d'espace pour réfléchir. On peut en reparler plus tard ?",
+          "Je préfère qu'on arrête cette conversation pour le moment.",
+          "Je ne veux plus discuter de ça maintenant. On peut en reparler calmement ?",
+          "Je pense qu'on devrait faire une pause dans cette discussion.",
+          "Prenons du recul et reparlerons-en quand on sera plus calmes.",
+          "Je crois qu'on a besoin de temps pour réfléchir chacun de notre côté."
+        ]
+      },
+      familial: {
+        patterns: [
+          'nique ta mere','nique ta mère','ntm','ta mere','ta mère','ta daronne','fils de pute','fdp','enculé',
+          'encule','enfoire','enfoiré','batard','bâtard','salaud','salop','ordure','fumier','raclure',
+          'pourriture','vermine','nique ta race','ntr','ta race','enflure','enclave','trou du cul','trouduc',
+          'motherfucker','son of a bitch','bastard'
+        ],
+        reformulations: [
+          "Je suis en désaccord avec toi.",
+          "Nous avons des points de vue différents sur ce sujet.",
+          "Je pense qu'il vaut mieux en discuter calmement.",
+          "On ne voit pas les choses de la même façon.",
+          "Nos opinions divergent, mais on peut en parler posément.",
+          "Je respecte ton point de vue même si je ne le partage pas."
+        ]
+      },
+      depreciation: {
+        patterns: [
+          'tu ne sers a rien','tu ne sers à rien','tu es nul','t es nul','t es qu un nul','tu sers a rien',
+          'tu es inutile','tu es incompetent','tu es incompétent','tu es bon a rien','bon a rien','bon à rien',
+          'ordure','racaille','pourri','dechet','déchet','parasite','crevure','sous merde','moins que rien',
+          'tu vaux rien','tu ne vaux rien','tu pues','degueulasse','dégueulasse','immonde','infect','repugnant',
+          'trash','pathetic','worthless','useless','waste','garbage'
+        ],
+        reformulations: [
+          "Je pense que nous pourrions faire mieux ensemble.",
+          "J'aimerais qu'on trouve une meilleure façon de gérer cette situation.",
+          "Je ne suis pas satisfait(e) de comment les choses se passent.",
+          "On pourrait améliorer notre façon de communiquer.",
+          "Je crois qu'on peut tous les deux progresser.",
+          "J'aimerais qu'on collabore différemment."
+        ]
+      },
+      menace: {
+        patterns: [
+          'attention a toi','attention à toi','fais gaffe','fait gaffe','tu vas voir','tu verras','tu vas le regretter',
+          'tu le regretteras','je vais me venger','je me vengerai','je te previens','je te préviens','gare a toi',
+          'gare à toi','tu vas payer','tu me le paieras','je te jure','prends garde','watch out','you ll regret',
+          'you will regret','i will make you pay','be careful','watch your back'
+        ],
+        reformulations: [
+          "J'aimerais qu'on trouve un terrain d'entente.",
+          "Je pense qu'on devrait éviter l'escalade et discuter calmement.",
+          "Essayons de résoudre ce conflit de manière constructive.",
+          "Je préfère qu'on trouve une solution pacifique.",
+          "On peut sûrement s'arranger autrement."
+        ]
+      },
+      raciste: {
+        patterns: [
+          'sale arabe','sale noir','sale blanc','sale juif','sale noir','bicot','bougnoule','bamboula',
+          'negro','negre','nègre','youpin','raton','bridé','chinetoque','niakoué','macaque'
+        ],
+        reformulations: [
+          "Je ne suis pas d'accord avec toi.",
+          "On peut discuter de nos différences avec respect.",
+          "Je pense qu'on devrait se concentrer sur le sujet principal.",
+          "Restons concentrés sur ce qui nous préoccupe vraiment."
+        ]
+      },
+      anglais: {
+        patterns: [
+          'fuck','fucking','fucker','fucked','shit','shitty','bitch','bitches','asshole','assholes',
+          'motherfucker','bastard','damn','hell','jerk','loser','dumb','stupid','idiot','moron',
+          'retard','retarded','wtf','stfu','shut up','dick','pussy','cock','cunt','whore','slut'
+        ],
+        reformulations: [
+          "Je suis vraiment contrarié(e).",
+          "Cette situation me frustre beaucoup.",
+          "Je ne suis pas content(e) de ce qui se passe.",
+          "Ça ne me plaît pas du tout.",
+          "Je trouve ça décevant."
+        ]
+      }
+    };
 
     const normalizeBase = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     const sanitize = (value: string) => normalizeBase(value).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -75,33 +220,62 @@ export default function ConversationScreen() {
     const normalizedText = sanitize(text);
     if (!normalizedText) return { allowed: true, suggestion: text };
 
-    const tokens = normalizedText.split(' ').filter(Boolean);
-    const tokenSet = new Set(tokens);
-    const normalizedWords = toxicWords.map(sanitize);
-    const normalizedPhrases = toxicPhrases.map(sanitize);
+    // Recherche de patterns toxiques
+    let detectedCategory: string | null = null;
+    let matchedPattern: string | null = null;
 
-    const wordHitIndex = normalizedWords.findIndex(w => tokenSet.has(w));
-    const phraseHitIndex = normalizedPhrases.findIndex(p => p && normalizedText.includes(p));
-    const hasBad = wordHitIndex !== -1 || phraseHitIndex !== -1;
-
-    if (!hasBad) return { allowed: true, suggestion: text };
-
-    // Propose a softer rephrase by masking banned terms; fallback to a polite sentence
-    let suggestion = text;
-    const termsToMask = [...toxicPhrases, ...toxicWords];
-    termsToMask.forEach(term => {
-      if (!term) return;
-      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-      const re = new RegExp(escaped, 'gi');
-      suggestion = suggestion.replace(re, '***');
-    });
-
-    const cleaned = suggestion.replace(/\*/g, '').trim();
-    if (!cleaned || cleaned.length < 3) {
-      suggestion = "Je préfère en parler calmement. Peux-tu m'expliquer ce qui ne va pas ?";
+    // Priorité aux phrases longues (expressions)
+    for (const [category, data] of Object.entries(toxicPatterns)) {
+      for (const pattern of data.patterns) {
+        const normalizedPattern = sanitize(pattern);
+        if (normalizedPattern.split(' ').length > 1 && normalizedText.includes(normalizedPattern)) {
+          detectedCategory = category;
+          matchedPattern = pattern;
+          break;
+        }
+      }
+      if (detectedCategory) break;
     }
 
-    return { allowed: false, suggestion: suggestion.trim() };
+    // Vérification par tokens pour les mots isolés
+    if (!detectedCategory) {
+      const tokens = normalizedText.split(' ').filter(Boolean);
+      const tokenSet = new Set(tokens);
+      
+      for (const [category, data] of Object.entries(toxicPatterns)) {
+        for (const pattern of data.patterns) {
+          const normalizedPattern = sanitize(pattern);
+          if (normalizedPattern.split(' ').length === 1 && tokenSet.has(normalizedPattern)) {
+            detectedCategory = category;
+            matchedPattern = pattern;
+            break;
+          }
+        }
+        if (detectedCategory) break;
+      }
+    }
+
+    if (!detectedCategory) return { allowed: true, suggestion: text };
+
+    // Génère une reformulation contextuelle intelligente
+    const categoryData = toxicPatterns[detectedCategory as keyof typeof toxicPatterns];
+    const reformulations = categoryData.reformulations;
+    const randomReformulation = reformulations[Math.floor(Math.random() * reformulations.length)];
+
+    return { allowed: false, suggestion: randomReformulation };
+  };
+
+  // Modération hybride: API Perspective + dictionnaire local en fallback
+  const moderateText = async (text: string) => {
+    try {
+      // Tentative avec Perspective API (plus précise)
+      const apiResult = await moderateTextWithAPI(text);
+      return apiResult;
+    } catch (error) {
+      // Fallback sur le dictionnaire local si l'API échoue
+      console.log('[Moderation] API unavailable, using local dictionary');
+      return moderateTextLocal(text);
+    }
   };
 
   useEffect(() => {
@@ -431,9 +605,9 @@ export default function ConversationScreen() {
     if ((!inputText.trim() && selectedImages.length === 0 && selectedFiles.length === 0) || !currentConversationId || !currentUser) return;
 
     const messageText = inputText.trim();
-    // Moderate every outgoing text message
+    // Moderate every outgoing text message with API + local dictionary
     if (messageText) {
-      const result = moderateText(messageText);
+      const result = await moderateText(messageText);
       if (!result.allowed) {
         Alert.alert(
           'Message non envoyé',
