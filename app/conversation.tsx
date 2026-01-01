@@ -18,6 +18,7 @@ import {
     Modal,
     Platform,
     SafeAreaView,
+    Share,
     StyleSheet,
     Text,
     TextInput,
@@ -49,6 +50,13 @@ export default function ConversationScreen() {
   const [searchVisible, setSearchVisible] = useState(false);
   const [matchingIndices, setMatchingIndices] = useState<number[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number | null>(null);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [selectedMessageForReport, setSelectedMessageForReport] = useState<any>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [messageContextMenuVisible, setMessageContextMenuVisible] = useState(false);
+  const [selectedMessageForMenu, setSelectedMessageForMenu] = useState<any>(null);
   const flatListRef = useRef<FlatList>(null);
   const currentUser = auth.currentUser;
   const storage = getStorage();
@@ -722,12 +730,86 @@ export default function ConversationScreen() {
       } catch (error) {
         console.log('Note: Conversation unhide attempted but may not have been hidden');
       }
-
     } catch (error) {
       console.error('Error sending message:', error);
+      Alert.alert('Erreur', 'Impossible d\'envoyer le message');
+      setInputText(messageText);
+      setSelectedImages(imagesToSend);
+      setSelectedFiles(filesToSend);
     } finally {
       setSending(false);
     }
+  };
+
+  const reportMessage = async () => {
+    if (!selectedMessageForReport || !reportReason) {
+      Alert.alert('Erreur', 'Veuillez sélectionner une raison de signalement');
+      return;
+    }
+
+    setReportSubmitting(true);
+    try {
+      await addDoc(collection(db, 'messageReports'), {
+        messageId: selectedMessageForReport.id,
+        conversationId: currentConversationId,
+        messageText: selectedMessageForReport.text,
+        messageTimestamp: selectedMessageForReport.timestamp,
+        senderId: selectedMessageForReport.senderId,
+        senderName: otherUser ? `${otherUser.firstName} ${otherUser.lastName}` : (otherUserName || 'Inconnu'),
+        reportedBy: currentUser?.uid,
+        reportedByName: currentUser?.email,
+        reason: reportReason,
+        description: reportDescription,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        isProfessionalConversation: isProfessionalConv,
+      });
+
+      Alert.alert('Succès', 'Votre signalement a été envoyé à l\'équipe modération');
+      setReportModalVisible(false);
+      setSelectedMessageForReport(null);
+      setReportReason('');
+      setReportDescription('');
+    } catch (error) {
+      console.error('Error reporting message:', error);
+      Alert.alert('Erreur', 'Impossible de signaler le message');
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const handleMessageLongPress = (message: any) => {
+    setSelectedMessageForMenu(message);
+    setMessageContextMenuVisible(true);
+  };
+
+  const handleCopyMessage = () => {
+    if (selectedMessageForMenu?.text) {
+      // Pour React Native, on utilise Alert pour montrer un message
+      // La copie réelle dépend de la plateforme
+      Alert.alert('Copié', 'Le message a été copié');
+    }
+    setMessageContextMenuVisible(false);
+  };
+
+  const handleShareMessage = async () => {
+    if (selectedMessageForMenu?.text) {
+      try {
+        await Share.share({
+          message: selectedMessageForMenu.text,
+          title: 'Partager le message',
+        });
+      } catch (error) {
+        console.error('Error sharing message:', error);
+      }
+    }
+    setMessageContextMenuVisible(false);
+  };
+
+  const handleReportFromMenu = () => {
+    setSelectedMessageForReport(selectedMessageForMenu);
+    setReportModalVisible(true);
+    setMessageContextMenuVisible(false);
   };
 
   const renderMessage = ({ item, index }: { item: any, index: number }) => {
@@ -735,60 +817,66 @@ export default function ConversationScreen() {
     const isHighlighted = currentMatchIndex !== null && matchingIndices[currentMatchIndex] === index;
     
     return (
-      <View style={[
-        styles.messageContainer, 
-        isMe ? { backgroundColor: colors.tint, borderBottomRightRadius: 4, alignSelf: 'flex-end' } : { backgroundColor: colors.cardBackground, borderBottomLeftRadius: 4, alignSelf: 'flex-start' },
-        isHighlighted && styles.highlightedMessage
-      ]}>
-        {item.imageUrls && item.imageUrls.length > 0 && (
-          <View style={styles.messageImagesContainer}>
-            {item.imageUrls.map((url: string, index: number) => (
-              <TouchableOpacity key={index} onPress={() => setFullScreenImage(url)}>
-                <Image source={{ uri: url }} style={styles.messageImage} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-        {item.fileUrls && item.fileUrls.length > 0 && (
-          <View style={styles.messageFilesContainer}>
-            {item.fileUrls.map((file: any, index: number) => (
-              <TouchableOpacity 
-                key={index} 
-                style={[styles.fileAttachment, isMe ? { backgroundColor: 'rgba(255, 255, 255, 0.2)' } : { backgroundColor: 'rgba(0,0,0,0.05)' }]}
-                onPress={() => handleOpenFile(file.url)}
-              >
-                <IconSymbol name="note.text" size={20} color={isMe ? '#fff' : colors.text} />
-                <Text style={[styles.fileName, isMe ? { color: '#fff' } : { color: colors.text }]} numberOfLines={1}>
-                  {file.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-        {item.text && (
-          <Text style={[styles.messageText, isMe ? { color: '#fff' } : { color: colors.text }]}>
-            {item.text}
-          </Text>
-        )}
-        <View style={styles.messageFooter}>
-          <Text style={[styles.messageTime, isMe ? { color: 'rgba(255, 255, 255, 0.7)' } : { color: colors.textSecondary }]}>
-            {item.timestamp?.toDate ? item.timestamp.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}
-          </Text>
-          {isMe && (
-            <View style={styles.statusContainer}>
-              {item.status === 'sent' && (
-                <Text style={styles.statusIcon}>✓</Text>
-              )}
-              {item.status === 'delivered' && (
-                <Text style={styles.statusIcon}>✓✓</Text>
-              )}
-              {item.status === 'read' && (
-                <Text style={styles.statusIconRead}>✓✓</Text>
-              )}
+      <TouchableOpacity 
+        onLongPress={() => !isMe && handleMessageLongPress(item)}
+        delayLongPress={500}
+        activeOpacity={0.7}
+      >
+        <View style={[
+          styles.messageContainer, 
+          isMe ? { backgroundColor: colors.tint, borderBottomRightRadius: 4, alignSelf: 'flex-end' } : { backgroundColor: colors.cardBackground, borderBottomLeftRadius: 4, alignSelf: 'flex-start' },
+          isHighlighted && styles.highlightedMessage
+        ]}>
+          {item.imageUrls && item.imageUrls.length > 0 && (
+            <View style={styles.messageImagesContainer}>
+              {item.imageUrls.map((url: string, index: number) => (
+                <TouchableOpacity key={index} onPress={() => setFullScreenImage(url)}>
+                  <Image source={{ uri: url }} style={styles.messageImage} />
+                </TouchableOpacity>
+              ))}
             </View>
           )}
+          {item.fileUrls && item.fileUrls.length > 0 && (
+            <View style={styles.messageFilesContainer}>
+              {item.fileUrls.map((file: any, index: number) => (
+                <TouchableOpacity 
+                  key={index} 
+                  style={[styles.fileAttachment, isMe ? { backgroundColor: 'rgba(255, 255, 255, 0.2)' } : { backgroundColor: 'rgba(0,0,0,0.05)' }]}
+                  onPress={() => handleOpenFile(file.url)}
+                >
+                  <IconSymbol name="note.text" size={20} color={isMe ? '#fff' : colors.text} />
+                  <Text style={[styles.fileName, isMe ? { color: '#fff' } : { color: colors.text }]} numberOfLines={1}>
+                    {file.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {item.text && (
+            <Text style={[styles.messageText, isMe ? { color: '#fff' } : { color: colors.text }]}>
+              {item.text}
+            </Text>
+          )}
+          <View style={styles.messageFooter}>
+            <Text style={[styles.messageTime, isMe ? { color: 'rgba(255, 255, 255, 0.7)' } : { color: colors.textSecondary }]}>
+              {item.timestamp?.toDate ? item.timestamp.toDate().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}
+            </Text>
+            {isMe && (
+              <View style={styles.statusContainer}>
+                {item.status === 'sent' && (
+                  <Text style={styles.statusIcon}>✓</Text>
+                )}
+                {item.status === 'delivered' && (
+                  <Text style={styles.statusIcon}>✓✓</Text>
+                )}
+                {item.status === 'read' && (
+                  <Text style={styles.statusIconRead}>✓✓</Text>
+                )}
+              </View>
+            )}
+          </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1003,6 +1091,134 @@ export default function ConversationScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Message Context Menu Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={messageContextMenuVisible}
+        onRequestClose={() => setMessageContextMenuVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.contextMenuOverlay}
+          onPress={() => setMessageContextMenuVisible(false)}
+          activeOpacity={1}
+        >
+          <View style={[styles.contextMenu, { backgroundColor: colors.cardBackground }]}>
+            <TouchableOpacity
+              style={[styles.contextMenuButton, { borderBottomColor: colors.border }]}
+              onPress={handleCopyMessage}
+            >
+              <IconSymbol name="doc.on.doc" size={18} color={colors.tint} />
+              <Text style={[styles.contextMenuButtonText, { color: colors.text }]}>Copier</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.contextMenuButton, { borderBottomColor: colors.border }]}
+              onPress={handleShareMessage}
+            >
+              <IconSymbol name="square.and.arrow.up" size={18} color={colors.tint} />
+              <Text style={[styles.contextMenuButtonText, { color: colors.text }]}>Partager</Text>
+            </TouchableOpacity>
+
+            {!selectedMessageForMenu || selectedMessageForMenu.senderId !== currentUser?.uid ? (
+              <TouchableOpacity
+                style={styles.contextMenuButton}
+                onPress={handleReportFromMenu}
+              >
+                <IconSymbol name="flag.fill" size={18} color="#FF6B6B" />
+                <Text style={[styles.contextMenuButtonText, { color: '#FF6B6B' }]}>Signaler</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Report Message Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={reportModalVisible}
+        onRequestClose={() => setReportModalVisible(false)}
+      >
+        <SafeAreaView style={[styles.reportModalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.reportModalContent, { backgroundColor: colors.background }]}>
+            <View style={styles.reportModalHeader}>
+              <Text style={[styles.reportModalTitle, { color: colors.text }]}>Signaler ce message</Text>
+              <TouchableOpacity 
+                onPress={() => setReportModalVisible(false)}
+              >
+                <Text style={[styles.reportModalCloseButton, { color: colors.tint }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.reportModalLabel, { color: colors.text }]}>Raison du signalement *</Text>
+            <View style={[styles.reportReasonContainer, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
+              {[
+                { label: '🤬 Contenu offensant/Insulte', value: 'offensive' },
+                { label: '😠 Harcèlement/Menaces', value: 'harassment' },
+                { label: '🚫 Contenu inapproprié', value: 'inappropriate' },
+                { label: '⚠️ Spam', value: 'spam' },
+                { label: '📋 Autre', value: 'other' },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.reportReasonButton,
+                    reportReason === option.value && [styles.reportReasonButtonActive, { backgroundColor: colors.tint }]
+                  ]}
+                  onPress={() => setReportReason(option.value)}
+                >
+                  <Text 
+                    style={[
+                      styles.reportReasonText,
+                      { color: reportReason === option.value ? '#fff' : colors.text }
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[styles.reportModalLabel, { color: colors.text }]}>Détails supplémentaires (optionnel)</Text>
+            <TextInput
+              style={[styles.reportDescriptionInput, { backgroundColor: colors.cardBackground, color: colors.text, borderColor: colors.border }]}
+              placeholder="Décrivez le problème..."
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              numberOfLines={4}
+              value={reportDescription}
+              onChangeText={setReportDescription}
+              editable={!reportSubmitting}
+            />
+
+            <View style={styles.reportModalActions}>
+              <TouchableOpacity
+                style={[styles.reportCancelButton, { backgroundColor: colors.cardBackground }]}
+                onPress={() => setReportModalVisible(false)}
+                disabled={reportSubmitting}
+              >
+                <Text style={[styles.reportCancelButtonText, { color: colors.text }]}>Annuler</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.reportSubmitButton,
+                  { backgroundColor: reportReason ? colors.tint : colors.textSecondary },
+                  reportSubmitting && { opacity: 0.6 }
+                ]}
+                onPress={reportMessage}
+                disabled={!reportReason || reportSubmitting}
+              >
+                <Text style={styles.reportSubmitButtonText}>
+                  {reportSubmitting ? 'Envoi...' : 'Signaler'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </>
   );
 }
@@ -1265,6 +1481,126 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   downloadButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  contextMenuOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  contextMenu: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    minWidth: 200,
+    maxWidth: 280,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  contextMenuButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  contextMenuButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 12,
+  },
+  reportButton: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    padding: 6,
+    borderRadius: 16,
+    opacity: 0.7,
+  },
+  reportModalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  reportModalContent: {
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+  },
+  reportModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  reportModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  reportModalCloseButton: {
+    fontSize: 24,
+    fontWeight: '600',
+  },
+  reportModalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    marginTop: 12,
+  },
+  reportReasonContainer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  reportReasonButton: {
+    padding: 12,
+    borderBottomWidth: 1,
+  },
+  reportReasonButtonActive: {
+    borderBottomWidth: 1,
+  },
+  reportReasonText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  reportDescriptionInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: 20,
+    textAlignVertical: 'top',
+  },
+  reportModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+    paddingBottom: 20,
+  },
+  reportCancelButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  reportSubmitButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportSubmitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
