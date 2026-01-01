@@ -42,11 +42,11 @@ export default function HelpCenterPro() {
           <Text style={[styles.heroTitle, { color: '#fff' }]}>Centre d'aide Pro</Text>
           <Text style={[styles.heroSubtitle, { color: '#e2e8f0' }]}>Guides rapides, assistance et réglages adaptés aux professionnels.</Text>
           <View style={styles.heroBadges}>
-            <View style={[styles.badge, { backgroundColor: accentColor + '33' }]}> 
+            <View style={[styles.badge, { backgroundColor: accentColor }]}> 
               <Text style={[styles.badgeText, { color: '#0f172a' }]}>Support 7j/7</Text>
             </View>
-            <View style={[styles.badge, { backgroundColor: '#10b98133' }]}> 
-              <Text style={[styles.badgeText, { color: '#064e3b' }]}>Temps de réponse &lt; 24h</Text>
+            <View style={[styles.badge, { backgroundColor: accentColor }]}> 
+              <Text style={[styles.badgeText, { color: '#0f172a' }]}>Temps de réponse &lt; 24h</Text>
             </View>
           </View>
         </View>
