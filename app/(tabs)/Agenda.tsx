@@ -293,15 +293,69 @@ export default function AgendaScreen() {
     const groupedEvents = groupEventsByDay();
     const eventDates = Object.keys(groupedEvents);
 
-    if (eventDates.length === 0) {
-      return <Text style={[styles.noEventsText, { color: colors.textTertiary }]}>Aucun évènement à venir</Text>;
-    }
-
     return (
       <FlatList
         ref={flatListRef}
         data={eventDates}
         keyExtractor={item => item}
+        contentContainerStyle={{
+          paddingHorizontal: SPACING.large,
+          paddingTop: V_SPACING.large,
+          paddingBottom: SAFE_BOTTOM_SPACING,
+        }}
+        ListHeaderComponent={(
+          <>
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: colors.tint }]}>Agenda</Text>
+              <View style={styles.headerButtons}>
+                <TouchableOpacity style={[styles.todayButton, { backgroundColor: colors.secondaryCardBackground }]} onPress={goToToday}>
+                  <Text style={[styles.todayButtonText, { color: colors.tint }]}>Aujourd'hui</Text>
+                </TouchableOpacity>
+                <View>
+                  <TouchableOpacity
+                    style={styles.viewModeButton}
+                    onPress={() => setShowViewOptions(true)}
+                  >
+                    <Text style={[styles.viewModeButtonText, { color: colors.tint }]}>{viewMode.charAt(0).toUpperCase() + viewMode.slice(1)}</Text>
+                    <Text style={{ color: colors.tint }}>▼</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={[styles.addButton, { backgroundColor: colors.primaryButton }]}
+                  onPress={() => {
+                    router.push('/create-event');
+                  }}
+                >
+                  <IconSymbol name="plus" size={hs(20)} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.familySelectorContainer}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <TouchableOpacity
+                      style={[styles.familyChip, {backgroundColor: selectedFamilyId === 'all' ? colors.tint : colors.secondaryCardBackground}]}
+                      onPress={() => setSelectedFamilyId('all')}
+                  >
+                      <Text style={[styles.familyChipText, {color: selectedFamilyId === 'all' ? '#fff' : colors.text}]}>Toutes</Text>
+                  </TouchableOpacity>
+                  {families.map((family) => (
+                      <TouchableOpacity
+                          key={family.id}
+                          style={[styles.familyChip, {backgroundColor: selectedFamilyId === family.id ? colors.tint : colors.secondaryCardBackground}]}
+                          onPress={() => setSelectedFamilyId(family.id)}
+                      >
+                          <Text style={[styles.familyChipText, {color: selectedFamilyId === family.id ? '#fff' : colors.text}]}>{family.name || `Famille`}</Text>
+                      </TouchableOpacity>
+                  ))}
+              </ScrollView>
+            </View>
+
+            {eventDates.length === 0 && (
+              <Text style={[styles.noEventsText, { color: colors.textTertiary }]}>Aucun évènement à venir</Text>
+            )}
+          </>
+        )}
         renderItem={({ item: date }) => (
           <View style={styles.dayGroup}>
             <Text style={[styles.dayGroupTitle, { color: colors.textSecondary }]}>{date}</Text>
@@ -324,6 +378,7 @@ export default function AgendaScreen() {
             ))}
           </View>
         )}
+        ListFooterComponent={<View style={{ height: SAFE_BOTTOM_SPACING }} />}
         onScrollToIndexFailed={info => {
           const wait = new Promise(resolve => setTimeout(resolve, 500));
           wait.then(() => {
@@ -407,6 +462,37 @@ export default function AgendaScreen() {
   const days = getDaysInMonth();
   const weekDays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
   const selectedDateEvents = getEventsForSelectedDate();
+
+  if (viewMode === 'liste') {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        {renderListView()}
+        {/* View mode modal shared with other views */}
+        <Modal
+          transparent={true}
+          visible={showViewOptions}
+          onRequestClose={() => setShowViewOptions(false)}
+        >
+          <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowViewOptions(false)}>
+            <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+              {['Mois', 'Semaine', 'Liste'].map(view => (
+                <TouchableOpacity
+                  key={view}
+                  style={styles.modalOption}
+                  onPress={() => {
+                    setViewMode(view.toLowerCase());
+                    setShowViewOptions(false);
+                  }}
+                >
+                  <Text style={{ color: colors.text }}>{view}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -580,7 +666,6 @@ export default function AgendaScreen() {
             </>
           )}
 
-          {viewMode === 'liste' && renderListView()}
           {viewMode === 'semaine' && renderWeeklyView()}
 
         </View>
