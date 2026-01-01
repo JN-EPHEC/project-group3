@@ -852,7 +852,7 @@ export default function ProProfilScreen() {
                       ) : (
                         <View style={styles.slotsContainer}>
                           {availableSlots.map((slot, idx) => (
-                            <View key={idx} style={[styles.slotChip, { backgroundColor: accentColor + '20', borderColor: accentColor }]}>
+                            <View key={idx} style={[styles.slotChip, { backgroundColor: accentColor, borderColor: accentColor }]}>
                               <Text style={[styles.slotText, { color: '#000' }]}>
                                 {slot.start} - {slot.end}
                               </Text>
