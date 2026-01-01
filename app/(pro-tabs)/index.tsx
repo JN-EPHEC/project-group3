@@ -368,17 +368,19 @@ export default function ProHomeScreen() {
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <View>
+            <View style={styles.headerLeft}>
               <Text style={[styles.title, { color: PRO_COLOR }]}>Dashboard Professionnel</Text>
               <Text style={[styles.greeting, { color: colors.textSecondary }]}>Bonjour {firstName}</Text>
             </View>
             {dualRole && (
-              <RoleSwitcher
-                activeRole={activeRole}
-                targetRole="parent"
-                accentColor={PRO_COLOR}
-                onToggle={handleToggleRole}
-              />
+              <View style={styles.headerSwitcher}>
+                <RoleSwitcher
+                  activeRole={activeRole}
+                  targetRole="parent"
+                  accentColor={PRO_COLOR}
+                  onToggle={handleToggleRole}
+                />
+              </View>
             )}
           </View>
 
@@ -608,7 +610,17 @@ const styles = StyleSheet.create({
     alignItems: 'center' 
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: V_SPACING.xlarge,
+  },
+  headerLeft: {
+    flexShrink: 1,
+  },
+  headerSwitcher: {
+    alignSelf: 'flex-start',
+    marginTop: V_SPACING.tiny,
   },
   title: {
     fontSize: FONT_SIZES.huge,
