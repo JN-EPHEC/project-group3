@@ -864,7 +864,7 @@ function CategoryLimitsManager({ familyId, colors }: { familyId: string | null; 
                     }}
                   >
                     <IconSymbol name="pencil" size={16} color={colors.tint} />
-                    <Text style={[styles.editNameButtonText, { color: colors.tint }]}>Modifier</Text>
+                    <Text style={[styles.editNameButtonText, { color: colors.tint }]}>Renommer</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.editNameButton, { borderColor: '#FF3B30' }]}
