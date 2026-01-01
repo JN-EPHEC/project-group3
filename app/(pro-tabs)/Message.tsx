@@ -219,7 +219,7 @@ export default function ProMessageScreen() {
                           style={[styles.addButton, { backgroundColor: PRO_COLOR }]}
                           onPress={handleNewMessage}
                         >
-                          <Text style={styles.addButtonText}>+</Text>
+                          <IconSymbol name="plus" size={hs(20)} color="#FFFFFF" />
                         </TouchableOpacity>
                       )}
                     </View>
@@ -386,22 +386,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: V_SPACING.large,
+    marginBottom: V_SPACING.xlarge,
+    gap: SPACING.small,
   },
   title: {
-    fontSize: FONT_SIZES.huge,
+    fontSize: FONT_SIZES.large,
     fontWeight: '700',
+    flex: 0,
+    flexShrink: 1,
   },
   headerButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: hs(6),
+    flexShrink: 0,
   },
   addButton: {
-    paddingHorizontal: SPACING.medium,
-    paddingTop: vs(6),
-    paddingBottom: vs(10),
-    borderRadius: BORDER_RADIUS.large,
-    flexDirection: 'row',
+    width: hs(34),
+    height: hs(34),
+    borderRadius: hs(17),
     justifyContent: 'center',
     alignItems: 'center',
   },

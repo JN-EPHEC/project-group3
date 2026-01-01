@@ -700,7 +700,7 @@ const styles = StyleSheet.create({
     gap: SPACING.small,
   },
   title: {
-    fontSize: FONT_SIZES.large,
+    fontSize: FONT_SIZES.xxlarge,
     fontWeight: '700',
     flex: 0,
     flexShrink: 1,
