@@ -505,6 +505,9 @@ export default function AideScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
+  const accentWarm = '#FF8A5C';
+  const accentCalm = '#2D6A4F';
+  const accentNight = '#0f172a';
 
   const [screen, setScreen] = useState<'category' | 'list' | 'detail'>('category');
   const [selectedCategory, setSelectedCategory] = useState<'avocat' | 'psychologue' | null>(null);
@@ -624,6 +627,18 @@ export default function AideScreen() {
     setScreen('category');
     setSelectedCategory(null);
     setExpandedProfessionalId(null);
+  };
+
+  const handleCallSupport = () => {
+    Linking.openURL('tel:+33184000000').catch(() => Alert.alert('Info', 'Appelez le 01 84 00 00 00'));
+  };
+
+  const handleEmailSupport = () => {
+    Linking.openURL('mailto:support@WeKid.app').catch(() => Alert.alert('Info', 'support@WeKid.app'));
+  };
+
+  const handleOpenFAQ = () => {
+    Linking.openURL('https://WeKid.app/faq').catch(() => Alert.alert('Info', 'FAQ indisponible pour le moment'));
   };
 
   const handleExpandProfessional = (professionalId: string) => {
@@ -814,93 +829,201 @@ export default function AideScreen() {
             paddingHorizontal: SPACING.large,
             paddingTop: V_SPACING.large,
             paddingBottom: SAFE_BOTTOM_SPACING,
-            gap: V_SPACING.huge
+            gap: V_SPACING.medium
           }}
+          showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
-          <View>
+          {/* Hero */}
+          <View
+            style={{
+              backgroundColor: accentNight,
+              borderRadius: BORDER_RADIUS.xxlarge,
+              padding: SPACING.xlarge,
+              overflow: 'hidden'
+            }}
+          >
+            <View style={{ position: 'absolute', right: -40, top: -60, width: 180, height: 180, borderRadius: 90, backgroundColor: '#FF8A5C22' }} />
+            <View style={{ position: 'absolute', left: -20, bottom: -60, width: 200, height: 200, borderRadius: 100, backgroundColor: '#2D6A4F22' }} />
             <Text
               style={{
-                color: colors.text,
+                color: '#fff',
                 fontSize: FONT_SIZES.xxlarge,
-                fontWeight: '700',
-                letterSpacing: -0.5
+                fontWeight: '800',
+                letterSpacing: -0.5,
               }}
             >
-              Je cherche un professionnel
+              WeKid : on vous accompagne
             </Text>
             <Text
               style={{
-                color: colors.textSecondary,
+                color: 'rgba(255,255,255,0.8)',
                 fontSize: FONT_SIZES.medium,
                 fontWeight: '500',
-                marginTop: vs(8)
+                marginTop: vs(8),
+                lineHeight: 22
               }}
             >
-              Sélectionnez le type de professionnel dont vous avez besoin
+              Trouvez rapidement un expert en droit ou un professionnel de l'écoute. Assistance rapide, sécurisée et adaptée aux familles.
             </Text>
+
+            <View style={{ gap: SPACING.small, marginTop: V_SPACING.small }}>
+              <View style={{ flexDirection: 'row', gap: SPACING.small, alignItems: 'center' }}>
+                {[{
+                  label: 'Réponse sous 24h',
+                  bg: accentWarm,
+                  color: accentNight,
+                  icon: 'clock.fill'
+                }, {
+                  label: 'Professionnels vérifiés',
+                  bg: accentCalm,
+                  color: '#fff',
+                  icon: 'checkmark.seal.fill'
+                }].map((item, idx) => (
+                  <View
+                    key={idx}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: item.bg,
+                      paddingHorizontal: SPACING.medium,
+                      paddingVertical: vs(6),
+                      borderRadius: BORDER_RADIUS.large,
+                      gap: SPACING.tiny,
+                      flexShrink: 1,
+                    }}
+                  >
+                    <IconSymbol name={item.icon as any} size={hs(16)} color={item.color} />
+                    <Text style={{ color: item.color, fontWeight: '700', fontSize: FONT_SIZES.small }}>
+                      {item.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#1e293b',
+                    paddingHorizontal: SPACING.medium,
+                    paddingVertical: vs(6),
+                    borderRadius: BORDER_RADIUS.large,
+                    gap: SPACING.tiny,
+                    flexShrink: 1,
+                  }}
+                >
+                  <IconSymbol name="lock.fill" size={hs(16)} color="#cbd5e1" />
+                  <Text style={{ color: '#cbd5e1', fontWeight: '700', fontSize: FONT_SIZES.small }}>
+                    En toute confidentialité
+                  </Text>
+                </View>
+              </View>
+            </View>
           </View>
 
-          {/* Category Buttons */}
-          <View style={{ flexDirection: 'row', gap: SPACING.large, justifyContent: 'space-between' }}>
-            {/* Lawyers */}
-            <TouchableOpacity
-              onPress={() => handleSelectCategory('avocat')}
-              style={{
-                flex: 1,
-                borderRadius: BORDER_RADIUS.large,
-                borderWidth: 1,
-                paddingVertical: vs(24),
-                alignItems: 'center',
-                gap: vs(12),
-                backgroundColor: colors.cardBackground,
-                borderColor: colors.border
-              }}
-            >
-              <IconSymbol name="doc.text" size={hs(32)} color={'#8ECAE6'} />
-              <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '600' }}>
-                Avocats
-              </Text>
-              <Text
+          {/* Actions block: quick + support (compact vertical spacing) */}
+          <View style={{ gap: V_SPACING.small }}>
+            <View style={{ flexDirection: 'row', gap: SPACING.medium }}>
+              <TouchableOpacity
                 style={{
-                  color: colors.textSecondary,
-                  fontSize: FONT_SIZES.small,
-                  fontWeight: '500'
+                  flex: 1,
+                  backgroundColor: accentWarm,
+                  borderRadius: BORDER_RADIUS.large,
+                  padding: SPACING.large,
+                  gap: SPACING.small,
                 }}
+                onPress={() => handleSelectCategory('psychologue')}
+                activeOpacity={0.9}
               >
-                Juridique & Droit
-              </Text>
-            </TouchableOpacity>
+                <IconSymbol name="heart.fill" size={hs(26)} color={accentNight} />
+                <Text style={{ color: accentNight, fontWeight: '800', fontSize: FONT_SIZES.large }}>Parler à quelqu'un</Text>
+                <Text style={{ color: accentNight, opacity: 0.75, fontWeight: '600' }}>Psychologues & médiateurs</Text>
+              </TouchableOpacity>
 
-            {/* Psychologists */}
-            <TouchableOpacity
-              onPress={() => handleSelectCategory('psychologue')}
-              style={{
-                flex: 1,
-                borderRadius: BORDER_RADIUS.large,
-                borderWidth: 1,
-                paddingVertical: vs(24),
-                alignItems: 'center',
-                gap: vs(12),
-                backgroundColor: colors.cardBackground,
-                borderColor: colors.border
-              }}
-            >
-              <IconSymbol name="person.fill" size={hs(32)} color={'#8ECAE6'} />
-              <Text style={{ color: colors.text, fontSize: FONT_SIZES.large, fontWeight: '600' }}>
-                Psychologues
-              </Text>
-              <Text
+              <TouchableOpacity
                 style={{
-                  color: colors.textSecondary,
-                  fontSize: FONT_SIZES.small,
-                  fontWeight: '500'
+                  flex: 1,
+                  backgroundColor: accentCalm,
+                  borderRadius: BORDER_RADIUS.large,
+                  padding: SPACING.large,
+                  gap: SPACING.small,
                 }}
+                onPress={() => handleSelectCategory('avocat')}
+                activeOpacity={0.9}
               >
-                Conseil & Support
-              </Text>
-            </TouchableOpacity>
+                <IconSymbol name="doc.text.fill" size={hs(26)} color="#f1f5f9" />
+                <Text style={{ color: '#f1f5f9', fontWeight: '800', fontSize: FONT_SIZES.large }}>Parler à un avocat</Text>
+                <Text style={{ color: '#e2e8f0', opacity: 0.85, fontWeight: '600' }}>Droit familial, médiation</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: SPACING.medium, flexWrap: 'wrap' }}>
+              <TouchableOpacity
+                style={{
+                  flexBasis: '32%',
+                  flexGrow: 1,
+                  borderRadius: BORDER_RADIUS.xlarge,
+                  padding: SPACING.large,
+                  backgroundColor: colors.cardBackground,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: SPACING.small,
+                }}
+                onPress={handleCallSupport}
+                activeOpacity={0.92}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.small }}>
+                  <IconSymbol name="phone.fill" size={hs(22)} color={accentCalm} />
+                  <Text style={{ color: colors.text, fontWeight: '800', fontSize: FONT_SIZES.medium }}>Parler à un conseiller</Text>
+                </View>
+                <Text style={{ color: colors.textSecondary, fontWeight: '600', lineHeight: 20 }}>Ligne dédiée 09h-19h</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flexBasis: '32%',
+                  flexGrow: 1,
+                  borderRadius: BORDER_RADIUS.xlarge,
+                  padding: SPACING.large,
+                  backgroundColor: colors.cardBackground,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: SPACING.small,
+                }}
+                onPress={handleEmailSupport}
+                activeOpacity={0.92}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.small }}>
+                  <IconSymbol name="envelope.fill" size={hs(22)} color={accentWarm} />
+                  <Text style={{ color: colors.text, fontWeight: '800', fontSize: FONT_SIZES.medium }}>Écrire au support</Text>
+                </View>
+                <Text style={{ color: colors.textSecondary, fontWeight: '600', lineHeight: 20 }}>Réponse sous 24h ouvrées</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flexBasis: '32%',
+                  flexGrow: 1,
+                  borderRadius: BORDER_RADIUS.xlarge,
+                  padding: SPACING.large,
+                  backgroundColor: colors.cardBackground,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  gap: SPACING.small,
+                }}
+                onPress={handleOpenFAQ}
+                activeOpacity={0.92}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.small }}>
+                  <IconSymbol name="questionmark.circle.fill" size={hs(22)} color={colors.tint} />
+                  <Text style={{ color: colors.text, fontWeight: '800', fontSize: FONT_SIZES.medium }}>Consulter la FAQ</Text>
+                </View>
+                <Text style={{ color: colors.textSecondary, fontWeight: '600', lineHeight: 20 }}>Guides rapides et procédures</Text>
+              </TouchableOpacity>
+            </View>
           </View>
+
+          {/* Category cards removed per request */}
         </ScrollView>
       )}
 
