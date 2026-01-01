@@ -54,20 +54,41 @@ export default function HelpCenterPro() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Accès rapide</Text>
           <View style={styles.cardGrid}>
-            <TouchableOpacity style={[styles.card, { backgroundColor: colors.cardBackground }]} onPress={openMail}>
-              <IconSymbol name="envelope.fill" size={22} color={accentColor} />
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Nous écrire</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>support@wekid.fr</Text>
+            <TouchableOpacity style={[styles.card, { backgroundColor: colors.cardBackground }]} onPress={openMail} activeOpacity={0.7}>
+              <View style={[styles.iconCircle, { backgroundColor: accentColor + '20' }]}>
+                <IconSymbol name="envelope.fill" size={24} color={accentColor} />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Nous écrire</Text>
+                <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>support@wekid.fr</Text>
+              </View>
+              <View style={[styles.cardArrow, { backgroundColor: accentColor + '10' }]}>
+                <IconSymbol name="arrow.right" size={14} color={accentColor} />
+              </View>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.card, { backgroundColor: colors.cardBackground }]} onPress={openWhatsapp}>
-              <IconSymbol name="message.fill" size={22} color={accentColor} />
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Chat Whatsapp</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>Réponses rapides</Text>
+            <TouchableOpacity style={[styles.card, { backgroundColor: colors.cardBackground }]} onPress={openWhatsapp} activeOpacity={0.7}>
+              <View style={[styles.iconCircle, { backgroundColor: accentColor + '20' }]}>
+                <IconSymbol name="message.fill" size={24} color={accentColor} />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Chat Whatsapp</Text>
+                <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>Réponses rapides</Text>
+              </View>
+              <View style={[styles.cardArrow, { backgroundColor: accentColor + '10' }]}>
+                <IconSymbol name="arrow.right" size={14} color={accentColor} />
+              </View>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.card, { backgroundColor: colors.cardBackground }]} onPress={openFaq}>
-              <IconSymbol name="questionmark.circle.fill" size={22} color={accentColor} />
-              <Text style={[styles.cardTitle, { color: colors.text }]}>FAQ Pro</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>Guides et tutoriels</Text>
+            <TouchableOpacity style={[styles.card, { backgroundColor: colors.cardBackground }]} onPress={openFaq} activeOpacity={0.7}>
+              <View style={[styles.iconCircle, { backgroundColor: accentColor + '20' }]}>
+                <IconSymbol name="questionmark.circle.fill" size={24} color={accentColor} />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>FAQ Pro</Text>
+                <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>Guides et tutoriels</Text>
+              </View>
+              <View style={[styles.cardArrow, { backgroundColor: accentColor + '10' }]}>
+                <IconSymbol name="arrow.right" size={14} color={accentColor} />
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -121,10 +142,42 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: 20, paddingTop: 22 },
   sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
   sectionSubtitle: { fontSize: 14, lineHeight: 20, marginBottom: 12 },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  card: { flexGrow: 1, flexBasis: '30%', minWidth: '30%', padding: 14, borderRadius: 14, gap: 6, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6, elevation: 2 },
-  cardTitle: { fontSize: 15, fontWeight: '700' },
-  cardDesc: { fontSize: 13 },
+  cardGrid: { flexDirection: 'column', gap: 14 },
+  card: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 18, 
+    borderRadius: 16, 
+    shadowColor: '#000', 
+    shadowOpacity: 0.08, 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowRadius: 12, 
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)'
+  },
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14
+  },
+  cardContent: {
+    flex: 1,
+    gap: 4
+  },
+  cardTitle: { fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
+  cardDesc: { fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  cardArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8
+  },
   listCard: { borderRadius: 14, padding: 14, gap: 10 },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   listText: { fontSize: 14, fontWeight: '600' },
