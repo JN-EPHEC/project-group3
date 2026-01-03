@@ -37,23 +37,57 @@ interface PerspectiveResponse {
 
 // Détection locale de menaces explicites (sans API)
 const THREAT_PATTERNS: RegExp[] = [
-  /\bje vais te tuer\b/i,
-  /\bje veux te tuer\b/i,
-  /\bje te tuerai\b/i,
-  /\btuer\b/i,
-  /\bkill\b/i,
-  /\bkill you\b/i,
-  /\bstab\b/i,
-  /\bshoot\b/i,
-  /\bassassiner\b/i,
-  /\bmeurtre\b/i,
-  /\bmenace\b/i,
-  /\bfaire du mal\b/i,
-  /\bbomb\b/i,
+  /\bje\s+(?:vais|veux|va)\s+te\s+(?:tuer|buter|fracasser|détruire|casser)\b/i,
+  /\bje\s+(?:vais|veux)\s+(?:te\s+)?(?:frapper|cogner|tabasser|massacrer|égorger|pendre|brûler)\b/i,
+  /\bje\s+vais\s+te\s+faire\s+du\s+mal\b/i,
+  /\bje\s+vais\s+te\s+retrouver\s+et\s+(?:te\s+faire\s+mal|te\s+tuer)\b/i,
+  /\bje\s+tuerai\s+(?:ta\s+famille|ta\s+mere|ta\s+mère|ton\s+père|ta\s+soeur|ta\s+soeur|ton\s+frere|ton\s+frère)\b/i,
+  /\bje\s+vais\s+vous\s+tuer\b/i,
+  /\bje\s+vais\s+te\s+(?:kill|stab|shoot)\b/i,
+  /\b(?:kill|i\s*will\s*kill\s*you|going\s*to\s*kill\s*you|kill\s*him|kill\s*her)\b/i,
+  /\b(?:stab|shoot|gun|stab you|shoot you)\b/i,
+  /\b(?:assassiner|meurtre|buter|égorger|pendre|décapiter)\b/i,
+  /\b(?:menace|threat)\b/i,
+  /\b(?:faire du mal|te faire mal|te faire du mal|hurt you|harm you)\b/i,
+  /\b(?:bombe?|bomb)\b/i,
 ];
 
+const normalizeForThreats = (text: string): string => {
+  const leetMap: Record<string, string> = {
+    '0': 'o',
+    '1': 'i',
+    '!': 'i',
+    'l': 'l',
+    '3': 'e',
+    '4': 'a',
+    '@': 'a',
+    '5': 's',
+    '$': 's',
+    '7': 't',
+    '8': 'b',
+    '9': 'g',
+  };
+
+  const withoutDiacritics = text
+    .normalize('NFD')
+    .replace(/\p{Diacritic}+/gu, '');
+
+  const leetNormalized = withoutDiacritics
+    .split('')
+    .map((ch) => leetMap[ch.toLowerCase()] ?? ch)
+    .join('');
+
+  // Supprimer la ponctuation intrusive mais conserver les espaces
+  const stripped = leetNormalized.replace(/[^a-zA-Z0-9\s]/g, ' ');
+
+  // Réduire les répétitions de caractères (ex: tuuuuer -> tuer)
+  const deduped = stripped.replace(/(.)\1{2,}/g, '$1$1');
+
+  return deduped.toLowerCase();
+};
+
 const hasThreatKeywords = (text: string): boolean => {
-  const normalized = text.normalize('NFC');
+  const normalized = normalizeForThreats(text);
   return THREAT_PATTERNS.some((pattern) => pattern.test(normalized));
 };
 
