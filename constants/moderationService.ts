@@ -35,6 +35,28 @@ interface PerspectiveResponse {
   };
 }
 
+// Détection locale de menaces explicites (sans API)
+const THREAT_PATTERNS: RegExp[] = [
+  /\bje vais te tuer\b/i,
+  /\bje veux te tuer\b/i,
+  /\bje te tuerai\b/i,
+  /\btuer\b/i,
+  /\bkill\b/i,
+  /\bkill you\b/i,
+  /\bstab\b/i,
+  /\bshoot\b/i,
+  /\bassassiner\b/i,
+  /\bmeurtre\b/i,
+  /\bmenace\b/i,
+  /\bfaire du mal\b/i,
+  /\bbomb\b/i,
+];
+
+const hasThreatKeywords = (text: string): boolean => {
+  const normalized = text.normalize('NFC');
+  return THREAT_PATTERNS.some((pattern) => pattern.test(normalized));
+};
+
 export interface ModerationResult {
   allowed: boolean;
   suggestion: string;
@@ -109,6 +131,15 @@ const getReformulationByScore = (scores: any): string => {
  * Seuils: toxicity > 0.7 = bloqué
  */
 export const moderateTextWithAPI = async (text: string): Promise<ModerationResult> => {
+  // Blocage immédiat sur détection locale de menace explicite
+  if (hasThreatKeywords(text)) {
+    return {
+      allowed: false,
+      suggestion: "Message bloqué : propos menaçants détectés.",
+      detectedCategory: 'local_threat',
+    };
+  }
+
   // Vérification locale de la clé API
   if (!PERSPECTIVE_API_KEY || PERSPECTIVE_API_KEY === 'YOUR_API_KEY_HERE') {
     throw new Error('API_KEY_NOT_CONFIGURED');
