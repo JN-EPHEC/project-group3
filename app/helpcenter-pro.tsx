@@ -16,14 +16,14 @@ export default function HelpCenterPro() {
   const accentColor = '#FFCEB0';
 
   const openMail = async () => {
-    const mailto = 'mailto:support@wekid.fr?subject=Aide%20Pro%20WeKid&body=Décrivez votre question:';
+    const mailto = 'mailto:support@wekid.be?subject=Aide%20Pro%20WeKid&body=Décrivez votre question:';
     const can = await Linking.canOpenURL(mailto);
     if (!can) return;
     await Linking.openURL(mailto);
   };
 
   const openFaq = async () => {
-    const url = 'https://wekid.fr/faq-pro';
+    const url = 'https://wekid.be/faq-pro';
     try { await Linking.openURL(url); } catch (error) { /* no-op */ }
   };
 
@@ -60,7 +60,7 @@ export default function HelpCenterPro() {
               </View>
               <View style={styles.cardContent}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>Nous écrire</Text>
-                <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>support@wekid.fr</Text>
+                <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>support@wekid.be</Text>
               </View>
               <View style={[styles.cardArrow, { backgroundColor: accentColor + '10' }]}>
                 <IconSymbol name="arrow.right" size={14} color={accentColor} />

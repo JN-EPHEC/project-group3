@@ -555,16 +555,16 @@ export default function AddExpenseScreen() {
             {/* Affichage du budget restant */}
             {categoryRules[category] && categoryRules[category].limit > 0 && (
               <View style={[styles.budgetInfo, { backgroundColor: colors.cardBackground, borderColor: colors.border }]}>
-                <IconSymbol name="chart.bar" size={20} color={colors.tint} />
-                <View style={{ flex: 1 }}>
+                <IconSymbol name="chart.bar" size={24} color={colors.tint} />
+                <View style={styles.budgetTextContainer}>
                   <Text style={[styles.budgetLabel, { color: colors.textSecondary }]}>
                     Budget {category}
                   </Text>
-                  <Text style={[styles.budgetValue, { color: colors.text }]}>
-                    Limite: {(categorySpent[category] || 0).toFixed(2)} {currency} dépensés / {categoryRules[category].limit.toFixed(2)} {currency}
+                  <Text style={[styles.budgetValue, { color: colors.text }]} numberOfLines={2}>
+                    {(categorySpent[category] || 0).toFixed(2)} {currency} / {categoryRules[category].limit.toFixed(2)} {currency} dépensés
                   </Text>
                   {!categoryRules[category].allowOverLimit && (
-                    <Text style={[styles.budgetWarning, { color: '#FF6B6B' }]}>
+                    <Text style={[styles.budgetWarning, { color: '#FF6B6B' }]} numberOfLines={2}>
                       ⚠️ Dépassement non autorisé - Approbation requise
                     </Text>
                   )}
@@ -981,6 +981,47 @@ const styles = StyleSheet.create({
   },
   modalCloseText: {
     fontSize: 16,
+    fontWeight: '600',
+  },
+  budgetInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.small,
+    padding: SPACING.regular,
+    borderRadius: BORDER_RADIUS.medium,
+    borderWidth: 1,
+    marginBottom: V_SPACING.regular,
+  },
+  budgetTextContainer: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  budgetLabel: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  budgetValue: {
+    fontSize: FONT_SIZES.regular,
+    marginBottom: 4,
+    flexWrap: 'wrap',
+  },
+  budgetWarning: {
+    fontSize: FONT_SIZES.small,
+    fontWeight: '600',
+    flexWrap: 'wrap',
+  },
+  categoriesScroll: {
+    marginTop: V_SPACING.small,
+  },
+  categoryChip: {
+    paddingHorizontal: SPACING.regular,
+    paddingVertical: SPACING.small,
+    borderRadius: BORDER_RADIUS.full,
+    marginRight: SPACING.small,
+  },
+  categoryChipText: {
+    fontSize: FONT_SIZES.regular,
     fontWeight: '600',
   },
 });

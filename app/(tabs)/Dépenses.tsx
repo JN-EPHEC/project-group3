@@ -847,27 +847,29 @@ export default function DepensesScreen() {
                       </View>
                       <View style={styles.expenseDetails}>
                         <View style={styles.expenseTopRow}>
-                          <Text style={[styles.expenseTitle, { color: colors.text }]}>{expense.description || payerName}</Text>
+                          <Text style={[styles.expenseTitle, { color: colors.text }]} numberOfLines={1}>{expense.description || payerName}</Text>
                           <Text style={[styles.expenseDate, { color: colors.textSecondary }]}>
                             {expense.date?.toDate ? new Date(expense.date.toDate()).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : 'Date inconnue'}
                           </Text>
                         </View>
-                        <View style={styles.expenseBottomRow}>
+                        <View style={styles.expenseMiddleRow}>
                           <Text style={[styles.expenseCategory, { color: isPending ? '#FF9500' : colors.tint }]}>{expense.category || 'Non catégorisé'}</Text>
+                          <Text style={[styles.expenseAmount, { color: isPending ? '#FF9500' : colors.tint }]}>{expense.amount?.toFixed(2)} {expense.currency ? getCurrencySymbol(expense.currency) : currency}</Text>
+                        </View>
+                        <View style={styles.expenseBottomRow}>
+                          <Text style={[styles.expensePayerName, { color: colors.textSecondary }]}>
+                            Payé par {payerName}
+                          </Text>
                           {isPending && (
                             <View style={[styles.pendingBadgeContainer, { backgroundColor: '#FFF3E0' }]}>
                               <IconSymbol name="exclamationmark.triangle.fill" size={12} color="#FF9500" />
                               <Text style={[styles.pendingBadge, { color: '#FF9500' }]}>
-                                {isCurrentUserExpense ? 'En attente d\'approbation' : 'À approuver'}
+                                {isCurrentUserExpense ? 'En attente' : 'À approuver'}
                               </Text>
                             </View>
                           )}
                         </View>
-                        <Text style={[styles.expensePayerName, { color: colors.textSecondary }]}>
-                          Payé par {payerName}
-                        </Text>
                       </View>
-                      <Text style={[styles.expenseAmount, { color: isPending ? '#FF9500' : colors.tint }]}>{expense.amount?.toFixed(2)} {expense.currency ? getCurrencySymbol(expense.currency) : currency}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -1337,11 +1339,12 @@ const styles = StyleSheet.create({
   avatarImage: { width: hs(50), height: hs(50), borderRadius: hs(25) },
   expenseDetails: { flex: 1 },
   expenseTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: V_SPACING.tiny },
-  expenseTitle: { fontSize: FONT_SIZES.medium, fontWeight: '600', flex: 1 },
-  expenseBottomRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.small },
+  expenseTitle: { fontSize: FONT_SIZES.medium, fontWeight: '600', flex: 1, marginRight: SPACING.small },
+  expenseMiddleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: V_SPACING.tiny },
+  expenseBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.small, marginTop: vs(2) },
   expenseCategory: { fontSize: FONT_SIZES.small, fontWeight: '600' },
   expenseDate: { fontSize: FONT_SIZES.small },
-  expenseAmount: { fontSize: FONT_SIZES.large, fontWeight: '800', marginLeft: SPACING.small },
+  expenseAmount: { fontSize: FONT_SIZES.large, fontWeight: '800' },
   pendingBadgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1351,7 +1354,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.small,
   },
   pendingBadge: { fontSize: FONT_SIZES.tiny, fontWeight: '600' },
-  expensePayerName: { fontSize: FONT_SIZES.tiny, marginTop: vs(2) },
+  expensePayerName: { fontSize: FONT_SIZES.tiny, flex: 1 },
   balanceHint: { fontSize: FONT_SIZES.tiny, marginTop: vs(2) },
   repayRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', marginTop: vs(8) },
   repayChip: { flexDirection: 'row', alignItems: 'center', gap: SPACING.tiny, paddingHorizontal: SPACING.medium, paddingVertical: vs(6), borderRadius: BORDER_RADIUS.large },

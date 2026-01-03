@@ -309,7 +309,7 @@ export default function RegisterScreenProfessional() {
           accepted: true,
           acceptedAt: serverTimestamp(),
           version: '2024-12-06',
-          privacyUrl: 'https://wekid.fr/politique-de-confidentialite',
+          privacyUrl: 'https://wekid.be/politique-de-confidentialite',
         },
       };
 
@@ -334,7 +334,7 @@ export default function RegisterScreenProfessional() {
           accepted: true,
           acceptedAt: serverTimestamp(),
           version: '2024-12-06',
-          privacyUrl: 'https://wekid.fr/politique-de-confidentialite',
+          privacyUrl: 'https://wekid.be/politique-de-confidentialite',
         },
       };
 
@@ -434,7 +434,7 @@ export default function RegisterScreenProfessional() {
           {consentChecked ? <Text style={styles.checkboxMark}>✓</Text> : null}
         </View>
         <Text style={[styles.consentText, { color: colors.textSecondary }]}>J'accepte la politique de confidentialité</Text>
-        <TouchableOpacity onPress={() => Linking.openURL('https://wekid.fr/politique-de-confidentialite')}>
+        <TouchableOpacity onPress={() => Linking.openURL('https://wekid.be/politique-de-confidentialite')}>
           <Text style={[styles.consentLink, { color: colors.tint }]}>Voir</Text>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -489,7 +489,7 @@ export default function RegisterScreenProfessional() {
       <Text style={[styles.label, { color: colors.text }]}>Téléphone*</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-        placeholder="+33 X XX XX XX XX"
+        placeholder="+32 X XX XX XX XX"
         placeholderTextColor={colors.textSecondary}
         keyboardType="phone-pad"
         value={phone}

@@ -72,7 +72,7 @@ export default function AddProfessionalRole() {
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(1); // 1: Professional info, 2: Photo, 3: Diploma
 
-  const privacyUrl = 'https://wekid.fr/politique-de-confidentialite';
+  const privacyUrl = 'https://wekid.be/politique-de-confidentialite';
   const consentVersion = '2024-12-06';
 
   const auth = getAuth();
@@ -297,7 +297,7 @@ export default function AddProfessionalRole() {
       <Text style={[styles.label, { color: colors.text }]}>Téléphone*</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-        placeholder="+33 X XX XX XX XX"
+        placeholder="+32 X XX XX XX XX"
         placeholderTextColor={colors.textSecondary}
         keyboardType="phone-pad"
         value={phone}

@@ -66,7 +66,7 @@ export default function ProProfilScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
   const accentColor = '#FFCEB0';
-  const privacyUrl = 'https://wekid.fr/politique-de-confidentialite';
+  const privacyUrl = 'https://wekid.be/politique-de-confidentialite';
   const consentVersion = '2024-12-06';
   const handleUploadDiploma = async () => {
     try {
@@ -264,10 +264,10 @@ export default function ProProfilScreen() {
   };
 
   const handleContactSupport = async () => {
-    const mailto = 'mailto:support@wekid.fr?subject=Support%20WeKid%20Pro&body=Décrivez votre demande:';
+    const mailto = 'mailto:support@wekid.be?subject=Support%20WeKid%20Pro&body=Décrivez votre demande:';
     const canOpen = await Linking.canOpenURL(mailto);
     if (!canOpen) {
-      Alert.alert('Info', 'Envoyez-nous un email à support@wekid.fr');
+      Alert.alert('Info', 'Envoyez-nous un email à support@wekid.be');
       return;
     }
     await Linking.openURL(mailto);
@@ -1103,7 +1103,7 @@ export default function ProProfilScreen() {
                     style={[styles.input, { backgroundColor: colors.background, color: colors.text }]}
                     value={tempPhone}
                     onChangeText={setTempPhone}
-                    placeholder="+33 X XX XX XX XX"
+                    placeholder="+32 X XX XX XX XX"
                     placeholderTextColor={colors.textSecondary}
                     keyboardType="phone-pad"
                   />

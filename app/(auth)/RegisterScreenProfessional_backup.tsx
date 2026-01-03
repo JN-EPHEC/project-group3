@@ -329,7 +329,7 @@ export default function RegisterScreenProfessional() {
       <Text style={[styles.label, { color: colors.text }]}>Téléphone*</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
-        placeholder="+33 X XX XX XX XX"
+        placeholder="+32 X XX XX XX XX"
         placeholderTextColor={colors.textSecondary}
         keyboardType="phone-pad"
         value={phone}

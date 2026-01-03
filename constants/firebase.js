@@ -37,7 +37,7 @@ import { Platform } from 'react-native';
 import firebaseConfig from './firebaseenv.js';
 
 const RGPD_VERSION = '2024-12-06';
-const RGPD_PRIVACY_URL = 'https://wekid.fr/politique-de-confidentialite';
+const RGPD_PRIVACY_URL = 'https://wekid.be/politique-de-confidentialite';
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 // Use persistent storage for React Native, fall back to web

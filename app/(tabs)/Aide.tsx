@@ -91,10 +91,10 @@ const MOCK_PROFESSIONALS: Professional[] = [
     id: '1',
     name: 'Me. Marie Dubois',
     type: 'avocat',
-    location: 'Paris, 75008',
+    location: 'Bruxelles, 1000',
     specialty: 'Droit de la Famille',
-    phone: '+33 1 23 45 67 89',
-    email: 'marie.dubois@cabinet.fr',
+    phone: '+32 2 123 45 67',
+    email: 'marie.dubois@cabinet.be',
     description: 'Spécialisée en droit de la famille avec 15 ans d\'expérience. Je vous accompagne dans tous vos démarches.',
     availability: {
       lundi: '9h - 18h',
@@ -110,10 +110,10 @@ const MOCK_PROFESSIONALS: Professional[] = [
     id: '2',
     name: 'Me. Pierre Lefebvre',
     type: 'avocat',
-    location: 'Lyon, 69003',
+    location: 'Anvers, 2000',
     specialty: 'Médiation Familiale',
-    phone: '+33 4 72 98 76 54',
-    email: 'pierre.lefebvre@cabinet.fr',
+    phone: '+32 3 234 56 78',
+    email: 'pierre.lefebvre@cabinet.be',
     description: 'Médiateur familial diplômé. Je facilite la communication entre parents.',
     availability: {
       lundi: '8h - 17h',
@@ -129,10 +129,10 @@ const MOCK_PROFESSIONALS: Professional[] = [
     id: '3',
     name: 'Me. Isabelle Rousseau',
     type: 'avocat',
-    location: 'Marseille, 13001',
+    location: 'Gand, 9000',
     specialty: 'Droit de la Garde',
-    phone: '+33 4 91 55 44 33',
-    email: 'isabelle.rousseau@cabinet.fr',
+    phone: '+32 9 345 67 89',
+    email: 'isabelle.rousseau@cabinet.be',
     description: 'Experte en questions de garde et de pension alimentaire.',
     availability: {
       lundi: '9h - 19h',
@@ -148,10 +148,10 @@ const MOCK_PROFESSIONALS: Professional[] = [
     id: '4',
     name: 'Dr. Sophie Moreau',
     type: 'psychologue',
-    location: 'Paris, 75010',
+    location: 'Liège, 4000',
     specialty: 'Psychologie Familiale',
-    phone: '+33 1 98 76 54 32',
-    email: 'sophie.moreau@psycare.fr',
+    phone: '+32 4 456 78 90',
+    email: 'sophie.moreau@psycare.be',
     description: 'Psychologue clinicienne spécialisée en thérapie familiale.',
     availability: {
       lundi: '10h - 20h',
@@ -167,10 +167,10 @@ const MOCK_PROFESSIONALS: Professional[] = [
     id: '5',
     name: 'Dr. Thomas Leclerc',
     type: 'psychologue',
-    location: 'Bordeaux, 33000',
+    location: 'Charleroi, 6000',
     specialty: 'Thérapie Enfants et Ados',
-    phone: '+33 5 56 12 34 56',
-    email: 'thomas.leclerc@psycare.fr',
+    phone: '+32 71 567 89 01',
+    email: 'thomas.leclerc@psycare.be',
     description: 'Spécialiste de l\'accompagnement des enfants et adolescents.',
     availability: {
       lundi: '9h - 18h',
@@ -186,10 +186,10 @@ const MOCK_PROFESSIONALS: Professional[] = [
     id: '6',
     name: 'Dr. Véronique Gibert',
     type: 'psychologue',
-    location: 'Toulouse, 31000',
+    location: 'Namur, 5000',
     specialty: 'Médiation Parent-Enfant',
-    phone: '+33 5 61 23 45 67',
-    email: 'veronique.gibert@psycare.fr',
+    phone: '+32 81 678 90 12',
+    email: 'veronique.gibert@psycare.be',
     description: 'Experte en médiation et en amélioration de la relation parent-enfant.',
     availability: {
       lundi: '9h - 19h',
@@ -630,7 +630,7 @@ export default function AideScreen() {
   };
 
   const handleCallSupport = () => {
-    Linking.openURL('tel:+33184000000').catch(() => Alert.alert('Info', 'Appelez le 01 84 00 00 00'));
+    Linking.openURL('tel:+3222000000').catch(() => Alert.alert('Info', 'Appelez le 02 200 00 00'));
   };
 
   const handleEmailSupport = () => {

@@ -139,7 +139,7 @@ export default function RegisterScreenParent() {
           accepted: true,
           acceptedAt: serverTimestamp(),
           version: '2024-12-06',
-          privacyUrl: 'https://wekid.fr/politique-de-confidentialite',
+          privacyUrl: 'https://wekid.be/politique-de-confidentialite',
         },
       };
       if (profileImage) userDoc.profileImage = profileImage;
@@ -249,7 +249,7 @@ export default function RegisterScreenParent() {
                 {consentChecked ? <Text style={styles.checkboxMark}>✓</Text> : null}
               </View>
               <Text style={[styles.consentText, { color: colors.textSecondary }]}>J'accepte la politique de confidentialité</Text>
-              <TouchableOpacity onPress={() => Linking.openURL('https://wekid.fr/politique-de-confidentialite')}>
+              <TouchableOpacity onPress={() => Linking.openURL('https://wekid.be/politique-de-confidentialite')}>
                 <Text style={[styles.consentLink, { color: colors.tint }]}>Voir</Text>
               </TouchableOpacity>
             </TouchableOpacity>

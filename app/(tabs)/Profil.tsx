@@ -61,7 +61,7 @@ export default function ProfilScreen() {
     ? children.find((c) => c.id === selectedChildForMedical.id) || null
     : null;
 
-  const privacyUrl = 'https://wekid.fr/politique-de-confidentialite';
+  const privacyUrl = 'https://wekid.be/politique-de-confidentialite';
 
   const handleOpenPrivacy = async () => {
     try {
@@ -83,10 +83,10 @@ export default function ProfilScreen() {
   };
 
   const handleContactSupport = async () => {
-    const mailto = 'mailto:support@wekid.fr?subject=Support%20WeKid&body=Décrivez votre demande:';
+    const mailto = 'mailto:support@wekid.be?subject=Support%20WeKid&body=Décrivez votre demande:';
     const canOpen = await Linking.canOpenURL(mailto);
     if (!canOpen) {
-      Alert.alert('Info', 'Envoyez-nous un email à support@wekid.fr');
+      Alert.alert('Info', 'Envoyez-nous un email à support@wekid.be');
       return;
     }
     await Linking.openURL(mailto);
