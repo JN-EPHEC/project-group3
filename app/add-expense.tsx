@@ -162,7 +162,11 @@ export default function AddExpenseScreen() {
           const rules = data.categoryRules || data.categoryLimits || {};
           
           if (rules && Object.keys(rules).length > 0) {
-            const categoryNames = Object.keys(rules);
+            // Filtrer uniquement les catégories non supprimées (exclure null et undefined)
+            const categoryNames = Object.keys(rules).filter(key => {
+              const value = rules[key];
+              return value !== null && value !== undefined;
+            });
             setCategories(categoryNames);
             
             const rulesMap: { [key: string]: CategoryRule } = {};
