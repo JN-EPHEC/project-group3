@@ -1,5 +1,5 @@
 // register.js
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "./firebase.js"; // On récupère les instances initialisées
 
@@ -19,6 +19,14 @@ export async function handleSignUp(email, password, nom, prenom) {
         // B. Création Auth
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
+
+        // Envoi de l'email de vérification
+        try {
+            await sendEmailVerification(user);
+            console.log('✅ Email de vérification envoyé à:', email);
+        } catch (emailError) {
+            console.error('❌ Erreur lors de l\'envoi de l\'email de vérification:', emailError.message);
+        }
 
         // C. Stockage Firestore
         await setDoc(doc(db, "users", user.uid), {

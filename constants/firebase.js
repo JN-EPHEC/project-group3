@@ -5,6 +5,7 @@ import {
     deleteUser as fbDeleteUser,
     signOut as fbSignOut,
     getAuth,
+    sendEmailVerification,
     signInWithEmailAndPassword
 } from 'firebase/auth';
 // Avoid static import of react-native auth entry to prevent bundler issues
@@ -119,6 +120,14 @@ export async function signIn(email, password) {
 export async function signUp(email, password, role = 'parent') {
   const res = await createUserWithEmailAndPassword(auth, email, password);
   const uid = res.user.uid;
+
+  // Envoi de l'email de vérification
+  try {
+    await sendEmailVerification(res.user);
+    console.log('✅ Email de vérification envoyé à:', email);
+  } catch (emailError) {
+    console.error('❌ Erreur lors de l\'envoi de l\'email de vérification:', emailError.message);
+  }
 
   const userRef = doc(db, 'users', uid);
   await setDoc(userRef, {
