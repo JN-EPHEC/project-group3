@@ -99,15 +99,10 @@ export class StripeService {
       };
     }
 
-    // Fallback natif : utiliser une URL configurée (ngrok/production) accessible depuis Expo Go
-    const fallbackBase = (envSuccess || STRIPE_CONFIG.API_URL || '').replace(/\/$/, '');
+    // Sur mobile : utiliser les deep links pour rediriger vers l'app
     return {
-      successUrl: fallbackBase
-        ? `${fallbackBase}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`
-        : undefined,
-      cancelUrl: (envCancel || fallbackBase)
-        ? `${(envCancel || fallbackBase).replace(/\/$/, '')}/subscription?cancelled=true`
-        : undefined,
+      successUrl: envSuccess || 'myapp://payment-success?session_id={CHECKOUT_SESSION_ID}',
+      cancelUrl: envCancel || 'myapp://payment-cancelled',
     };
   }
 

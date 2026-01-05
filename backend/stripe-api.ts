@@ -115,11 +115,12 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
     const sanitizeUrl = (url?: string) => {
       if (!url || typeof url !== 'string') return undefined;
-      return /^https?:\/\//i.test(url) ? url : undefined;
+      // Autoriser les URLs HTTP/HTTPS ET les deep links (myapp://)
+      return /^(https?|myapp):\/\//i.test(url) ? url : undefined;
     };
 
-    const resolvedSuccessUrl = sanitizeUrl(successUrl) || process.env.SUCCESS_URL || `http://localhost:8081/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`;
-    const resolvedCancelUrl = sanitizeUrl(cancelUrl) || process.env.CANCEL_URL || `http://localhost:8081/subscription?cancelled=true`;
+    const resolvedSuccessUrl = sanitizeUrl(successUrl) || process.env.SUCCESS_URL || 'myapp://payment-success?session_id={CHECKOUT_SESSION_ID}';
+    const resolvedCancelUrl = sanitizeUrl(cancelUrl) || process.env.CANCEL_URL || 'myapp://payment-cancelled';
 
     // Créer la Checkout Session
     const session = await stripe.checkout.sessions.create({
