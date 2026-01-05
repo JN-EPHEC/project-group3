@@ -99,10 +99,32 @@ export class StripeService {
       };
     }
 
-    // Sur mobile : utiliser les deep links pour rediriger vers l'app
+    // Sur mobile : vérifier si on est dans Expo Go ou une app standalone
+    const expoScheme = (Constants as any)?.expoConfig?.scheme || (Constants as any)?.manifest?.scheme || 'myapp';
+    const isExpoGo = (Constants as any)?.appOwnership === 'expo';
+    
+    if (isExpoGo) {
+      // Dans Expo Go, utiliser exp:// avec l'hôte du projet
+      const hostUri = (Constants as any)?.expoConfig?.hostUri || (Constants as any)?.manifest?.debuggerHost;
+      const host = hostUri ? hostUri.split(':').shift() : '';
+      const projectId = (Constants as any)?.expoConfig?.extra?.eas?.projectId;
+      
+      console.log('🔵 Expo Go détecté - Configuration deep link:');
+      console.log('   - Host URI:', hostUri);
+      console.log('   - Host:', host);
+      console.log('   - Project ID:', projectId);
+      
+      // Pour Expo Go, on utilise la route avec paramètres
+      return {
+        successUrl: envSuccess || `exp://${host}/--/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: envCancel || `exp://${host}/--/subscription?cancelled=true`,
+      };
+    }
+    
+    // Pour une app standalone, utiliser le schéma personnalisé
     return {
-      successUrl: envSuccess || 'myapp://payment-success?session_id={CHECKOUT_SESSION_ID}',
-      cancelUrl: envCancel || 'myapp://payment-cancelled',
+      successUrl: envSuccess || `${expoScheme}://payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: envCancel || `${expoScheme}://payment-cancelled`,
     };
   }
 

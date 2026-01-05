@@ -29,13 +29,14 @@ export default function SubscriptionScreen() {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
-    // Détecter le retour de Stripe via les query params
+    // Détecter le retour de Stripe via les query params (Web)
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const success = urlParams.get('success');
       const sessionId = urlParams.get('session_id');
       
       if (success === 'true' && sessionId) {
+        console.log('🎉 Paiement réussi détecté (Web)! Session ID:', sessionId);
         setIsRedirecting(true);
         
         // Nettoyer l'URL
@@ -63,6 +64,7 @@ export default function SubscriptionScreen() {
       }
     }
     
+    console.log('📱 Vérification du statut d\'abonnement au chargement...');
     checkSubscriptionStatus(true);
 
     return () => {};
@@ -70,6 +72,7 @@ export default function SubscriptionScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      console.log('📱 Subscription screen focused - Vérification du statut...');
       // Re-vérifier quand l'écran revient en focus (utile après un retour de Stripe sur Expo Go)
       if (!isRedirecting) {
         checkSubscriptionStatus();

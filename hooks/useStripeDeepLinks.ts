@@ -13,8 +13,11 @@ export function useStripeDeepLinks() {
   const router = useRouter();
 
   useEffect(() => {
+    console.log('🔵 useStripeDeepLinks: Hook initialisé');
+    
     // Gérer l'URL initiale (app ouvert via deep link)
     Linking.getInitialURL().then(url => {
+      console.log('🔵 Initial URL:', url);
       if (url) {
         handleDeepLink(url);
       }
@@ -22,6 +25,7 @@ export function useStripeDeepLinks() {
 
     // Écouter les deep links pendant que l'app est active
     const subscription = Linking.addEventListener('url', event => {
+      console.log('🔵 Deep link event:', event.url);
       handleDeepLink(event.url);
     });
 
@@ -31,7 +35,7 @@ export function useStripeDeepLinks() {
   }, []);
 
   const handleDeepLink = async (url: string) => {
-    console.log('Deep link received:', url);
+    console.log('🔵 Deep link received:', url);
 
     try {
       // Récupérer le type d'utilisateur pour les redirections
@@ -51,18 +55,48 @@ export function useStripeDeepLinks() {
 
       const profileRoute = userType === 'professionnel' ? '/(pro-tabs)/ProSettings' : '/(tabs)/Profil';
 
+      // Vérifier si l'URL contient des paramètres de succès ou d'annulation
+      const isPaymentSuccess = url.includes('payment-success') || url.includes('success=true');
+      const isPaymentCancelled = url.includes('payment-cancelled') || url.includes('cancelled=true');
+      const isSettings = url.includes('settings');
+
+      console.log('🔵 URL Analysis:', {
+        isPaymentSuccess,
+        isPaymentCancelled,
+        isSettings,
+        url
+      });
+
       // Payment Success
-      if (url.startsWith('myapp://payment-success')) {
+      if (isPaymentSuccess) {
         const urlParams = new URLSearchParams(url.split('?')[1]);
         const sessionId = urlParams.get('session_id');
 
+        console.log('✅ Payment success détecté! Session ID:', sessionId);
+
         if (sessionId) {
           await handlePaymentSuccess(sessionId);
+        } else {
+          // Même sans session ID, afficher le message de succès
+          Alert.alert(
+            '🎉 Paiement réussi !',
+            'Votre abonnement est en cours d\'activation.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  const homeRoute = userType === 'professionnel' ? '/(pro-tabs)/' : '/(tabs)/';
+                  router.push(homeRoute);
+                },
+              },
+            ]
+          );
         }
       }
 
       // Payment Cancelled
-      else if (url.startsWith('myapp://payment-cancelled')) {
+      else if (isPaymentCancelled) {
+        console.log('❌ Payment cancelled détecté');
         Alert.alert(
           'Paiement annulé',
           'Vous avez annulé le processus de paiement. Vous pouvez réessayer à tout moment.',
@@ -76,12 +110,13 @@ export function useStripeDeepLinks() {
       }
 
       // Settings return
-      else if (url.startsWith('myapp://settings')) {
+      else if (isSettings) {
+        console.log('⚙️ Settings return détecté');
         router.push(profileRoute);
       }
 
     } catch (error) {
-      console.error('Error handling deep link:', error);
+      console.error('❌ Error handling deep link:', error);
     }
   };
 
