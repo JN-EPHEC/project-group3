@@ -31,10 +31,23 @@ export default function RootLayout() {
           <Stack.Screen name="(pro-tabs)" options={{ headerShown: false, title: '' }} />
           <Stack.Screen name="modal" options={{ headerShown: false }} />
           <Stack.Screen name="add-expense" options={{ headerShown: false }} />
+          <Stack.Screen name="edit-expense" options={{ headerShown: false }} />
+          <Stack.Screen name="expense-details" options={{ headerShown: false }} />
+          <Stack.Screen name="expense-approvals" options={{ headerShown: false }} />
           <Stack.Screen name="category-approvals" options={{ headerShown: false }} />
+          <Stack.Screen name="budget-settings" options={{ headerShown: false }} />
+          <Stack.Screen name="currencies" options={{ headerShown: false }} />
           <Stack.Screen name="RoleSelection" options={{ headerShown: false }} />
           <Stack.Screen name="subscription" options={{ headerShown: false }} />
           <Stack.Screen name="AddProfessionalRole" options={{ headerShown: false }} />
+          <Stack.Screen name="conversation" options={{ headerShown: false }} />
+          <Stack.Screen name="admin-messages" options={{ headerShown: false }} />
+          <Stack.Screen name="admin-message-reports" options={{ headerShown: false }} />
+          <Stack.Screen name="admin-moderation" options={{ headerShown: false }} />
+          <Stack.Screen name="create-event" options={{ headerShown: false }} />
+          <Stack.Screen name="edit-event" options={{ headerShown: false }} />
+          <Stack.Screen name="event-details" options={{ headerShown: false }} />
+          <Stack.Screen name="scan-barcode" options={{ headerShown: false }} />
           <Stack.Screen 
             name="helpcenter-pro" 
             options={{ 

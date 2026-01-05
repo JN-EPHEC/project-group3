@@ -265,20 +265,20 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   linkText: {
-    passwordToggle: {
-      position: 'absolute',
-      right: 12,
-      top: 12,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    passwordToggleText: {
-      fontSize: 14,
-      fontWeight: '700'
-    },
     fontSize: 14,
     textDecorationLine: 'underline'
-  }
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  passwordToggleText: {
+    fontSize: 14,
+    fontWeight: '700'
+  },
 });
 
 export default LoginScreen;
