@@ -39,6 +39,7 @@ export default function RootLayout() {
           <Stack.Screen name="currencies" options={{ headerShown: false }} />
           <Stack.Screen name="RoleSelection" options={{ headerShown: false }} />
           <Stack.Screen name="subscription" options={{ headerShown: false }} />
+          <Stack.Screen name="manage-subscription" options={{ headerShown: false }} />
           <Stack.Screen name="AddProfessionalRole" options={{ headerShown: false }} />
           <Stack.Screen name="conversation" options={{ headerShown: false }} />
           <Stack.Screen name="admin-messages" options={{ headerShown: false }} />

@@ -124,24 +124,23 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const handleManageSubscription = async () => {
+  const handleManageSubscription = () => {
     try {
-      setLoading(true);
+      console.log('🔄 Navigation vers la page de gestion d\'abonnement');
       const auth = getAuth();
       const user = auth.currentUser;
       
-      if (!user) return;
+      if (!user) {
+        Alert.alert('Erreur', 'Utilisateur non connecté');
+        return;
+      }
 
-      const status = await StripeService.getSubscriptionStatus(user.uid);
-      
-      // Ouvrir le Customer Portal (nécessite le customerId)
-      // Pour l'instant, rediriger vers les paramètres
-      router.push('/(tabs)/Profil');
+      // Rediriger vers la page de gestion d'abonnement
+      router.push('/manage-subscription');
       
     } catch (error: any) {
+      console.error('❌ Erreur navigation:', error);
       Alert.alert('Erreur', 'Impossible de gérer votre abonnement');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -175,7 +174,6 @@ export default function SubscriptionScreen() {
         <TouchableOpacity
           style={styles.manageButton}
           onPress={handleManageSubscription}
-          disabled={loading}
         >
           <Text style={styles.manageButtonText}>
             Gérer mon abonnement
