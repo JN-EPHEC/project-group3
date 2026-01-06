@@ -24,7 +24,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SUBSCRIPTION_PLANS } from '../constants/stripeConfig';
 import { StripeService } from '../constants/stripeService';
-import { getUserCurrentSubscriptionInfo } from '../constants/subscriptionSync';
 
 interface SubscriptionDetails {
   type: 'monthly' | 'yearly' | 'unknown';
@@ -62,12 +61,20 @@ export default function ManageSubscriptionScreen() {
       }
 
       // Récupérer les informations d'abonnement
-      const subInfo: any = await getUserCurrentSubscriptionInfo();
+      console.log('📱 Récupération des infos d\'abonnement pour:', user.uid);
       
-      if (!subInfo || typeof subInfo !== 'object' || !('hasActiveSubscription' in subInfo)) {
+      // Utiliser la même méthode que la page Profil
+      const subInfo: any = await StripeService.getSubscriptionStatus(user.uid);
+      console.log('📊 Infos d\'abonnement récupérées:', JSON.stringify(subInfo, null, 2));
+      
+      if (!subInfo || typeof subInfo !== 'object') {
+        console.error('❌ subInfo invalide:', subInfo);
         setError('Impossible de récupérer les informations d\'abonnement');
         return;
       }
+      
+      console.log('✅ hasActiveSubscription:', subInfo.hasActiveSubscription);
+      console.log('✅ subscription:', subInfo.subscription);
       
       if (!subInfo.hasActiveSubscription || !subInfo.subscription) {
         setError('Aucun abonnement actif trouvé');
@@ -108,16 +115,11 @@ export default function ManageSubscriptionScreen() {
 
       // Calculer les dates
       const now = new Date();
+      // StripeService retourne des timestamps en secondes (epoch)
       let endDate: Date | null = null;
       if (sub.currentPeriodEnd) {
-        // Gérer à la fois les Timestamps Firestore et les objets Date
-        if (typeof sub.currentPeriodEnd === 'object' && 'seconds' in sub.currentPeriodEnd) {
-          endDate = new Date(sub.currentPeriodEnd.seconds * 1000);
-        } else if (sub.currentPeriodEnd instanceof Date) {
-          endDate = sub.currentPeriodEnd;
-        } else {
-          endDate = new Date(sub.currentPeriodEnd);
-        }
+        // currentPeriodEnd est un timestamp en secondes
+        endDate = new Date(sub.currentPeriodEnd * 1000);
       }
       
       // Estimer la date de début (date de fin - durée de la période)
