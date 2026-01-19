@@ -2,7 +2,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as DocumentPicker from 'expo-document-picker';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -161,6 +161,19 @@ export default function ChildMedicalRecord({
   const [record, setRecord] = useState<ChildMedicalRecordData>(computedInitialRecord);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+
+  // Mettre à jour le nom dans le record quand childName change
+  useEffect(() => {
+    if (childName && childName !== record.general.fullName) {
+      setRecord(prev => ({
+        ...prev,
+        general: {
+          ...prev.general,
+          fullName: childName
+        }
+      }));
+    }
+  }, [childName]);
 
   // Temporary Inputs
   const [newAllergyName, setNewAllergyName] = useState('');
