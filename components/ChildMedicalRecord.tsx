@@ -146,6 +146,12 @@ export default function ChildMedicalRecord({
   
   const [editMode, setEditMode] = useState(false);
   const [expandedSectionId, setExpandedSectionId] = useState<string | null>('general');
+  const [, forceUpdate] = useState({});
+
+  // Force update when color scheme changes
+  useEffect(() => {
+    forceUpdate({});
+  }, [colorScheme]);
   
   const computedInitialRecord = useMemo<ChildMedicalRecordData>(() => {
     if (initialRecord) return initialRecord;

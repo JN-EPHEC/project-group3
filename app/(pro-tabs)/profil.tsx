@@ -307,6 +307,7 @@ export default function ProProfilScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedDay, setSelectedDay] = useState<keyof AvailabilitySchedule>('lundi');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [availabilityExpanded, setAvailabilityExpanded] = useState(false);
 
   useEffect(() => {
     const currentUser = auth.currentUser;
@@ -828,43 +829,62 @@ export default function ProProfilScreen() {
               </TouchableOpacity>
             </View>
             
-            <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
-              {Object.entries(availability).map(([day, dayData]) => {
-                const dayName = day.charAt(0).toUpperCase() + day.slice(1);
-                const availableSlots = dayData.isOpen 
-                  ? dayData.slots.filter(slot => slot.available)
-                  : [];
-                
-                return (
-                  <View key={day} style={styles.availabilityRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.dayText, { color: colors.text, fontWeight: '600' }]}>
-                        {dayName}
-                      </Text>
-                      {!dayData.isOpen ? (
-                        <Text style={[styles.slotText, { color: colors.textSecondary, fontStyle: 'italic' }]}>
-                          Fermé
+            <TouchableOpacity 
+              style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}
+              onPress={() => setAvailabilityExpanded(!availabilityExpanded)}
+              activeOpacity={0.7}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[styles.sectionTitle, { color: accentColor, fontSize: 16 }]}>
+                  Voir les disponibilités
+                </Text>
+                <IconSymbol 
+                  name={availabilityExpanded ? "chevron.up" : "chevron.down"} 
+                  size={20} 
+                  color={accentColor}
+                />
+              </View>
+            </TouchableOpacity>
+            
+            {availabilityExpanded && (
+              <View style={[styles.infoCard, { backgroundColor: colors.cardBackground, marginTop: 12 }]}>
+                {Object.entries(availability).map(([day, dayData]) => {
+                  const dayName = day.charAt(0).toUpperCase() + day.slice(1);
+                  const availableSlots = dayData.isOpen 
+                    ? dayData.slots.filter(slot => slot.available)
+                    : [];
+                  
+                  return (
+                    <View key={day} style={styles.availabilityRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.dayText, { color: colors.text, fontWeight: '600' }]}>
+                          {dayName}
                         </Text>
-                      ) : availableSlots.length === 0 ? (
-                        <Text style={[styles.slotText, { color: colors.textSecondary, fontStyle: 'italic' }]}>
-                          Aucun créneau disponible
-                        </Text>
-                      ) : (
-                        <View style={styles.slotsContainer}>
-                          {availableSlots.map((slot, idx) => (
-                            <View key={idx} style={[styles.slotChip, { backgroundColor: accentColor, borderColor: accentColor }]}>
-                              <Text style={[styles.slotText, { color: '#000' }]}>
-                                {slot.start} - {slot.end}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-                      )}
+                        {!dayData.isOpen ? (
+                          <Text style={[styles.slotText, { color: colors.textSecondary, fontStyle: 'italic' }]}>
+                            Fermé
+                          </Text>
+                        ) : availableSlots.length === 0 ? (
+                          <Text style={[styles.slotText, { color: colors.textSecondary, fontStyle: 'italic' }]}>
+                            Aucun créneau disponible
+                          </Text>
+                        ) : (
+                          <View style={styles.slotsContainer}>
+                            {availableSlots.map((slot, idx) => (
+                              <View key={idx} style={[styles.slotChip, { backgroundColor: accentColor, borderColor: accentColor }]}>
+                                <Text style={[styles.slotText, { color: '#000' }]}>
+                                  {slot.start} - {slot.end}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
                     </View>
-                  </View>
-                );
-              })}
-            </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           <View style={styles.section}>

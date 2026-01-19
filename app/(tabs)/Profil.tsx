@@ -135,6 +135,14 @@ export default function ProfilScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
+  // Force modal update when theme changes
+  useEffect(() => {
+    if (medicalModalVisible) {
+      // Trigger a re-render of the modal content
+      setSelectedChildForMedical(selectedChildForMedical);
+    }
+  }, [colorScheme, medicalModalVisible]);
+
   const handleAddMissingRole = async () => {
     const current = auth.currentUser;
     if (!current) return;
