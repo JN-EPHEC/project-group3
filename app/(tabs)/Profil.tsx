@@ -872,7 +872,10 @@ export default function ProfilScreen() {
                       </>
                     ) : null}
                     <View style={[styles.separator, { backgroundColor: colors.border }]} />
-                    <TouchableOpacity style={[styles.settingCard, { backgroundColor: colors.cardBackground, marginHorizontal: 0 }]}>
+                    <TouchableOpacity 
+                      onPress={() => router.push('/manage-subscription')}
+                      style={[styles.settingCard, { backgroundColor: colors.cardBackground, marginHorizontal: 0 }]}
+                    >
                       <Text style={[styles.settingText, { color: colors.tint }]}>Gérer mon abonnement</Text>
                       <IconSymbol name="chevron.right" size={20} color={colors.tint} />
                     </TouchableOpacity>
