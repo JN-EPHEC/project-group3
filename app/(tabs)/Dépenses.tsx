@@ -632,52 +632,6 @@ export default function DepensesScreen() {
             </View>
           )}
 
-          {/* Pending Expenses Section - ONLY HERE */}
-          {expenses.filter((exp: any) => exp.approvalStatus === 'PENDING_APPROVAL').length > 0 && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: '#FF9500' }]}>⏳ Dépenses en attente d'approbation</Text>
-              {expenses.filter((exp: any) => exp.approvalStatus === 'PENDING_APPROVAL').map((expense: any) => {
-                const payer = familyMembersData[expense.paidBy];
-                const payerName = payer ? `${payer.firstName} ${payer.lastName}` : 'Membre';
-                const payerInitials = payer ? `${payer.firstName.charAt(0)}${payer.lastName.charAt(0)}` : 'M';
-                
-                return (
-                  <TouchableOpacity 
-                    key={expense.id} 
-                    style={[
-                      styles.expenseCard, 
-                      { backgroundColor: colors.cardBackground },
-                      { borderLeftWidth: 4, borderLeftColor: '#FF9500' }
-                    ]}
-                    onPress={() => router.push(`/expense-details?expenseId=${expense.id}`)}
-                  >
-                    <View style={[styles.avatarBubble, { backgroundColor: '#FF9500' }]}>
-                      <IconSymbol name="clock" size={24} color="#fff" />
-                    </View>
-                    <View style={styles.expenseDetails}>
-                      <View style={styles.expenseTopRow}>
-                        <Text style={[styles.expenseTitle, { color: colors.text }]} numberOfLines={1}>{expense.description || payerName}</Text>
-                        <Text style={[styles.expenseAmount, { color: colors.text }]}>
-                          {expense.amount?.toFixed(2)} {currency}
-                        </Text>
-                      </View>
-                      <View style={styles.expenseBottomRow}>
-                        <View style={styles.expenseMetaContainer}>
-                          <Text style={[styles.expenseCategory, { color: colors.textSecondary }]}>{expense.category}</Text>
-                          <Text style={[styles.expenseMeta, { color: colors.textSecondary }]}>
-                            {expense.date?.toDate ? new Date(expense.date.toDate()).toLocaleDateString('fr-FR') : '—'}
-                          </Text>
-                        </View>
-                        <Text style={[styles.expensePayer, { color: colors.textSecondary }]}>{payerName}</Text>
-                      </View>
-                      <Text style={[styles.pendingBadge, { color: '#FF9500' }]}>⏳ En attente d'approbation</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
           {/* Expenses List */}
           <View style={styles.section}>
             <View style={styles.expensesHeader}>

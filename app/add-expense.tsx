@@ -411,26 +411,8 @@ export default function AddExpenseScreen() {
       console.log(`💾 Dépense créée avec ID: ${expenseRef.id}`);
       console.log(`   Statut: ${approvalStatus}`);
 
-      // 5. Si approbation nécessaire, créer une demande d'approbation
+      // 5. Afficher un message approprié selon le statut
       if (needsApproval) {
-        const approvalData = {
-          expenseId: expenseRef.id,
-          familyId: familyId,
-          categoryName: category,
-          limit: categoryRule.limit,
-          allowOverLimit: categoryRule.allowOverLimit,
-          requestedBy: currentUser.uid,
-          requestedByName: userName,
-          amount: amountNumber,
-          exceededBy: exceededBy,
-          description: description.trim(),
-          status: 'PENDING',
-          createdAt: serverTimestamp(),
-        };
-
-        await addDoc(collection(db, 'categoryApprovals'), approvalData);
-        console.log(`📬 Demande d'approbation créée pour ${exceededBy.toFixed(2)} € de dépassement`);
-
         Alert.alert(
           '⚠️ Budget dépassé',
           `Cette dépense dépasse le budget de la catégorie "${category}" de ${exceededBy.toFixed(2)} €.\n\n` +
