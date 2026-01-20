@@ -352,21 +352,37 @@ export default function AddExpenseScreen() {
         console.log(`   Total actuel: ${currentTotal.toFixed(2)} €`);
         console.log(`   Nouveau montant: ${amountNumber.toFixed(2)} €`);
         console.log(`   Nouveau total: ${newTotal.toFixed(2)} €`);
-        console.log(`   Dépassement autorisé: ${categoryRule.allowOverLimit}`);
 
         // Vérifier si on dépasse la limite
         if (newTotal > categoryRule.limit) {
           exceededBy = newTotal - categoryRule.limit;
           
-          // Si le dépassement n'est PAS autorisé, mettre en attente d'approbation
-          if (!categoryRule.allowOverLimit) {
+          // Récupérer le nombre de parents dans la famille pour approbation multi-parent
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('familyIds', 'array-contains', familyId));
+          const parentsSnapshot = await getDocs(q);
+          const parentCount = parentsSnapshot.size;
+          
+          console.log(`📋 Nombre de parents dans la famille: ${parentCount}`);
+          console.log(`   Dépassement autorisé (categoryRule): ${categoryRule.allowOverLimit}`);
+
+          // Si PLUSIEURS parents ET budget dépassé, approbation requise
+          if (parentCount > 1) {
             needsApproval = true;
             approvalStatus = 'PENDING_APPROVAL';
             
             console.log(`⚠️ DÉPASSEMENT DÉTECTÉ - Montant dépassé: ${exceededBy.toFixed(2)} €`);
-            console.log(`🔒 Dépassement NON autorisé - Approbation requise`);
-          } else {
+            console.log(`👥 Approbation requise (${parentCount} parents dans la famille)`);
+          } 
+          // Si budget autorisé à dépasser ET règle permet le dépassement, auto-approuver
+          else if (categoryRule.allowOverLimit) {
             console.log(`✅ Dépassement autorisé - Pas d'approbation nécessaire`);
+          }
+          // Sinon, approbation requise
+          else {
+            needsApproval = true;
+            approvalStatus = 'PENDING_APPROVAL';
+            console.log(`🔒 Dépassement NON autorisé - Approbation requise`);
           }
         } else {
           console.log(`✅ Budget respecté - Approbation automatique`);

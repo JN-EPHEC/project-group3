@@ -1204,14 +1204,20 @@ export default function ProfilScreen() {
                                 onChangeText={setNewChildName}
                                 placeholder="Nom de l'enfant"
                                 placeholderTextColor={colors.textSecondary}
+                                autoFocus={true}
                             />
-                            <TouchableOpacity style={[styles.saveButton, {flex: 0, paddingVertical: 12}]} onPress={handleAddChild}>
-                                <Text style={styles.saveButtonText}>Ajouter</Text>
-                            </TouchableOpacity>
+                            <View style={{ flexDirection: 'row', gap: SPACING.small }}>
+                                <TouchableOpacity style={[styles.addChildSubmitButton, { backgroundColor: colors.cardBackground, flex: 1 }]} onPress={() => setShowAddChild(false)}>
+                                    <Text style={[styles.addChildSubmitText, { color: colors.text }]}>Annuler</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.addChildSubmitButton, { backgroundColor: colors.tint, flex: 1 }]} onPress={handleAddChild}>
+                                    <Text style={[styles.addChildSubmitText, { color: '#fff' }]}>Ajouter</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     ) : (
-                        <TouchableOpacity style={styles.addChildButton} onPress={() => setShowAddChild(true)}>
-                            <Text style={styles.addChildButtonText}>+ Ajouter un enfant</Text>
+                        <TouchableOpacity style={[styles.addChildButton, { borderColor: colors.tint }]} onPress={() => setShowAddChild(true)}>
+                            <Text style={[styles.addChildButtonText, { color: colors.tint }]}>+ Ajouter un enfant</Text>
                         </TouchableOpacity>
                     )
                   )}
@@ -1624,17 +1630,39 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   addChildContainer: {
-    marginTop: 10,
+    marginTop: V_SPACING.small,
+    gap: SPACING.medium,
+    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+    padding: SPACING.medium,
+    borderRadius: BORDER_RADIUS.medium,
   },
   addChildButton: {
-    paddingVertical: 12,
+    paddingVertical: vs(14),
+    paddingHorizontal: SPACING.medium,
+    marginTop: V_SPACING.small,
+    borderRadius: BORDER_RADIUS.large,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    minHeight: vs(50),
     alignItems: 'center',
-    marginTop: 5,
+    justifyContent: 'center',
   },
   addChildButtonText: {
-    fontSize: 16,
-    color: '#87CEEB',
-    fontWeight: '600',
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  addChildSubmitButton: {
+    paddingVertical: vs(12),
+    paddingHorizontal: SPACING.medium,
+    borderRadius: BORDER_RADIUS.large,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: vs(45),
+  },
+  addChildSubmitText: {
+    fontSize: FONT_SIZES.medium,
+    fontWeight: '700',
   },
   familySelectorContainer: {
     flexDirection: 'row',

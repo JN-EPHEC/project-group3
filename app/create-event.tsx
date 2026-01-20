@@ -82,11 +82,34 @@ export default function CreateEventScreen() {
             }
           }
 
-          // Fetch parents from the same family
+          // Fetch parents from the same family - Try multiple approaches
+          let parentsList: any[] = [];
+          
+          // Approach 1: Query by familyIds (array field)
           const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('familyId', '==', family.id));
+          const q = query(usersRef, where('familyIds', 'array-contains', family.id));
           const querySnapshot = await getDocs(q);
-          const parentsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          parentsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          
+          // Approach 2: If no parents found, get from family.members field
+          if (parentsList.length === 0 && familyDoc.exists()) {
+            const familyData = familyDoc.data();
+            if (familyData.members && Array.isArray(familyData.members)) {
+              // Fetch user details for each member
+              for (const memberId of familyData.members) {
+                try {
+                  const memberDoc = await getDoc(doc(db, 'users', memberId));
+                  if (memberDoc.exists()) {
+                    parentsList.push({ id: memberId, ...memberDoc.data() });
+                  }
+                } catch (e) {
+                  console.error('Error fetching member:', memberId, e);
+                }
+              }
+            }
+          }
+          
+          console.log('📋 Parents trouvés:', parentsList.length, parentsList);
           setAllParents(parentsList);
           // Select current user by default
           if (currentUser) {
@@ -320,14 +343,16 @@ export default function CreateEventScreen() {
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Parents concernés *</Text>
-                <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowParentPicker(true)}>
-                  <Text style={[styles.dateButtonText, { color: colors.text }]}>
-                    {getSelectedParentNames() || 'Sélectionner les parents'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              {true && (
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: colors.text }]}>Parents concernés *</Text>
+                  <TouchableOpacity style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} onPress={() => setShowParentPicker(true)}>
+                    <Text style={[styles.dateButtonText, { color: colors.text }]}>
+                      {getSelectedParentNames() || 'Sélectionner les parents'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>Date</Text>
