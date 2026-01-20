@@ -111,9 +111,11 @@ const getReformulationByScore = (scores: any): string => {
   // Priorité aux menaces (seuil très strict à 0.25)
   if (threat && threat > 0.25) {
     const reformulations = [
-      "J'aimerais qu'on trouve un terrain d'entente.",
-      "Essayons de résoudre ce conflit de manière constructive.",
-      "Je préfère qu'on trouve une solution pacifique.",
+      "Je pense qu'on pourrait mieux communiquer ensemble. Qu'en penses-tu ?",
+      "Prenons le temps de nous écouter mutuellement.",
+      "Cette situation mérite qu'on en parle calmement, tu ne crois pas ?",
+      "Je propose qu'on fasse une pause et qu'on reprenne cette discussion plus tard.",
+      "Et si on essayait de trouver un compromis qui nous convienne à tous les deux ?",
     ];
     return reformulations[Math.floor(Math.random() * reformulations.length)];
   }
@@ -121,9 +123,11 @@ const getReformulationByScore = (scores: any): string => {
   // Ensuite insultes sévères (seuil très strict à 0.25)
   if (severeToxicity && severeToxicity > 0.25) {
     const reformulations = [
-      "Je suis très en colère en ce moment. Peux-tu m'expliquer ton point de vue ?",
-      "Cette situation me met hors de moi. On peut prendre du recul et en reparler ?",
-      "J'ai besoin d'espace pour réfléchir. On peut en reparler plus tard ?",
+      "Je suis vraiment frustré(e) en ce moment. On peut en reparler quand je serai plus calme ?",
+      "Cette situation me met mal à l'aise. Peux-tu m'expliquer ton point de vue calmement ?",
+      "J'ai besoin d'un moment pour réfléchir. On reprend cette conversation plus tard ?",
+      "Je sens que la tension monte. Faisons une pause, d'accord ?",
+      "Je préférerais qu'on en discute à tête reposée. Ça te va si on en reparle demain ?",
     ];
     return reformulations[Math.floor(Math.random() * reformulations.length)];
   }
@@ -131,10 +135,12 @@ const getReformulationByScore = (scores: any): string => {
   // Insultes (seuil très strict à 0.3)
   if (insult && insult > 0.3) {
     const reformulations = [
-      "Je ne suis pas d'accord avec toi sur ce point.",
-      "Je pense qu'on ne se comprend pas bien. Peux-tu m'expliquer ?",
-      "Nos points de vue semblent diverger. Pouvons-nous clarifier ?",
-      "Je trouve qu'il y a un malentendu. On peut en discuter ?",
+      "Je ne partage pas ton avis sur ce point. On peut en discuter ?",
+      "Je pense qu'il y a un malentendu entre nous. Explique-moi comment tu vois les choses.",
+      "Nos points de vue sont différents, mais j'aimerais comprendre le tien.",
+      "Je ressens les choses autrement. Qu'est-ce qui te fait penser ça ?",
+      "On dirait qu'on ne parle pas de la même chose. Reprenons depuis le début ?",
+      "J'ai l'impression qu'on ne se comprend pas bien. Peux-tu reformuler ?",
     ];
     return reformulations[Math.floor(Math.random() * reformulations.length)];
   }
@@ -142,20 +148,24 @@ const getReformulationByScore = (scores: any): string => {
   // Vulgarité/Profanité (seuil très strict à 0.3)
   if (profanity && profanity > 0.3) {
     const reformulations = [
-      "Je suis vraiment contrarié(e) par cette situation.",
-      "Ça ne me convient pas du tout.",
-      "Cette situation me dérange beaucoup.",
-      "Je trouve ça vraiment frustrant.",
+      "Cette situation me contrarie vraiment.",
+      "Je trouve ça vraiment difficile à accepter.",
+      "Honnêtement, ça ne me convient pas du tout.",
+      "Je suis déçu(e) par cette tournure des événements.",
+      "Cette situation me pèse beaucoup en ce moment.",
+      "C'est vraiment frustrant pour moi.",
     ];
     return reformulations[Math.floor(Math.random() * reformulations.length)];
   }
 
   // Toxicité générale
   const reformulations = [
-    "Je préfère en parler calmement. Peux-tu m'expliquer ce qui ne va pas ?",
-    "On pourrait discuter de ça de façon plus constructive.",
-    "J'aimerais qu'on trouve une meilleure façon de communiquer.",
-    "Je pense qu'on peut exprimer ça autrement.",
+    "Je pense qu'on pourrait exprimer ça de façon plus constructive.",
+    "Reformulons ensemble pour mieux se comprendre.",
+    "Et si on cherchait une meilleure façon d'en parler ?",
+    "Je suis sûr(e) qu'on peut trouver les bons mots ensemble.",
+    "Prenons le temps de bien choisir nos mots.",
+    "Essayons d'être plus positifs dans notre échange.",
   ];
   return reformulations[Math.floor(Math.random() * reformulations.length)];
 };
@@ -167,9 +177,15 @@ const getReformulationByScore = (scores: any): string => {
 export const moderateTextWithAPI = async (text: string): Promise<ModerationResult> => {
   // Blocage immédiat sur détection locale de menace explicite
   if (hasThreatKeywords(text)) {
+    const reformulations = [
+      "Je pense qu'on devrait vraiment discuter de ça calmement. Tu es d'accord ?",
+      "Prenons du recul ensemble. Cette situation mérite une vraie discussion.",
+      "Je propose qu'on trouve une solution qui nous convienne à tous les deux.",
+      "Et si on essayait de résoudre ça de manière plus constructive ?",
+    ];
     return {
       allowed: false,
-      suggestion: "Message bloqué : propos menaçants détectés.",
+      suggestion: reformulations[Math.floor(Math.random() * reformulations.length)],
       detectedCategory: 'local_threat',
     };
   }
