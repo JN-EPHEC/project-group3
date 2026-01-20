@@ -135,63 +135,25 @@ export default function ProHomeScreen() {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
-    // Si pas de familles, on cherche tout de même les événements personnels (userId)
-    if (families.length === 0) {
-      const personalEventsQuery = query(
-        collection(db, 'events'),
-        where('userId', '==', currentUser.uid),
-        orderBy('date', 'asc')
-      );
-      const unsub = onSnapshot(personalEventsQuery, (snapshot) => {
-        const now = new Date();
-        const fetchedEvents: EventData[] = snapshot.docs
-          .map(d => ({ id: d.id, ...d.data() } as EventData))
-          .filter((event) => event.date?.toDate() >= now)
-          .sort((a, b) => (a.date?.toDate() || 0) - (b.date?.toDate() || 0));
-        setEvents(fetchedEvents);
-      });
-      return () => unsub();
-    }
-
-    const familyIds = families.map(f => f.id);
-
-    // Deux sources : événements familiaux et événements personnels (userId)
-    const familyEventsQuery = query(
-      collection(db, 'events'),
-      where('familyId', 'in', familyIds),
-      orderBy('date', 'asc')
-    );
-
+    // Dans l'interface professionnelle, on ne charge que les événements personnels du professionnel
+    // Les événements familiaux (de sa famille en tant que parent) ne doivent pas apparaître ici
     const personalEventsQuery = query(
       collection(db, 'events'),
       where('userId', '==', currentUser.uid),
       orderBy('date', 'asc')
     );
 
-    let familyEvents: EventData[] = [];
-    let personalEvents: EventData[] = [];
-
     const now = new Date();
 
-    const mergeAndSet = () => {
-      const combined = [...familyEvents, ...personalEvents]
+    const unsubPersonal = onSnapshot(personalEventsQuery, (snapshot) => {
+      const fetchedEvents: EventData[] = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as EventData))
         .filter((event) => event.date?.toDate() >= now)
         .sort((a, b) => (a.date?.toDate() || 0) - (b.date?.toDate() || 0));
-      setEvents(combined);
-    };
-
-    const unsubFamily = onSnapshot(familyEventsQuery, (snapshot) => {
-      familyEvents = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventData));
-      mergeAndSet();
-    });
-
-    const unsubPersonal = onSnapshot(personalEventsQuery, (snapshot) => {
-      personalEvents = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as EventData));
-      mergeAndSet();
+      setEvents(fetchedEvents);
     });
 
     return () => {
-      unsubFamily();
       unsubPersonal();
     };
   }, [families]);

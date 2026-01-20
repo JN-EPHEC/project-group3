@@ -51,13 +51,34 @@ async function loadProfessionalsFromFirebase(): Promise<Professional[]> {
     const professionalsSnapshot = await getDocs(collection(db, 'professionals'));
     const professionals: Professional[] = [];
     
-    professionalsSnapshot.forEach((doc) => {
-      const data = doc.data();
+    for (const docSnap of professionalsSnapshot.docs) {
+      const data = docSnap.data();
       // Only include professionals with a defined type
       if (data.type && (data.type === 'avocat' || data.type === 'psychologue')) {
+        // Récupérer le nom depuis le document professionals d'abord
+        let firstName = data.firstName || '';
+        let lastName = data.lastName || '';
+        
+        // Si pas de nom dans professionals, chercher dans users en utilisant doc.id comme userId
+        if (!firstName && !lastName) {
+          try {
+            // Le doc.id est normalement l'userId
+            const userDoc = await getDoc(doc(db, 'users', docSnap.id));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              firstName = userData.firstName || '';
+              lastName = userData.lastName || '';
+            }
+          } catch (e) {
+            console.log('Error fetching user data:', e);
+          }
+        }
+        
+        const fullName = `${firstName} ${lastName}`.trim();
+        
         professionals.push({
-          id: doc.id,
-          name: `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Professionnel',
+          id: docSnap.id,
+          name: fullName || 'Professionnel',
           type: data.type,
           location: data.address || 'Non renseignée',
           specialty: data.specialty || 'Non spécifiée',
@@ -76,7 +97,7 @@ async function loadProfessionalsFromFirebase(): Promise<Professional[]> {
           }
         });
       }
-    });
+    }
     
     return professionals;
   } catch (error) {

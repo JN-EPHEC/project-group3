@@ -8,23 +8,23 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
-import { arrayUnion, doc, getFirestore, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { arrayUnion, doc, getDoc, getFirestore, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Linking,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    useColorScheme,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useColorScheme,
 } from 'react-native';
 import { Colors } from '../constants/theme';
 
@@ -202,6 +202,13 @@ export default function AddProfessionalRole() {
         }
       }
 
+      // Récupérer firstName et lastName du profil parent existant
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+      const firstName = userData.firstName || '';
+      const lastName = userData.lastName || '';
+
       // Créer le document professionnel lié au user.uid (PAS parent_id)
       const consentPayload = {
         accepted: true,
@@ -214,6 +221,8 @@ export default function AddProfessionalRole() {
       const professionalDoc = {
         userId: user.uid, // Lié au user.uid pour éviter les mélanges
         email: user.email?.toLowerCase(),
+        firstName, // Même prénom que le profil parent
+        lastName, // Même nom que le profil parent
         type: professionalType,
         address,
         phone,

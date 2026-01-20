@@ -136,52 +136,13 @@ export default function ProAgendaScreen() {
     
     unsubscribers.push(unsubPersonal);
 
-    // Requête pour les événements de famille (si le professionnel a des familles)
-    if (families.length > 0) {
-        let familyEventsQuery;
-
-        if (selectedFamilyId === 'all') {
-            const familyIds = families.map(f => f.id);
-            if (familyIds.length > 0) {
-                familyEventsQuery = query(
-                    collection(db, 'events'),
-                    where('familyId', 'in', familyIds),
-                    orderBy('date', 'asc')
-                );
-            }
-        } else {
-            familyEventsQuery = query(
-                collection(db, 'events'),
-                where('familyId', '==', selectedFamilyId),
-                orderBy('date', 'asc')
-            );
-        }
-        
-        if (familyEventsQuery) {
-            const unsubFamily = onSnapshot(familyEventsQuery, (querySnapshot) => {
-                const familyEvents = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                
-                // Fusionner avec les événements personnels
-                allEvents = [...allEvents.filter(e => e.userId), ...familyEvents];
-                setEvents(allEvents);
-                setLoading(false);
-            }, (error) => {
-                console.error("Error fetching family events:", error);
-            });
-            
-            unsubscribers.push(unsubFamily);
-        }
-    } else {
-        setLoading(false);
-    }
+    // Les événements familiaux ne doivent pas apparaître dans l'agenda professionnel
+    // Le professionnel ne voit que ses événements personnels
 
     return () => {
         unsubscribers.forEach(unsub => unsub());
     };
-  }, [families, selectedFamilyId]);
+  }, []);
 
   // Load appointments for professional
   useEffect(() => {
