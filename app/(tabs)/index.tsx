@@ -272,7 +272,6 @@ export default function HomeScreen() {
                   >
                     <Text style={[styles.rowCardText, { color: colors.textSecondary }]}>{event.title}</Text>
                     <View style={styles.eventMetaRow}>
-                      {event.location ? <Text style={[styles.eventLocation, { color: colors.tint }]}>{event.location}</Text> : null}
                       <Text style={[styles.rowCardDate, { color: colors.tint }]}>
                         {event.date?.toDate().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                       </Text>
@@ -285,6 +284,7 @@ export default function HomeScreen() {
                         }
                       </Text>
                     </View>
+                    {event.location ? <Text style={[styles.eventLocation, { color: colors.tint }]}>{event.location}</Text> : null}
                   </TouchableOpacity>
                 ))}
                 {events.length > 3 && (
@@ -459,12 +459,14 @@ const styles = StyleSheet.create({
   eventMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.medium,
+    gap: SPACING.small,
+    marginBottom: V_SPACING.tiny,
   },
   rowCardDate: { fontSize: FONT_SIZES.small, fontWeight: '600' },
   eventLocation: {
     fontSize: FONT_SIZES.small,
     fontWeight: '600',
+    marginTop: V_SPACING.tiny,
   },
   eventTime: {
     fontSize: FONT_SIZES.small,
