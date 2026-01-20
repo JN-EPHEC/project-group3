@@ -74,6 +74,9 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "EXPO_PUBLIC_API_URL": "https://momentously-involucral-hal.ngrok-free.dev"
     }
   }
 }
