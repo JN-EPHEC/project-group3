@@ -927,6 +927,12 @@ export async function updateUserSubscriptionInfo(uid, subscriptionData) {
   try {
     const userRef = doc(db, 'users', uid);
     
+    // S'assurer que le document existe, sinon le créer avant update
+    const snap = await getDoc(userRef);
+    if (!snap.exists()) {
+      await setDoc(userRef, { uid }, { merge: true });
+    }
+
     await updateDoc(userRef, {
       stripeCustomerId: subscriptionData.stripeCustomerId || null,
       subscriptionId: subscriptionData.subscriptionId || null,

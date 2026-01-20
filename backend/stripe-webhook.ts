@@ -29,10 +29,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 /**
- * POST /webhook/stripe
- * Endpoint pour recevoir les événements Stripe
+ * Handler partagé pour les webhooks Stripe (alias /webhook/stripe et /api/webhook)
  */
-app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+const handleStripeWebhook = async (req: express.Request, res: express.Response) => {
   const sig = req.headers['stripe-signature'];
 
   let event: Stripe.Event;
@@ -83,7 +82,17 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
     console.error('Error handling webhook:', error);
     res.status(500).json({ error: error.message });
   }
-});
+};
+
+/**
+ * POST /webhook/stripe (chemin historique)
+ */
+app.post('/webhook/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook);
+
+/**
+ * POST /api/webhook (alias utilisé par certains environnements)
+ */
+app.post('/api/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 
 /**
  * Checkout Session terminée avec succès
@@ -92,9 +101,23 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
   console.log('💳 Checkout completed:', session.id);
 
-  const userId = session.metadata?.userId;
+  // Essayer de récupérer le userId de la session.metadata
+  let userId = session.metadata?.userId;
+
+  // Si pas de userId dans session metadata, récupérer depuis customer metadata
+  if (!userId && session.customer) {
+    console.log('🔍 No userId in session metadata, fetching from customer...');
+    try {
+      const customer = await stripe.customers.retrieve(session.customer as string) as Stripe.Customer;
+      userId = customer.metadata?.userId;
+      console.log('✅ userId retrieved from customer metadata:', userId);
+    } catch (error) {
+      console.error('❌ Error fetching customer:', error);
+    }
+  }
+
   if (!userId) {
-    console.error('❌ No userId in session metadata');
+    console.error('❌ No userId found in session or customer metadata');
     return;
   }
 
@@ -146,9 +169,20 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   console.log('📝 Subscription created:', subscription.id);
 
-  const userId = subscription.metadata?.userId;
+  let userId = subscription.metadata?.userId;
+  
+  // Si pas de userId dans subscription metadata, essayer de le récupérer depuis customer
+  if (!userId && subscription.customer) {
+    try {
+      const customer = await stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer;
+      userId = customer.metadata?.userId;
+    } catch (error) {
+      console.error('Error fetching customer for subscription:', error);
+    }
+  }
+  
   if (!userId) {
-    console.error('❌ No userId in subscription metadata');
+    console.error('❌ No userId found in subscription or customer metadata');
     return;
   }
 
@@ -174,9 +208,20 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log('🔄 Subscription updated:', subscription.id);
 
-  const userId = subscription.metadata?.userId;
+  let userId = subscription.metadata?.userId;
+  
+  // Si pas de userId dans subscription metadata, essayer de le récupérer depuis customer
+  if (!userId && subscription.customer) {
+    try {
+      const customer = await stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer;
+      userId = customer.metadata?.userId;
+    } catch (error) {
+      console.error('Error fetching customer for subscription:', error);
+    }
+  }
+  
   if (!userId) {
-    console.error('❌ No userId in subscription metadata');
+    console.error('❌ No userId found in subscription or customer metadata');
     return;
   }
 
@@ -205,9 +250,20 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log('❌ Subscription deleted:', subscription.id);
 
-  const userId = subscription.metadata?.userId;
+  let userId = subscription.metadata?.userId;
+  
+  // Si pas de userId dans subscription metadata, essayer de le récupérer depuis customer
+  if (!userId && subscription.customer) {
+    try {
+      const customer = await stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer;
+      userId = customer.metadata?.userId;
+    } catch (error) {
+      console.error('Error fetching customer for subscription:', error);
+    }
+  }
+  
   if (!userId) {
-    console.error('❌ No userId in subscription metadata');
+    console.error('❌ No userId found in subscription or customer metadata');
     return;
   }
 
@@ -263,11 +319,16 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   console.log('✅ Invoice paid:', invoice.id);
 
   const customerId = invoice.customer as string;
+  if (!customerId) {
+    console.error('❌ No customerId in invoice');
+    return;
+  }
+
   const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
-  const userId = customer.metadata?.userId;
+  let userId = customer.metadata?.userId;
 
   if (!userId) {
-    console.error('❌ No userId in customer metadata');
+    console.error('❌ No userId in customer metadata for invoice:', invoice.id);
     return;
   }
 

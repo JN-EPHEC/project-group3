@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '../constants/stripeConfig';
 import { StripeService } from '../constants/stripeService';
+import { syncUserSubscriptionFromStripe } from '../constants/subscriptionSync';
 
 export default function SubscriptionScreen() {
   const router = useRouter();
@@ -39,12 +40,13 @@ export default function SubscriptionScreen() {
         console.log('🎉 Paiement réussi détecté (Web)! Session ID:', sessionId);
         setIsRedirecting(true);
         
-        // Nettoyer l'URL
+        // Nettoyer l'URL (évite de rejouer le flux au refresh)
         window.history.replaceState({}, '', '/subscription');
-        
-        // Attendre que la navigation soit prête puis rediriger
-        const timer = setTimeout(() => {
+
+        // Forcer la synchro depuis Stripe avant de rediriger (utile sans webhook en local)
+        const timer = setTimeout(async () => {
           try {
+            await syncUserSubscriptionFromStripe();
             router.replace('/(tabs)/');
             
             // Afficher le message après redirection

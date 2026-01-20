@@ -125,8 +125,16 @@ export function useStripeDeepLinks() {
       const auth = getAuth();
       const user = auth.currentUser;
 
+      // Sur web, le deep link peut arriver avant que Firebase Auth soit prêt.
+      // Dans ce cas, on évite de bloquer : on continue sans update Firestore.
       if (!user) {
-        throw new Error('User not authenticated');
+        console.warn('Payment success detected but user not authenticated yet. Skipping Firestore update.');
+        Alert.alert(
+          'Paiement confirmé',
+          "Votre abonnement est en cours d'activation. Veuillez patienter quelques secondes puis revenir.",
+          [{ text: 'OK', onPress: () => router.push('/(tabs)/') }]
+        );
+        return;
       }
 
       // Mettre à jour Firestore (le webhook le fera aussi, mais c'est un backup)

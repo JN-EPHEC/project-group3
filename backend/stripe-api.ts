@@ -104,6 +104,16 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
     if (existingCustomers.data.length > 0) {
       customer = existingCustomers.data[0];
+      
+      // Vérifier si le userId est déjà dans les métadonnées du customer
+      if (!customer.metadata?.userId) {
+        console.log('🔄 Updating existing customer with userId metadata...');
+        customer = await stripe.customers.update(customer.id, {
+          metadata: {
+            userId: userId,
+          },
+        });
+      }
     } else {
       customer = await stripe.customers.create({
         email: userEmail,
