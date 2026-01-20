@@ -16,6 +16,7 @@ import express from 'express';
 import path from 'path';
 import Stripe from 'stripe';
 import { db } from './firebase-admin';
+import { handleStripeWebhook } from './stripe-webhook';
 
 // Charger les variables d'environnement depuis la racine du projet
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
