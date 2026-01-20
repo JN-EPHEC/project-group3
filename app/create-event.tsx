@@ -2,7 +2,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Stack, useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, getUserFamily } from '../constants/firebase';
 import { Colors } from '../constants/theme';
 
@@ -11,6 +11,9 @@ export default function CreateEventScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const scrollRef = useRef<ScrollView>(null);
+  const [descriptionY, setDescriptionY] = useState(0);
+  const [locationY, setLocationY] = useState(0);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
@@ -303,9 +306,19 @@ export default function CreateEventScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.container}>
-            <View style={styles.form}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+        >
+          <ScrollView
+            style={styles.scrollView}
+            keyboardShouldPersistTaps="handled"
+            contentInsetAdjustmentBehavior="automatic"
+            ref={scrollRef}
+          >
+            <View style={styles.container}>
+              <View style={styles.form}>
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: colors.text }]}>Titre *</Text>
                 <TextInput 
@@ -319,6 +332,10 @@ export default function CreateEventScreen() {
                     }
                   }} 
                   placeholderTextColor={colors.textSecondary} 
+                  onFocus={() => {
+                    // Scroll a bit to keep the field visible
+                    scrollRef.current?.scrollTo({ y: 0, animated: true });
+                  }}
                 />
                 {titleError ? <Text style={styles.errorText}>{titleError}</Text> : null}
               </View>
@@ -395,12 +412,25 @@ export default function CreateEventScreen() {
                 </>
               )}
 
-              <View style={styles.inputGroup}>
+              <View style={styles.inputGroup} onLayout={(e) => setDescriptionY(e.nativeEvent.layout.y)}>
                 <Text style={[styles.label, { color: colors.text }]}>Description</Text>
-                <TextInput style={[styles.input, styles.textArea, { backgroundColor: colors.cardBackground, color: colors.text }]} placeholder="Ajouter une description..." value={description} onChangeText={setDescription} multiline numberOfLines={4} textAlignVertical="top" placeholderTextColor={colors.textSecondary} />
+                <TextInput
+                  style={[styles.input, styles.textArea, { backgroundColor: colors.cardBackground, color: colors.text }]}
+                  placeholder="Ajouter une description..."
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  placeholderTextColor={colors.textSecondary}
+                  onFocus={() => {
+                    // Scroll to the description field position
+                    scrollRef.current?.scrollTo({ y: Math.max(0, descriptionY - 80), animated: true });
+                  }}
+                />
               </View>
 
-              <View style={styles.inputGroup}>
+              <View style={styles.inputGroup} onLayout={(e) => setLocationY(e.nativeEvent.layout.y)}>
                 <Text style={[styles.label, { color: colors.text }]}>Lieu</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text }]}
@@ -408,6 +438,10 @@ export default function CreateEventScreen() {
                   value={location}
                   onChangeText={setLocation}
                   placeholderTextColor={colors.textSecondary}
+                  onFocus={() => {
+                    // Scroll to the location field position
+                    scrollRef.current?.scrollTo({ y: Math.max(0, locationY - 80), animated: true });
+                  }}
                 />
               </View>
 
@@ -419,9 +453,10 @@ export default function CreateEventScreen() {
                   <Text style={styles.createButtonText}>{loading ? 'Création...' : 'Créer'}</Text>
                 </TouchableOpacity>
               </View>
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
         <Modal visible={showDatePicker} transparent={true} animationType="slide" onShow={() => {
           setTimeout(() => {
