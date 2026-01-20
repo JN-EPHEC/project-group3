@@ -35,13 +35,16 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 app.use(cors({
   origin: strictCors ? allowedOrigins : true, // true = reflet origin
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature', 'ngrok-skip-browser-warning'],
   credentials: true,
   optionsSuccessStatus: 200,
 }));
 
 // Pré-vol (OPTIONS)
-app.options('*', cors({ origin: strictCors ? allowedOrigins : true }));
+app.options('*', cors({ 
+  origin: strictCors ? allowedOrigins : true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature', 'ngrok-skip-browser-warning'],
+}));
 app.use(express.json());
 
 // Health check

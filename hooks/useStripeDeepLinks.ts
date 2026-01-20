@@ -3,8 +3,9 @@
  * À intégrer dans _layout.tsx ou le composant principal
  */
 
+import { syncUserSubscriptionFromStripe } from '@/constants/subscriptionSync';
 import { useRouter } from 'expo-router';
-import { getAuth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, getFirestore, updateDoc } from 'firebase/firestore';
 import { useEffect } from 'react';
 import { Alert, Linking } from 'react-native';
@@ -123,49 +124,71 @@ export function useStripeDeepLinks() {
   const handlePaymentSuccess = async (sessionId: string) => {
     try {
       const auth = getAuth();
+      const db = getFirestore();
+
+      const finalize = async (uid: string) => {
+        const userRef = doc(db, 'users', uid);
+        const userDoc = await getDoc(userRef);
+        const userData = userDoc.data();
+        const userType = userData?.userType || 'parent';
+
+        await updateDoc(userRef, {
+          stripeSessionId: sessionId,
+          subscriptionStatus: 'trialing',
+          updatedAt: new Date(),
+        });
+
+        // Forcer une synchro depuis Stripe (utile en local si webhooks absents)
+        await syncUserSubscriptionFromStripe();
+
+        const homeRoute = userType === 'professionnel' ? '/(pro-tabs)/' : '/(tabs)/';
+        Alert.alert(
+          '🎉 Bienvenue Premium !',
+          'Votre essai gratuit de 30 jours a commencé. Profitez de toutes les fonctionnalités premium !',
+          [
+            {
+              text: 'Commencer',
+              onPress: () => router.push(homeRoute),
+            },
+          ]
+        );
+      };
+
       const user = auth.currentUser;
 
       // Sur web, le deep link peut arriver avant que Firebase Auth soit prêt.
-      // Dans ce cas, on évite de bloquer : on continue sans update Firestore.
       if (!user) {
-        console.warn('Payment success detected but user not authenticated yet. Skipping Firestore update.');
+        console.warn('Payment success detected but user not authenticated yet. Waiting for auth…');
         Alert.alert(
           'Paiement confirmé',
-          "Votre abonnement est en cours d'activation. Veuillez patienter quelques secondes puis revenir.",
-          [{ text: 'OK', onPress: () => router.push('/(tabs)/') }]
+          "Votre abonnement est en cours d'activation. Veuillez patienter quelques secondes...",
+          [{ text: 'OK' }]
         );
-        return;
+
+        return new Promise<void>((resolve) => {
+          const unsubscribe = onAuthStateChanged(auth, async (u) => {
+            if (u) {
+              unsubscribe();
+              try {
+                await finalize(u.uid);
+              } catch (e) {
+                console.error('Error finalizing after auth ready:', e);
+              }
+              resolve();
+            }
+          });
+
+          // Sécurité : si après 8s aucun user, on sort et on redirige
+          setTimeout(() => {
+            unsubscribe();
+            console.warn('Auth not ready after payment; please refresh and reconnect.');
+            router.push('/(tabs)/');
+            resolve();
+          }, 8000);
+        });
       }
 
-      // Mettre à jour Firestore (le webhook le fera aussi, mais c'est un backup)
-      const db = getFirestore();
-      const userRef = doc(db, 'users', user.uid);
-      
-      // Récupérer les infos utilisateur pour déterminer le type
-      const userDoc = await getDoc(userRef);
-      const userData = userDoc.data();
-      const userType = userData?.userType || 'parent';
-      
-      await updateDoc(userRef, {
-        stripeSessionId: sessionId,
-        subscriptionStatus: 'trialing',
-        updatedAt: new Date(),
-      });
-
-      // Déterminer la route d'accueil selon le type d'utilisateur
-      const homeRoute = userType === 'professionnel' ? '/(pro-tabs)/' : '/(tabs)/';
-
-      // Afficher un message de succès
-      Alert.alert(
-        '🎉 Bienvenue Premium !',
-        'Votre essai gratuit de 30 jours a commencé. Profitez de toutes les fonctionnalités premium !',
-        [
-          {
-            text: 'Commencer',
-            onPress: () => router.push(homeRoute),
-          },
-        ]
-      );
+      await finalize(user.uid);
 
     } catch (error: any) {
       console.error('Error handling payment success:', error);
