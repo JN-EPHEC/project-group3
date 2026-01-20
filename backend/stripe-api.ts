@@ -253,15 +253,38 @@ app.get('/api/subscription-status/:userId', async (req, res) => {
       limit: 1,
     });
 
-    if (customers.data.length === 0) {
+    let customer = customers.data[0];
+
+    // ✅ Fallback: certains anciens clients n'ont pas encore userId en metadata -> rechercher par email Firestore
+    if (!customer) {
+      const userSnap = await db.collection('users').doc(userId).get();
+      const userEmail = userSnap.exists ? (userSnap.data()?.email || userSnap.data()?.userEmail) : undefined;
+
+      if (userEmail) {
+        const byEmail = await stripe.customers.list({ email: userEmail, limit: 1 });
+        if (byEmail.data.length) {
+          customer = byEmail.data[0];
+
+          // Mettre à jour les métadonnées pour les prochaines requêtes
+          if (!customer.metadata?.userId) {
+            await stripe.customers.update(customer.id, {
+              metadata: {
+                ...customer.metadata,
+                userId,
+              },
+            });
+          }
+        }
+      }
+    }
+
+    if (!customer) {
       return res.json({
         hasActiveSubscription: false,
         subscription: null,
         stripeCustomerId: null,
       });
     }
-
-    const customer = customers.data[0];
 
     // Récupérer les abonnements actifs ou en période d'essai
     const subscriptions = await stripe.subscriptions.list({

@@ -226,34 +226,49 @@ export class StripeService {
   }
 
   /**
-   * Vérifie le statut d'abonnement de l'utilisateur
+   * Récupère les détails complets du statut d'abonnement
+   * Utilisé par Profil.tsx et manage-subscription.tsx
    */
-  static async getSubscriptionStatus(userId: string): Promise<SubscriptionStatus> {
+  static async getSubscriptionStatus(userId: string) {
     try {
-      const response = await fetch(`${this.apiUrl}/api/subscription-status/${userId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
-      });
+      const userDocRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userDocRef);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch subscription status');
+      if (!userDoc.exists()) {
+        return { hasActiveSubscription: false, subscription: null, stripeCustomerId: null };
       }
 
-      return await response.json();
+      const userData = userDoc.data();
+      const now = Date.now() / 1000;
 
-    } catch (error: any) {
-      // Ajoute des détails utiles pour le debug sur appareil réel
-      console.error('[StripeService] Error fetching subscription status:', error);
-      console.error('[StripeService] API URL used:', this.apiUrl);
-      console.warn('[StripeService] Conseils:');
-      console.warn(' - Vérifiez que le backend tourne: cd backend && npm run dev');
-      console.warn(' - Depuis votre iPhone, ouvrez Safari: http://<IP_PC>:3000/health');
-      console.warn(' - Si inaccessible, désactivez/autorisez le pare-feu Windows pour Node.js (port 3000)');
-      console.warn(' - Ou définissez EXPO_PUBLIC_API_URL sur une URL accessible (LAN ou ngrok https)');
-      throw error;
+      // 1. Vérification du statut (accepter 'active' ET 'trialing')
+      const status = userData.subscriptionStatus;
+      const isActiveStatus = status === 'active' || status === 'trialing';
+
+      // 2. Vérification des dates (Fin de période OU Fin d'essai)
+      const currentPeriodEnd = userData.currentPeriodEnd?.seconds || 0;
+      const trialEnd = userData.trialEnd?.seconds || 0;
+      
+      const isDateValid = currentPeriodEnd > now || trialEnd > now;
+
+      // Résultat final
+      const hasActiveSubscription = isActiveStatus && isDateValid;
+
+      return {
+        hasActiveSubscription,
+        stripeCustomerId: userData.stripeCustomerId,
+        subscription: {
+          id: userData.subscriptionId,
+          status: status,
+          currentPeriodEnd: currentPeriodEnd, // Renvoie 0 si null, géré par le front
+          trialEnd: trialEnd,                 // Important pour l'affichage "Essai"
+          cancelAtPeriodEnd: userData.cancelAtPeriodEnd || false
+        }
+      };
+
+    } catch (error) {
+      console.error('Error getting subscription status:', error);
+      return { hasActiveSubscription: false, subscription: null, stripeCustomerId: null };
     }
   }
 
