@@ -3,7 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import { addDoc, collection, doc, getDoc, getDocs, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { auth, db, getUserFamily } from '../constants/firebase';
+import { auth, db, getUserFamilies } from '../constants/firebase';
 import { Colors } from '../constants/theme';
 
 
@@ -38,7 +38,12 @@ export default function CreateEventScreen() {
   const [allParents, setAllParents] = useState<any[]>([]);
   const [selectedParents, setSelectedParents] = useState<string[]>([]);
   const [showParentPicker, setShowParentPicker] = useState(false);
-  const [familyName, setFamilyName] = useState('');
+  
+  // State for family selection
+  const [allFamilies, setAllFamilies] = useState<any[]>([]);
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
+  const [familyName, setFamilyName] = useState<string>('');
+  const [showFamilyPicker, setShowFamilyPicker] = useState(false);
 
   const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -67,18 +72,24 @@ export default function CreateEventScreen() {
   ];
 
   useEffect(() => {
-    const fetchChildren = async () => {
+    const fetchFamiliesAndChildren = async () => {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
 
       try {
-        const family = await getUserFamily(currentUser.uid);
-        if (family?.id) {
-          const familyDoc = await getDoc(doc(db, 'families', family.id));
+        // Charger toutes les familles de l'utilisateur
+        const families = await getUserFamilies(currentUser.uid);
+        setAllFamilies(families);
+        
+        // Sélectionner la première famille par défaut
+        if (families.length > 0) {
+          const defaultFamily = families[0];
+          setSelectedFamilyId(defaultFamily.id);
+          
+          const familyDoc = await getDoc(doc(db, 'families', defaultFamily.id));
           if (familyDoc.exists()) {
             const familyData = familyDoc.data();
             setChildren(familyData.children || []);
-            setFamilyName(familyData.name || '');
             // Sélectionner tous les enfants par défaut
             if (familyData.children && familyData.children.length > 0) {
               setSelectedChildren(familyData.children.map((child: any) => child.id));
@@ -90,7 +101,7 @@ export default function CreateEventScreen() {
           
           // Approach 1: Query by familyIds (array field)
           const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('familyIds', 'array-contains', family.id));
+          const q = query(usersRef, where('familyIds', 'array-contains', defaultFamily.id));
           const querySnapshot = await getDocs(q);
           parentsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           
@@ -120,12 +131,76 @@ export default function CreateEventScreen() {
           }
         }
       } catch (error) {
-        console.error('Error fetching children:', error);
+        console.error('Error fetching families and children:', error);
       }
     };
 
-    fetchChildren();
+    fetchFamiliesAndChildren();
   }, []);
+
+  // Reload children and parents when selected family changes
+  useEffect(() => {
+    if (selectedFamilyId && allFamilies.length > 0) {
+      const loadFamilyData = async () => {
+        try {
+          const currentUser = auth.currentUser;
+          if (!currentUser) return;
+
+          const selectedFamily = allFamilies.find(f => f.id === selectedFamilyId);
+          if (!selectedFamily) return;
+
+          setFamilyName(selectedFamily.name || '');
+
+          // Fetch family document to get children and members
+          const familyDoc = await getDoc(doc(db, 'families', selectedFamilyId));
+          if (familyDoc.exists()) {
+            const familyData = familyDoc.data();
+            
+            // Set children (they are already objects with id)
+            setChildren(familyData.children || []);
+            
+            // Select all children by default
+            if (familyData.children && Array.isArray(familyData.children) && familyData.children.length > 0) {
+              setSelectedChildren(familyData.children.map((child: any) => child.id));
+            } else {
+              setSelectedChildren([]);
+            }
+
+            // Fetch parents from the family
+            let parentsList: any[] = [];
+            
+            // Query by familyIds
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('familyIds', 'array-contains', selectedFamilyId));
+            const querySnapshot = await getDocs(q);
+            parentsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Fallback: get from family.members field
+            if (parentsList.length === 0 && familyData.members && Array.isArray(familyData.members)) {
+              for (const memberId of familyData.members) {
+                try {
+                  const memberDoc = await getDoc(doc(db, 'users', memberId));
+                  if (memberDoc.exists()) {
+                    parentsList.push({ id: memberId, ...memberDoc.data() });
+                  }
+                } catch (e) {
+                  console.error('Error fetching member:', memberId, e);
+                }
+              }
+            }
+            
+            setAllParents(parentsList);
+            
+            // Select current user by default
+            setSelectedParents([currentUser.uid]);
+          }
+        } catch (error) {
+          console.error('Error loading family data:', error);
+        }
+      };
+      loadFamilyData();
+    }
+  }, [selectedFamilyId]);
 
   const handleCreateEvent = async () => {
     if (!title.trim()) {
@@ -150,10 +225,8 @@ export default function CreateEventScreen() {
         return;
       }
 
-      const family = await getUserFamily(currentUser.uid);
-      
-      if (!family?.id) {
-        Alert.alert('Erreur', 'Vous devez appartenir à une famille pour créer un événement');
+      if (!selectedFamilyId) {
+        Alert.alert('Erreur', 'Veuillez sélectionner une famille pour créer un événement');
         return;
       }
       
@@ -173,7 +246,7 @@ export default function CreateEventScreen() {
         isAllDay: isAllDay,
         category: category,
         userID: currentUser.uid,
-        familyId: family.id,
+        familyId: selectedFamilyId,
         childrenIds: selectedChildren,
         parentIds: selectedParents,
         createdAt: Timestamp.now(),
@@ -340,14 +413,17 @@ export default function CreateEventScreen() {
                 {titleError ? <Text style={styles.errorText}>{titleError}</Text> : null}
               </View>
 
-              {familyName && (
+              {allFamilies.length > 1 && (
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.label, { color: colors.text }]}>Famille</Text>
-                  <TextInput 
-                    style={[styles.input, { backgroundColor: colors.cardBackground, color: colors.text, opacity: 0.7 }]}
-                    value={familyName}
-                    editable={false}
-                  />
+                  <Text style={[styles.label, { color: colors.text }]}>Famille *</Text>
+                  <TouchableOpacity 
+                    style={[styles.dateButton, { backgroundColor: colors.cardBackground }]} 
+                    onPress={() => setShowFamilyPicker(true)}
+                  >
+                    <Text style={[styles.dateButtonText, { color: colors.text }]}>
+                      {familyName || 'Sélectionner une famille'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
@@ -711,6 +787,33 @@ export default function CreateEventScreen() {
                 ))}
               </ScrollView>
               <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground, marginTop: 20 }]} onPress={() => setShowParentPicker(false)}>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Fermer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={showFamilyPicker} transparent={true} animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Sélectionner une famille</Text>
+              <ScrollView style={{ maxHeight: 300, marginBottom: 10 }}>
+                {allFamilies.map((family: any) => (
+                  <TouchableOpacity
+                    key={family.id}
+                    style={[styles.childItem, { backgroundColor: colors.cardBackground }]}
+                    onPress={() => {
+                      setSelectedFamilyId(family.id);
+                      setFamilyName(family.name || '');
+                      setShowFamilyPicker(false);
+                    }}
+                  >
+                    <Text style={[styles.childName, { color: colors.text }]}>{family.name}</Text>
+                    {selectedFamilyId === family.id && <Text style={styles.checkMark}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity style={[styles.modalCancelButton, { backgroundColor: colors.cardBackground, marginTop: 20 }]} onPress={() => setShowFamilyPicker(false)}>
                 <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Fermer</Text>
               </TouchableOpacity>
             </View>
