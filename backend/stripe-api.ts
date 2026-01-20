@@ -46,6 +46,23 @@ app.options('*', cors({
   origin: strictCors ? allowedOrigins : true,
   allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature', 'ngrok-skip-browser-warning'],
 }));
+// ... (code existant CORS)
+
+app.options('*', cors({ 
+  origin: strictCors ? allowedOrigins : true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature', 'ngrok-skip-browser-warning'],
+}));
+
+// --- DÉBUT AJOUT ---
+// IMPORTANT : Les routes Webhook doivent être définies AVANT express.json()
+// Utilisez express.raw() pour que Stripe puisse vérifier la signature binaire
+app.post('/webhook/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook);
+app.post('/api/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
+// --- FIN AJOUT ---
+
+app.use(express.json());
+
+// ... (reste du code /health, etc.)
 app.use(express.json());
 
 // Health check

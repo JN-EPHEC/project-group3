@@ -1,13 +1,5 @@
 /**
- * Gestionnaire de Webhook Stripe
- * Configure l'URL dans : Stripe Dashboard → Developers → Webhooks
- * 
- * Événements à écouter :
- * - checkout.session.completed
- * - customer.subscription.created
- * - customer.subscription.updated
- * - customer.subscription.deleted
- * - invoice.payment_failed
+ * Gestionnaire de Webhook Stripe - Version Blindée contre les Dates Invalides
  */
 
 import dotenv from 'dotenv';
@@ -16,341 +8,218 @@ import path from 'path';
 import Stripe from 'stripe';
 import { dateToTimestamp, db, timestamp } from './firebase-admin';
 
-// Charger les variables d'environnement depuis la racine du projet
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
-const app = express();
-
-// Configuration Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-02-24.acacia',
 });
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
-/**
- * Handler partagé pour les webhooks Stripe (alias /webhook/stripe et /api/webhook)
- */
-const handleStripeWebhook = async (req: express.Request, res: express.Response) => {
+export const handleStripeWebhook = async (req: express.Request, res: express.Response) => {
   const sig = req.headers['stripe-signature'];
-
   let event: Stripe.Event;
 
   try {
-    // Vérifier la signature du webhook
-    event = stripe.webhooks.constructEvent(req.body, sig!, webhookSecret);
+    if (!sig || !webhookSecret) throw new Error('Missing Stripe signature or Webhook Secret');
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err: any) {
     console.error('⚠️ Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  console.log('✅ Event received:', event.type);
+  // Log concis pour éviter de polluer
+  console.log(`📨 Webhook: ${event.type}`);
 
-  // Traiter les différents types d'événements
   try {
     switch (event.type) {
       case 'checkout.session.completed':
         await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
         break;
-
       case 'customer.subscription.created':
         await handleSubscriptionCreated(event.data.object as Stripe.Subscription);
         break;
-
       case 'customer.subscription.updated':
         await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
         break;
-
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
-
       case 'invoice.payment_failed':
         await handlePaymentFailed(event.data.object as Stripe.Invoice);
         break;
-
       case 'invoice.paid':
         await handleInvoicePaid(event.data.object as Stripe.Invoice);
         break;
-
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        break;
     }
-
     res.json({ received: true });
   } catch (error: any) {
-    console.error('Error handling webhook:', error);
-    res.status(500).json({ error: error.message });
+    console.error('❌ Error handling webhook logic:', error);
+    res.json({ received: true, error: error.message });
   }
 };
 
-/**
- * POST /webhook/stripe (chemin historique)
- */
-app.post('/webhook/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook);
+// --- Helper de Sécurité (La correction est ICI) ---
 
 /**
- * POST /api/webhook (alias utilisé par certains environnements)
+ * Convertit un timestamp Stripe (secondes) en Timestamp Firestore de manière sécurisée.
+ * Renvoie null si la date est invalide, évitant le crash "valid integer".
  */
-app.post('/api/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
+function safeDateToTimestamp(seconds: number | null | undefined) {
+  if (typeof seconds !== 'number') return null;
+  
+  const ms = seconds * 1000;
+  if (isNaN(ms)) return null;
 
-/**
- * Checkout Session terminée avec succès
- * Enregistre le client Stripe et initialise l'abonnement
- */
-async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  console.log('💳 Checkout completed:', session.id);
+  const date = new Date(ms);
+  // Vérifie si la date est valide (getTime ne renvoie pas NaN)
+  if (isNaN(date.getTime())) {
+      console.warn(`⚠️ Date invalide reçue de Stripe: ${seconds}`);
+      return null;
+  }
 
-  // Essayer de récupérer le userId de la session.metadata
-  let userId = session.metadata?.userId;
+  try {
+    return dateToTimestamp(date);
+  } catch (e) {
+    console.error('⚠️ Erreur conversion dateToTimestamp:', e);
+    return null;
+  }
+}
 
-  // Si pas de userId dans session metadata, récupérer depuis customer metadata
-  if (!userId && session.customer) {
-    console.log('🔍 No userId in session metadata, fetching from customer...');
-    try {
-      const customer = await stripe.customers.retrieve(session.customer as string) as Stripe.Customer;
-      userId = customer.metadata?.userId;
-      console.log('✅ userId retrieved from customer metadata:', userId);
-    } catch (error) {
-      console.error('❌ Error fetching customer:', error);
+// Fonction pour récupérer l'ID utilisateur de manière robuste
+async function getUserIdFromCustomer(customerOrId: string | Stripe.Customer | Stripe.DeletedCustomer | null): Promise<string | undefined> {
+  if (!customerOrId) return undefined;
+  
+  if (typeof customerOrId !== 'string' && 'metadata' in customerOrId && customerOrId.metadata?.userId) {
+    return customerOrId.metadata.userId;
+  }
+
+  const customerId = typeof customerOrId === 'string' ? customerOrId : customerOrId.id;
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    if (!customer.deleted && customer.metadata?.userId) {
+      return customer.metadata.userId;
     }
+  } catch (e) {
+    console.error('Error retrieving customer:', e);
   }
+  return undefined;
+}
 
-  if (!userId) {
-    console.error('❌ No userId found in session or customer metadata');
-    return;
-  }
+// --- Handlers ---
 
-  // Créer ou mettre à jour l'utilisateur dans Firestore
-  const userRef = db.collection('users').doc(userId);
-  const userDoc = await userRef.get();
+async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+  let userId = session.metadata?.userId || await getUserIdFromCustomer(session.customer);
+  if (!userId) return;
 
-  // Si l'utilisateur n'existe pas, le créer
-  if (!userDoc.exists) {
-    console.log(`📝 Créant nouvel utilisateur: ${userId}`);
-    await userRef.set({
-      uid: userId,
-      createdAt: timestamp(),
-    });
-  }
-
-  // Mettre à jour avec les informations Stripe
   const updateData: any = {
-    stripeCustomerId: session.customer,
+    uid: userId,
+    stripeCustomerId: typeof session.customer === 'string' ? session.customer : session.customer?.id,
     subscriptionUpdatedAt: timestamp(),
   };
 
-  // Si c'est un abonnement, ajouter les infos
   if (session.subscription) {
     updateData.subscriptionId = session.subscription;
-    
-    // Récupérer les détails de l'abonnement
-    const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-    
-    updateData.subscriptionStatus = subscription.status;
-    updateData.currentPeriodEnd = dateToTimestamp(new Date(subscription.current_period_end * 1000));
-    updateData.cancelAtPeriodEnd = subscription.cancel_at_period_end || false;
-    updateData.lastPaymentFailed = false;
-    
-    if (subscription.trial_end) {
-      updateData.trialEnd = dateToTimestamp(new Date(subscription.trial_end * 1000));
-    }
+    const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+    updateData.subscriptionStatus = sub.status;
+    // Utilisation du helper sécurisé
+    updateData.currentPeriodEnd = safeDateToTimestamp(sub.current_period_end);
+    updateData.trialEnd = safeDateToTimestamp(sub.trial_end);
+    updateData.cancelAtPeriodEnd = sub.cancel_at_period_end || false;
   }
 
-  await userRef.update(updateData);
-
-  console.log(`✅ User ${userId} subscription started`);
+  await db.collection('users').doc(userId).set(updateData, { merge: true });
+  console.log(`✅ User ${userId} updated after checkout`);
 }
 
-/**
- * Abonnement créé
- * Enregistre les détails de l'abonnement dans Firestore
- */
-async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
-  console.log('📝 Subscription created:', subscription.id);
+async function handleSubscriptionCreated(sub: Stripe.Subscription) {
+  let userId = sub.metadata?.userId || await getUserIdFromCustomer(sub.customer);
+  if (!userId) { 
+      console.error('❌ Sub Created: userId introuvable'); 
+      return; 
+  }
 
-  let userId = subscription.metadata?.userId;
-  
-  // Si pas de userId dans subscription metadata, essayer de le récupérer depuis customer
-  if (!userId && subscription.customer) {
-    try {
-      const customer = await stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer;
-      userId = customer.metadata?.userId;
-    } catch (error) {
-      console.error('Error fetching customer for subscription:', error);
-    }
-  }
-  
-  if (!userId) {
-    console.error('❌ No userId found in subscription or customer metadata');
-    return;
-  }
+  console.log(`📝 Traitement Sub Created pour ${userId}. Fin: ${sub.current_period_end}`);
 
   const updateData: any = {
-    subscriptionId: subscription.id,
-    subscriptionStatus: subscription.status,
-    currentPeriodEnd: dateToTimestamp(new Date(subscription.current_period_end * 1000)),
-    trialEnd: subscription.trial_end ? dateToTimestamp(new Date(subscription.trial_end * 1000)) : null,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
+    uid: userId,
+    subscriptionId: sub.id,
+    subscriptionStatus: sub.status,
+    // Utilisation du helper sécurisé
+    currentPeriodEnd: safeDateToTimestamp(sub.current_period_end),
+    trialEnd: safeDateToTimestamp(sub.trial_end),
+    cancelAtPeriodEnd: sub.cancel_at_period_end || false,
     lastPaymentFailed: false,
     subscriptionUpdatedAt: timestamp(),
   };
 
-  await db.collection('users').doc(userId).update(updateData);
-
-  console.log(`✅ User ${userId} subscription created: ${subscription.id}`);
+  await db.collection('users').doc(userId).set(updateData, { merge: true });
+  console.log(`✅ User ${userId} subscription created: ${sub.status}`);
 }
 
-/**
- * Abonnement mis à jour
- * Synchronise les changements (renouvellement, changement de plan, résiliation, etc.)
- */
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  console.log('🔄 Subscription updated:', subscription.id);
-
-  let userId = subscription.metadata?.userId;
-  
-  // Si pas de userId dans subscription metadata, essayer de le récupérer depuis customer
-  if (!userId && subscription.customer) {
-    try {
-      const customer = await stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer;
-      userId = customer.metadata?.userId;
-    } catch (error) {
-      console.error('Error fetching customer for subscription:', error);
-    }
-  }
-  
-  if (!userId) {
-    console.error('❌ No userId found in subscription or customer metadata');
-    return;
-  }
+async function handleSubscriptionUpdated(sub: Stripe.Subscription) {
+  let userId = sub.metadata?.userId || await getUserIdFromCustomer(sub.customer);
+  if (!userId) return;
 
   const updateData: any = {
-    subscriptionStatus: subscription.status,
-    currentPeriodEnd: dateToTimestamp(new Date(subscription.current_period_end * 1000)),
-    cancelAtPeriodEnd: subscription.cancel_at_period_end || false,
-    lastPaymentFailed: false,
+    uid: userId,
+    subscriptionStatus: sub.status,
+    currentPeriodEnd: safeDateToTimestamp(sub.current_period_end),
+    trialEnd: safeDateToTimestamp(sub.trial_end),
+    cancelAtPeriodEnd: sub.cancel_at_period_end || false,
     subscriptionUpdatedAt: timestamp(),
   };
 
-  // Mettre à jour trialEnd si en période d'essai
-  if (subscription.trial_end) {
-    updateData.trialEnd = dateToTimestamp(new Date(subscription.trial_end * 1000));
-  }
-
-  await db.collection('users').doc(userId).update(updateData);
-
-  console.log(`✅ User ${userId} subscription updated: ${subscription.status}`);
+  await db.collection('users').doc(userId).set(updateData, { merge: true });
+  console.log(`✅ User ${userId} subscription updated: ${sub.status}`);
 }
 
-/**
- * Abonnement supprimé/annulé
- * Mise à jour du statut de l'abonnement à 'canceled'
- */
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  console.log('❌ Subscription deleted:', subscription.id);
+async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
+  let userId = sub.metadata?.userId || await getUserIdFromCustomer(sub.customer);
+  if (!userId) return;
 
-  let userId = subscription.metadata?.userId;
-  
-  // Si pas de userId dans subscription metadata, essayer de le récupérer depuis customer
-  if (!userId && subscription.customer) {
-    try {
-      const customer = await stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer;
-      userId = customer.metadata?.userId;
-    } catch (error) {
-      console.error('Error fetching customer for subscription:', error);
-    }
-  }
-  
-  if (!userId) {
-    console.error('❌ No userId found in subscription or customer metadata');
-    return;
-  }
-
-  await db.collection('users').doc(userId).update({
+  await db.collection('users').doc(userId).set({
     subscriptionStatus: 'canceled',
     subscriptionId: null,
     currentPeriodEnd: null,
     trialEnd: null,
     cancelAtPeriodEnd: false,
-    lastPaymentFailed: false,
     subscriptionUpdatedAt: timestamp(),
-  });
-
+  }, { merge: true });
+  
   console.log(`✅ User ${userId} subscription canceled`);
 }
 
-/**
- * Échec de paiement
- * Marque l'utilisateur comme ayant une erreur de paiement
- * L'abonnement est généralement mis en suspens après quelques tentatives
- */
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  console.error('⚠️ Payment failed for invoice:', invoice.id);
+  const userId = await getUserIdFromCustomer(invoice.customer);
+  if (!userId) return;
 
-  const customerId = invoice.customer as string;
-  
-  // Récupérer le client pour obtenir l'userId
-  const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
-  const userId = customer.metadata?.userId;
-
-  if (!userId) {
-    console.error('❌ No userId in customer metadata');
-    return;
-  }
-
-  // Marquer comme impayé et enregistrer l'erreur
-  await db.collection('users').doc(userId).update({
+  await db.collection('users').doc(userId).set({
     lastPaymentFailed: true,
     lastPaymentFailedAt: timestamp(),
-    subscriptionUpdatedAt: timestamp(),
-    subscriptionStatus: 'past_due', // Marquer comme en retard de paiement
-  });
-
-  console.log(`⚠️ User ${userId} payment failed - action required`);
-  // TODO: Envoyer une notification push à l'utilisateur pour relancer le paiement
+    subscriptionStatus: 'past_due',
+  }, { merge: true });
+  
+  console.log(`⚠️ User ${userId} payment failed`);
 }
 
-/**
- * Facture payée avec succès
- * Remet l'abonnement en bon état après paiement
- */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  console.log('✅ Invoice paid:', invoice.id);
+  const userId = await getUserIdFromCustomer(invoice.customer);
+  if (!userId) return;
 
-  const customerId = invoice.customer as string;
-  if (!customerId) {
-    console.error('❌ No customerId in invoice');
-    return;
-  }
-
-  const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
-  let userId = customer.metadata?.userId;
-
-  if (!userId) {
-    console.error('❌ No userId in customer metadata for invoice:', invoice.id);
-    return;
-  }
-
-  // Récupérer l'abonnement pour mettre à jour la période
   if (invoice.subscription) {
-    const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-    
-    await db.collection('users').doc(userId).update({
-      subscriptionStatus: subscription.status,
-      currentPeriodEnd: dateToTimestamp(new Date(subscription.current_period_end * 1000)),
-      lastPaymentFailed: false,
-      subscriptionUpdatedAt: timestamp(),
-    });
+     const sub = await stripe.subscriptions.retrieve(invoice.subscription as string);
+     await db.collection('users').doc(userId).set({
+        subscriptionStatus: sub.status,
+        currentPeriodEnd: safeDateToTimestamp(sub.current_period_end),
+        lastPaymentFailed: false
+     }, { merge: true });
   } else {
-    // Juste mettre à jour le statut de paiement
-    await db.collection('users').doc(userId).update({
-      lastPaymentFailed: false,
-      subscriptionUpdatedAt: timestamp(),
-    });
+     await db.collection('users').doc(userId).set({
+        lastPaymentFailed: false
+     }, { merge: true });
   }
-
-  console.log(`✅ User ${userId} payment successful - subscription renewed`);
+  console.log(`✅ User ${userId} invoice paid`);
 }
-
-export default app;

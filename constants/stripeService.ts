@@ -6,8 +6,10 @@
 import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import { getAuth } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { Linking, NativeModules, Platform } from 'react-native';
 import { STRIPE_CONFIG } from '../constants/stripeConfig';
+import { db } from './firebase'; // Assurez-vous que le fichier firebase.js est bien dans le même dossier
 
 export interface CreateCheckoutSessionParams {
   priceId: string;
@@ -260,15 +262,39 @@ export class StripeService {
    */
   static async hasActiveSubscription(userId: string): Promise<boolean> {
     try {
-      const status = await this.getSubscriptionStatus(userId);
-      return status.hasActiveSubscription;
+      // On récupère le document utilisateur directement
+      const userDocRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userDocRef);
+
+      if (!userDoc.exists()) return false;
+
+      const data = userDoc.data();
+      const now = Date.now() / 1000; // Maintenant en secondes
+
+      // 1. Vérification du statut : on accepte 'active' ET 'trialing'
+      const status = data.subscriptionStatus;
+      const isValidStatus = status === 'active' || status === 'trialing';
+
+      if (!isValidStatus) return false;
+
+      // 2. Vérification des dates (C'est ici que ça bloquait avant)
+      // On regarde soit la fin de période normale, soit la fin de l'essai
+      const currentPeriodEnd = data.currentPeriodEnd?.seconds || 0;
+      const trialEnd = data.trialEnd?.seconds || 0;
+
+      // Si l'une des deux dates est dans le futur, c'est bon
+      const isDateValid = currentPeriodEnd > now || trialEnd > now;
+
+      console.log(`🔍 Vérif Abo: Status=${status}, ValidDate=${isDateValid} (Fin Période: ${currentPeriodEnd}, Fin Essai: ${trialEnd})`);
+
+      return isDateValid;
+
     } catch (error) {
       console.error('Error checking subscription:', error);
       return false;
     }
   }
 }
-
 /**
  * Hook personnalisé pour gérer le Deep Linking après paiement
  * À utiliser dans le composant racine de l'app

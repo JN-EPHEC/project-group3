@@ -8,13 +8,13 @@ import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '../constants/stripeConfig';
