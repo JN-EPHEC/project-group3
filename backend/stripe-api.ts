@@ -246,25 +246,42 @@ app.post('/api/create-portal-session', async (req, res) => {
 app.get('/api/subscription-status/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
+    // 1) Essayer via Firestore: utiliser `stripeCustomerId` si présent
+    const userSnap = await db.collection('users').doc(userId).get();
+    const userData = userSnap.exists ? userSnap.data() : undefined;
+    const customerIdFromFirestore = userData?.stripeCustomerId as string | undefined;
 
-    // Rechercher le client Stripe via les métadonnées (search est plus efficace)
-    const customers = await stripe.customers.search({
-      query: `metadata['userId']:'${userId}'`,
-      limit: 1,
-    });
+    let customer: Stripe.Customer | undefined;
 
-    let customer = customers.data[0];
+    if (customerIdFromFirestore) {
+      try {
+        const resp = await stripe.customers.retrieve(customerIdFromFirestore);
+        if ((resp as any)?.deleted) {
+          console.warn('Stripe customer ID points to a deleted customer, falling back');
+        } else {
+          customer = resp as Stripe.Customer;
+        }
+      } catch (e) {
+        console.warn('Stripe customer from Firestore not retrievable, will fallback to search:', e);
+      }
+    }
 
-    // ✅ Fallback: certains anciens clients n'ont pas encore userId en metadata -> rechercher par email Firestore
+    // 2) Fallback: rechercher via metadata userId
     if (!customer) {
-      const userSnap = await db.collection('users').doc(userId).get();
-      const userEmail = userSnap.exists ? (userSnap.data()?.email || userSnap.data()?.userEmail) : undefined;
+      const customers = await stripe.customers.search({
+        query: `metadata['userId']:'${userId}'`,
+        limit: 1,
+      });
+      customer = customers.data[0];
+    }
 
+    // 3) Fallback: rechercher via email Firestore si metadata introuvable
+    if (!customer && userData) {
+      const userEmail = userData.email || userData.userEmail;
       if (userEmail) {
         const byEmail = await stripe.customers.list({ email: userEmail, limit: 1 });
         if (byEmail.data.length) {
           customer = byEmail.data[0];
-
           // Mettre à jour les métadonnées pour les prochaines requêtes
           if (!customer.metadata?.userId) {
             await stripe.customers.update(customer.id, {
@@ -380,6 +397,133 @@ app.post('/api/sync-subscription/:userId', async (req, res) => {
     });
   }
 });
+
+  /**
+   * GET /api/subscription-details/:userId
+   * Récupère tous les détails de l'abonnement depuis Stripe
+   * Inclut les dates de début, fin, prix, type, période d'essai, etc.
+   */
+  app.get('/api/subscription-details/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      // 1) Essayer via Firestore avec stripeCustomerId en priorité
+      const userSnap = await db.collection('users').doc(userId).get();
+      const userData = userSnap.exists ? userSnap.data() : undefined;
+      const customerIdFromFirestore = userData?.stripeCustomerId as string | undefined;
+
+      let customer: Stripe.Customer | undefined;
+      if (customerIdFromFirestore) {
+        try {
+          const resp = await stripe.customers.retrieve(customerIdFromFirestore);
+          if ((resp as any)?.deleted) {
+            console.warn('Stripe customer ID points to a deleted customer, falling back');
+          } else {
+            customer = resp as Stripe.Customer;
+          }
+        } catch (e) {
+          console.warn('Stripe customer from Firestore not retrievable, will fallback to search:', e);
+        }
+      }
+
+      // 2) Fallback: rechercher via metadata userId
+      if (!customer) {
+        const customers = await stripe.customers.search({
+          query: `metadata['userId']:'${userId}'`,
+          limit: 1,
+        });
+        customer = customers.data[0];
+      }
+
+      // 3) Fallback: rechercher via email Firestore si metadata introuvable
+      if (!customer && userData) {
+        const userEmail = userData.email || userData.userEmail;
+        if (userEmail) {
+          const byEmail = await stripe.customers.list({ email: userEmail, limit: 1 });
+          if (byEmail.data.length) {
+            customer = byEmail.data[0];
+            // Mettre à jour les métadonnées pour les prochaines requêtes
+            if (!customer.metadata?.userId) {
+              await stripe.customers.update(customer.id, {
+                metadata: {
+                  ...customer.metadata,
+                  userId,
+                },
+              });
+            }
+          }
+        }
+      }
+
+      if (!customer) {
+        return res.status(404).json({
+          error: 'Client Stripe non trouvé',
+        });
+      }
+    
+      // Récupérer tous les abonnements
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customer.id,
+        status: 'all',
+        limit: 10,
+      });
+
+      // Trouver l'abonnement actif ou en période d'essai
+      const activeSubscription = subscriptions.data.find(
+        sub => sub.status === 'active' || sub.status === 'trialing'
+      );
+
+      if (!activeSubscription) {
+        return res.status(404).json({
+          error: 'Aucun abonnement actif trouvé',
+        });
+      }
+
+      // Récupérer les détails du prix
+      const priceId = activeSubscription.items.data[0]?.price.id;
+      const price = activeSubscription.items.data[0]?.price;
+    
+      // Déterminer le type d'abonnement (monthly/yearly)
+      let subscriptionType: 'monthly' | 'yearly' = 'monthly';
+      let priceAmount = 0;
+    
+      if (price) {
+        priceAmount = price.unit_amount ? price.unit_amount / 100 : 0;
+        subscriptionType = price.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+      }
+
+      // Retourner tous les détails
+      res.json({
+        success: true,
+        subscription: {
+          id: activeSubscription.id,
+          status: activeSubscription.status,
+          type: subscriptionType,
+          price: priceAmount,
+          priceId: priceId,
+          currency: price?.currency || 'eur',
+          interval: price?.recurring?.interval || 'month',
+          currentPeriodStart: activeSubscription.current_period_start,
+          currentPeriodEnd: activeSubscription.current_period_end,
+          trialStart: activeSubscription.trial_start,
+          trialEnd: activeSubscription.trial_end,
+          cancelAtPeriodEnd: activeSubscription.cancel_at_period_end,
+          canceledAt: activeSubscription.canceled_at,
+          created: activeSubscription.created,
+          startDate: activeSubscription.start_date,
+        },
+        customer: {
+          id: customer.id,
+          email: customer.email,
+        },
+      });
+
+    } catch (error: any) {
+      console.error('Error fetching subscription details:', error);
+      res.status(500).json({
+        error: error.message || 'An error occurred',
+      });
+    }
+  });
 
 // Démarrer le serveur (pour développement local)
 const PORT = Number(process.env.PORT) || 3000;

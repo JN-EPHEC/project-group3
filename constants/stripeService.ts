@@ -309,6 +309,34 @@ export class StripeService {
       return false;
     }
   }
+
+    /**
+     * Récupère tous les détails de l'abonnement depuis Stripe API
+     * Inclut les dates de début, fin, prix, type, période d'essai, etc.
+     */
+    static async getSubscriptionDetails(userId: string) {
+      try {
+        const response = await fetch(`${this.apiUrl}/api/subscription-details/${userId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erreur lors de la récupération des détails');
+        }
+
+        const data = await response.json();
+        return data;
+
+      } catch (error: any) {
+        console.error('Error fetching subscription details:', error);
+        throw error;
+      }
+    }
 }
 /**
  * Hook personnalisé pour gérer le Deep Linking après paiement

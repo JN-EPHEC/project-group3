@@ -13,13 +13,13 @@ import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SUBSCRIPTION_PLANS } from '../constants/stripeConfig';
@@ -60,10 +60,10 @@ export default function ManageSubscriptionScreen() {
         return;
       }
 
-      // Récupérer les informations d'abonnement
+        // Récupérer les informations depuis Firebase ET Stripe
       console.log('📱 Récupération des infos d\'abonnement pour:', user.uid);
       
-      // Utiliser la même méthode que la page Profil
+        // D'abord vérifier qu'il y a un abonnement actif
       const subInfo: any = await StripeService.getSubscriptionStatus(user.uid);
       console.log('📊 Infos d\'abonnement récupérées:', JSON.stringify(subInfo, null, 2));
       
@@ -73,33 +73,83 @@ export default function ManageSubscriptionScreen() {
         return;
       }
       
-      console.log('✅ hasActiveSubscription:', subInfo.hasActiveSubscription);
-      console.log('✅ subscription:', subInfo.subscription);
-      
       if (!subInfo.hasActiveSubscription || !subInfo.subscription) {
         setError('Aucun abonnement actif trouvé');
         return;
       }
 
-      const sub: any = subInfo.subscription;
+        // Récupérer les détails complets depuis Stripe via l'API backend
+        let detailedInfo: any = null;
+        try {
+          detailedInfo = await StripeService.getSubscriptionDetails(user.uid);
+          console.log('🔍 Détails complets de l\'abonnement:', JSON.stringify(detailedInfo, null, 2));
+        } catch (apiError: any) {
+          console.error('⚠️ Impossible de récupérer les détails depuis Stripe API:', apiError);
+          // On continue avec les données de Firebase uniquement
+        }
+
+        let subscriptionType: 'monthly' | 'yearly' | 'unknown' = 'unknown';
+        let price = 0;
+        let startDate: Date | null = null;
+        let endDate: Date | null = null;
+        let trialEndDate: Date | null = null;
+        let status = subInfo.subscription.status || 'unknown';
       
-      // Déterminer le type d'abonnement en récupérant les détails complets depuis Stripe
-      let subscriptionType: 'monthly' | 'yearly' | 'unknown' = 'unknown';
-      let price = 0;
+        // Si on a les détails complets depuis Stripe, les utiliser
+        if (detailedInfo && detailedInfo.success && detailedInfo.subscription) {
+          const stripeSub = detailedInfo.subscription;
+        
+          subscriptionType = stripeSub.type || 'unknown';
+          price = stripeSub.price || 0;
+        
+          // Dates de début et fin depuis Stripe (plus précises)
+          if (stripeSub.currentPeriodStart) {
+            startDate = new Date(stripeSub.currentPeriodStart * 1000);
+          } else if (stripeSub.startDate) {
+            startDate = new Date(stripeSub.startDate * 1000);
+          } else if (stripeSub.created) {
+            startDate = new Date(stripeSub.created * 1000);
+          }
+        
+          if (stripeSub.currentPeriodEnd) {
+            endDate = new Date(stripeSub.currentPeriodEnd * 1000);
+          }
+        
+          // Période d'essai
+          if (stripeSub.trialEnd && stripeSub.trialEnd > 0) {
+            trialEndDate = new Date(stripeSub.trialEnd * 1000);
+          }
+        
+          status = stripeSub.status;
+        
+        } else {
+          // Fallback: utiliser les données de Firebase
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('../constants/firebase');
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
       
-      try {
-        const stripeStatus = await StripeService.getSubscriptionStatus(user.uid);
-        if (stripeStatus.subscription) {
-          const subscriptionId = stripeStatus.subscription.id;
-          
-          // Comparer avec les price IDs connus
-          // Note: Pour une vraie implémentation, il faudrait récupérer le price_id depuis Stripe
-          // Pour l'instant, on estime basé sur le montant ou les métadonnées
-          
-          // Essayer de deviner basé sur le currentPeriodEnd
-          const periodStart = new Date((stripeStatus.subscription as any).current_period_start * 1000);
-          const periodEnd = new Date(stripeStatus.subscription.currentPeriodEnd * 1000);
-          const periodDays = Math.round((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+          // Récupérer la date de fin de période
+          if (subInfo.subscription.currentPeriodEnd) {
+            endDate = new Date(subInfo.subscription.currentPeriodEnd * 1000);
+        }
+        
+        // Récupérer la date de fin d'essai si elle existe
+          if (subInfo.subscription.trialEnd && subInfo.subscription.trialEnd > 0) {
+            trialEndDate = new Date(subInfo.subscription.trialEnd * 1000);
+        }
+        
+          // Récupérer la date de début depuis subscriptionUpdatedAt
+        if (userData.subscriptionUpdatedAt?.seconds) {
+          startDate = new Date(userData.subscriptionUpdatedAt.seconds * 1000);
+        }
+        
+        // Calculer le type d'abonnement basé sur la période
+        if (endDate && startDate) {
+          const periodDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
           
           if (periodDays > 200) {
             subscriptionType = 'yearly';
@@ -108,51 +158,50 @@ export default function ManageSubscriptionScreen() {
             subscriptionType = 'monthly';
             price = SUBSCRIPTION_PLANS.monthly.price;
           }
+          } else if (endDate) {
+            // Si on n'a pas de date de début, l'estimer
+          const now = new Date();
+          const periodDays = Math.round((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (periodDays > 200) {
+            subscriptionType = 'yearly';
+            price = SUBSCRIPTION_PLANS.yearly.price;
+              startDate = new Date(endDate);
+              startDate.setFullYear(startDate.getFullYear() - 1);
+          } else {
+            subscriptionType = 'monthly';
+            price = SUBSCRIPTION_PLANS.monthly.price;
+              startDate = new Date(endDate);
+              startDate.setMonth(startDate.getMonth() - 1);
+          }
         }
-      } catch (e) {
-        console.error('Erreur lors de la récupération des détails Stripe:', e);
       }
+        }
 
-      // Calculer les dates
       const now = new Date();
-      // StripeService retourne des timestamps en secondes (epoch)
-      let endDate: Date | null = null;
-      if (sub.currentPeriodEnd) {
-        // currentPeriodEnd est un timestamp en secondes
-        endDate = new Date(sub.currentPeriodEnd * 1000);
-      }
       
-      // Estimer la date de début (date de fin - durée de la période)
-      let startDate: Date | null = null;
-      if (endDate) {
-        startDate = new Date(endDate);
-        if (subscriptionType === 'yearly') {
-          startDate.setFullYear(startDate.getFullYear() - 1);
-        } else if (subscriptionType === 'monthly') {
-          startDate.setMonth(startDate.getMonth() - 1);
-        }
-      }
-
       // Calculer la durée depuis l'abonnement
       const daysSubscribed = startDate 
         ? Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
         : 0;
 
       // Calculer les jours restants
-      const daysRemaining = endDate
-        ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      // Si en période d'essai, utiliser trialEnd, sinon currentPeriodEnd
+        const relevantEndDate = status === 'trialing' && trialEndDate ? trialEndDate : endDate;
+      const daysRemaining = relevantEndDate
+        ? Math.ceil((relevantEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
         : 0;
 
       setDetails({
         type: subscriptionType,
-        status: sub.status || 'unknown',
+          status: status,
         startDate,
-        endDate,
+        endDate: relevantEndDate,
         daysSubscribed,
         daysRemaining,
         price,
-        isTrialing: sub.status === 'trialing',
-        cancelAtPeriodEnd: sub.cancelAtPeriodEnd || false,
+          isTrialing: status === 'trialing',
+          cancelAtPeriodEnd: subInfo.subscription.cancelAtPeriodEnd || false,
       });
 
     } catch (error: any) {
