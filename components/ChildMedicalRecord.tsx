@@ -183,6 +183,7 @@ export default function ChildMedicalRecord({
 
   // Temporary Inputs
   const [newAllergyName, setNewAllergyName] = useState('');
+  const [newDiseaseName, setNewDiseaseName] = useState('');
 
   const toggleSection = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -212,7 +213,47 @@ export default function ChildMedicalRecord({
     setNewAllergyName('');
   };
 
+  const addDisease = () => {
+    if(!newDiseaseName.trim()) return;
+    setRecord(p => ({...p, history: {...p.history, diseases: [...p.history.diseases, newDiseaseName]}}));
+    setNewDiseaseName('');
+  };
+
+  const removeDisease = (index: number) => {
+    const newArr = [...record.history.diseases];
+    newArr.splice(index, 1);
+    setRecord(p => ({...p, history: {...p.history, diseases: newArr}}));
+  };
+
   const sanitizeFileName = (name: string) => name.replace(/[^a-z0-9._-]/gi, '_');
+
+  const calculateAge = (dateString: string): string => {
+    try {
+      // Parse date in format DD/MM/YYYY
+      const parts = dateString.split('/');
+      if (parts.length !== 3) return 'N/A';
+      
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed in Date
+      const year = parseInt(parts[2], 10);
+      
+      if (isNaN(day) || isNaN(month) || isNaN(year)) return 'N/A';
+      
+      const birthDate = new Date(year, month, day);
+      const today = new Date();
+      
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      return age >= 0 ? `${age} ans` : 'N/A';
+    } catch (error) {
+      return 'N/A';
+    }
+  };
 
   const handlePickFile = async () => {
     try {
@@ -289,7 +330,7 @@ export default function ChildMedicalRecord({
                 {record.general.fullName || 'Nouvelle fiche'}
               </Text>
               <Text style={[styles.profileSub, { color: colors.textSecondary }]}>
-                {record.general.dateOfBirth}
+                {record.general.dateOfBirth} • {calculateAge(record.general.dateOfBirth)}
               </Text>
             </View>
             <TouchableOpacity 
@@ -351,6 +392,25 @@ export default function ChildMedicalRecord({
                   />
                 </View>
                 
+                <View style={[styles.separator, { backgroundColor: colors.border }]} />
+
+                <InputItemBig 
+                  label="Date de Naissance" 
+                  value={record.general.dateOfBirth} 
+                  isEdit={editMode} 
+                  onChange={(t: string) => updateGeneral('dateOfBirth', t)} 
+                  colors={colors} 
+                />
+                
+                <View style={{ marginTop: 16 }}>
+                  <View>
+                    <Text style={[styles.label, {color: colors.textSecondary}]}>Âge</Text>
+                    <Text style={[styles.valueTextBig, {color: colors.tint, fontWeight: '700'}]}>
+                      {calculateAge(record.general.dateOfBirth)}
+                    </Text>
+                  </View>
+                </View>
+
                 <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
                 <InputItemBig 
@@ -459,16 +519,40 @@ export default function ChildMedicalRecord({
                 <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
                 <Text style={[styles.subSectionTitle, {color: colors.textSecondary}]}>Conditions & Maladies</Text>
-                 {record.history.diseases.length > 0 ? (
-                    record.history.diseases.map((d, i) => (
-                      <View key={i} style={styles.bulletRow}>
-                         <IconSymbol name="circle.fill" size={8} color={colors.textSecondary} />
-                         <Text style={[styles.bulletText, {color: colors.text}]}>{d}</Text>
-                      </View>
-                    ))
-                 ) : (
-                   <Text style={[styles.emptyText, {color: colors.textSecondary}]}>Aucune condition chronique.</Text>
-                 )}
+                
+                <View style={styles.chipContainer}>
+                  {record.history.diseases.map((d, i) => (
+                    <View key={i} style={[styles.chip, { backgroundColor: colors.tint + '15', borderColor: colors.tint }]}>
+                      <Text style={[styles.chipText, { color: colors.tint }]}>{d}</Text>
+                      {editMode && (
+                        <TouchableOpacity 
+                          style={{ padding: 4 }}
+                          onPress={() => removeDisease(i)}
+                        >
+                          <IconSymbol name="xmark.circle.fill" size={18} color={colors.tint} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  {record.history.diseases.length === 0 && !editMode && (
+                    <Text style={[styles.emptyText, {color: colors.textSecondary}]}>Aucune condition chronique.</Text>
+                  )}
+                </View>
+
+                {editMode && (
+                  <View style={styles.addInlineRow}>
+                    <TextInput 
+                      style={[styles.inputLarge, {color: colors.text, borderColor: colors.border, flex: 1, backgroundColor: colors.background}]} 
+                      placeholder="Ajouter une condition/maladie..."
+                      placeholderTextColor={colors.textSecondary}
+                      value={newDiseaseName}
+                      onChangeText={setNewDiseaseName}
+                    />
+                    <TouchableOpacity onPress={addDisease} style={[styles.addButtonSquare, {backgroundColor: colors.tint}]}>
+                      <IconSymbol name="plus" size={24} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
           </View>
